@@ -1,18 +1,16 @@
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import { app, BrowserWindow } from 'electron';
 import { is } from '@electron-toolkit/utils';
 import { discoverLcuConnection } from './lcu/discovery';
 import { createLcuClient } from './lcu/http-client';
 import { registerMatchIpc } from './ipc/register-match-ipc';
+import { registerSettingsIpc } from './ipc/register-settings-ipc';
 import { MatchService } from './match/match-service';
+import { MatchCache, migrateDatabase } from './cache/database';
+import { SettingsService } from './settings/settings-service';
 
-registerMatchIpc({
-  async loadLiveMatch(scope, onPlayer) {
-    const connection = await discoverLcuConnection();
-    if (!connection) throw new Error('League client is unavailable');
-    return new MatchService(createLcuClient(connection)).loadLiveMatch(scope, onPlayer);
-  }
-});
+let database: Database.Database | undefined;
 
 function createWindow(): void {
   const window = new BrowserWindow({
@@ -34,11 +32,27 @@ function createWindow(): void {
 }
 
 void app.whenReady().then(() => {
+  database = new Database(join(app.getPath('userData'), 'lol-viewer.sqlite3'));
+  migrateDatabase(database);
+  const cache = new MatchCache(database);
+  registerSettingsIpc(new SettingsService(database, cache));
+  registerMatchIpc({
+    async loadLiveMatch(scope, onPlayer) {
+      const connection = await discoverLcuConnection();
+      if (!connection) throw new Error('League client is unavailable');
+      return new MatchService(createLcuClient(connection), { cache }).loadLiveMatch(scope, onPlayer);
+    }
+  });
   createWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on('before-quit', () => {
+  database?.close();
+  database = undefined;
 });
 
 app.on('window-all-closed', () => {

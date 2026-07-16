@@ -1,13 +1,15 @@
 import type Database from 'better-sqlite3';
+import { z } from 'zod';
 import type { PlayerSnapshot, QueueScope } from '../../shared/domain';
 import { playerSnapshotSchema } from '../../shared/ipc';
 
 const PLAYER_HISTORY_TTL_MS = 15 * 60_000;
 
-interface SnapshotRow {
-  snapshot_json: string;
-  cached_at: number;
-}
+const snapshotRowSchema = z.object({
+  snapshot_json: z.string(),
+  cached_at: z.number().int().nonnegative()
+}).strict();
+const cacheTimeSchema = z.number().int().nonnegative();
 
 export function migrateDatabase(database: Database.Database): void {
   database.transaction(() => {
@@ -48,22 +50,29 @@ export class MatchCache {
   constructor(private readonly database: Database.Database) {}
 
   get(playerId: string, scope: QueueScope, now = Date.now()): PlayerSnapshot | null {
-    const row = this.database
+    const rowResult = snapshotRowSchema.safeParse(this.database
       .prepare('SELECT snapshot_json, cached_at FROM player_snapshots WHERE player_id = ? AND scope = ?')
-      .get(playerId, scope) as SnapshotRow | undefined;
-    if (!row || now - row.cached_at > PLAYER_HISTORY_TTL_MS) return null;
-    return playerSnapshotSchema.parse(JSON.parse(row.snapshot_json));
+      .get(playerId, scope));
+    if (!rowResult.success) return null;
+    const row = rowResult.data;
+    if (row.cached_at > now || now - row.cached_at > PLAYER_HISTORY_TTL_MS) return null;
+    try {
+      return playerSnapshotSchema.parse(JSON.parse(row.snapshot_json));
+    } catch {
+      return null;
+    }
   }
 
   put(snapshot: PlayerSnapshot, cachedAt = Date.now()): void {
     const validated = playerSnapshotSchema.parse(snapshot);
+    const validatedCachedAt = cacheTimeSchema.parse(cachedAt);
     this.database.prepare(`
       INSERT INTO player_snapshots (player_id, scope, snapshot_json, cached_at)
       VALUES (?, ?, ?, ?)
       ON CONFLICT(player_id, scope) DO UPDATE SET
         snapshot_json = excluded.snapshot_json,
         cached_at = excluded.cached_at
-    `).run(validated.playerId, validated.scope, JSON.stringify(validated), cachedAt);
+    `).run(validated.playerId, validated.scope, JSON.stringify(validated), validatedCachedAt);
   }
 
   clearPlayerSnapshots(): void {

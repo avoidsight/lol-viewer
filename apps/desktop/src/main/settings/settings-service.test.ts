@@ -7,21 +7,21 @@ describe('SettingsService', () => {
   it('persists validated partial setting updates', () => {
     const database = new Database(':memory:');
     migrateDatabase(database);
-    const service = new SettingsService(database);
+    const service = new SettingsService(database, new MatchCache(database));
 
     expect(service.update({ autoOpenLiveMatch: false })).toEqual({
       queueScope: 'ranked-solo',
       autoOpenLiveMatch: false,
       showLaneDifferences: true
     });
-    expect(new SettingsService(database).get().autoOpenLiveMatch).toBe(false);
+    expect(new SettingsService(database, new MatchCache(database)).get().autoOpenLiveMatch).toBe(false);
     expect(() => service.update({ queueScope: 'invalid' } as never)).toThrow();
   });
 
   it('does not expose mutable default settings state', () => {
     const database = new Database(':memory:');
     migrateDatabase(database);
-    const service = new SettingsService(database);
+    const service = new SettingsService(database, new MatchCache(database));
 
     (service.get() as { queueScope: string }).queueScope = 'invalid';
 
@@ -32,7 +32,7 @@ describe('SettingsService', () => {
     const database = new Database(':memory:');
     migrateDatabase(database);
     const cache = new MatchCache(database);
-    const service = new SettingsService(database);
+    const service = new SettingsService(database, cache);
     service.update({ queueScope: 'ranked-solo' });
     cache.put({
       playerId: 'player-1', displayName: 'Player', teamId: 100, lane: 'TOP', championId: 1,
@@ -45,5 +45,14 @@ describe('SettingsService', () => {
 
     expect(service.get().queueScope).toBe('ranked-solo');
     expect(cache.get('player-1', 'ranked-solo')).toBeNull();
+  });
+
+  it('rejects corrupt persisted boolean values instead of coercing them', () => {
+    const database = new Database(':memory:');
+    migrateDatabase(database);
+    database.prepare('INSERT INTO app_settings VALUES (?, ?, ?, ?)')
+      .run(1, 'ranked-solo', 2, 1);
+
+    expect(() => new SettingsService(database, new MatchCache(database)).get()).toThrow();
   });
 });

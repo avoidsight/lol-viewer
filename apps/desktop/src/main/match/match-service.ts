@@ -26,6 +26,12 @@ const lanes = new Set<Lane>(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'UN
 
 export interface MatchServiceOptions {
   sleep?: (milliseconds: number) => Promise<void>;
+  cache?: MatchSnapshotCache;
+}
+
+export interface MatchSnapshotCache {
+  get(playerId: string, scope: QueueScope): PlayerSnapshot | null;
+  put(snapshot: PlayerSnapshot): void;
 }
 
 function laneOf(value: string | undefined): Lane {
@@ -51,9 +57,11 @@ async function mapLimit<T, R>(items: T[], limit: number, mapper: (item: T) => Pr
 
 export class MatchService {
   private readonly sleep: (milliseconds: number) => Promise<void>;
+  private readonly cache: MatchSnapshotCache | undefined;
 
   constructor(private readonly client: LcuClient, options: MatchServiceOptions = {}) {
     this.sleep = options.sleep ?? ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
+    this.cache = options.cache;
   }
 
   async loadLiveMatch(scope: QueueScope, onPlayer: (player: PlayerSnapshot) => void): Promise<LiveMatch> {
@@ -80,12 +88,15 @@ export class MatchService {
         scope,
         updatedAt: Date.now()
       };
-      let matches: MatchSummary[] | null;
-      try {
-        const rawHistory = await this.getHistoryWithRetry(base.playerId);
-        matches = adaptMatchHistory(rawHistory, scope);
-      } catch {
-        matches = null;
+      const cached = this.cache?.get(base.playerId, scope);
+      let matches: MatchSummary[] | null = cached?.matches ?? null;
+      if (!cached) {
+        try {
+          const rawHistory = await this.getHistoryWithRetry(base.playerId);
+          matches = adaptMatchHistory(rawHistory, scope);
+        } catch {
+          matches = null;
+        }
       }
       const recentMatches = matches ?? [];
       const wins = recentMatches.filter((match) => match.win).length;
@@ -104,6 +115,7 @@ export class MatchService {
         status: matches === null ? 'unavailable' : 'ready',
         ...(matches === null ? { error: 'Player history is unavailable' } : {})
       };
+      if (player.status === 'ready' && !cached) this.cache?.put(player);
       try {
         onPlayer(player);
       } catch {

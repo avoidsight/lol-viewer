@@ -5,10 +5,14 @@
   "type": "module",
   "main": "./out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
-    "test": "vitest run --configLoader runner",
-    "typecheck": "tsc --noEmit"
+    "dev": "pnpm rebuild:native && electron-vite dev",
+    "build": "pnpm rebuild:native && electron-vite build",
+    "rebuild:native": "electron-rebuild -f -w better-sqlite3",
+    "rebuild:test-native": "node scripts/rebuild-node-sqlite.cjs",
+    "smoke:sqlite": "electron scripts/sqlite-smoke.cjs",
+    "test": "pnpm rebuild:test-native && vitest run --configLoader runner",
+    "typecheck": "tsc --noEmit",
+    "verify": "pnpm test && pnpm typecheck && pnpm rebuild:native && pnpm smoke:sqlite && electron-vite build"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
@@ -19,6 +23,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.2.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@types/better-sqlite3": "^7.6.13",

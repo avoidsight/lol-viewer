@@ -44,4 +44,48 @@ describe('MatchCache', () => {
 
     expect(cache.get(snapshot.playerId, 'ranked-solo', now)).toEqual(snapshot);
   });
+
+  it('isolates player and scope keys and overwrites the same key', () => {
+    const database = new Database(':memory:');
+    migrateDatabase(database);
+    const cache = new MatchCache(database);
+    cache.put(snapshot, 1);
+    cache.put({ ...snapshot, playerId: 'player-2', displayName: 'Two' }, 1);
+    cache.put({ ...snapshot, displayName: 'Updated' }, 2);
+
+    expect(cache.get('player-1', 'ranked-solo', 2)?.displayName).toBe('Updated');
+    expect(cache.get('player-2', 'ranked-solo', 2)?.displayName).toBe('Two');
+    expect(cache.get('player-1', 'all', 2)).toBeNull();
+  });
+
+  it.each([
+    ['invalid JSON', '{'],
+    ['invalid snapshot', JSON.stringify({ playerId: 'incomplete' })]
+  ])('safely ignores %s rows', (_label, payload) => {
+    const database = new Database(':memory:');
+    migrateDatabase(database);
+    database.prepare('INSERT INTO player_snapshots VALUES (?, ?, ?, ?)')
+      .run('player-1', 'ranked-solo', payload, 1);
+
+    expect(new MatchCache(database).get('player-1', 'ranked-solo', 2)).toBeNull();
+  });
+
+  it('rejects malformed timestamps and future cache entries', () => {
+    const database = new Database(':memory:');
+    migrateDatabase(database);
+    database.prepare('INSERT INTO player_snapshots VALUES (?, ?, ?, ?)')
+      .run('player-1', 'ranked-solo', JSON.stringify(snapshot), 1.5);
+    expect(new MatchCache(database).get('player-1', 'ranked-solo', 2)).toBeNull();
+
+    database.prepare('UPDATE player_snapshots SET cached_at = ?').run(3);
+    expect(new MatchCache(database).get('player-1', 'ranked-solo', 2)).toBeNull();
+  });
+
+  it('runs migrations idempotently and records one version row', () => {
+    const database = new Database(':memory:');
+    migrateDatabase(database);
+    migrateDatabase(database);
+
+    expect(database.prepare('SELECT version FROM schema_migrations').all()).toEqual([{ version: 1 }]);
+  });
 });

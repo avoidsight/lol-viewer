@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { LcuClient } from '../lcu/http-client';
+import type { PlayerSnapshot } from '../../shared/domain';
 import { MatchService } from './match-service';
 
 const participants = Array.from({ length: 10 }, (_, index) => ({
@@ -130,5 +131,29 @@ describe('MatchService', () => {
     expect(result.players.every((player) => player.status === 'ready')).toBe(true);
     expect(updated).toHaveLength(10);
     expect(new Set(updated).size).toBe(10);
+  });
+
+  it('uses cached players before history calls and caches only successful snapshots', async () => {
+    const cached: PlayerSnapshot = {
+      playerId: '1', displayName: 'Old', teamId: 200, lane: 'JUNGLE', championId: 1,
+      scope: 'ranked-solo', matches: [], sampleSize: 0, wins: 0, losses: 0, winRate: 0,
+      currentChampionGames: 0, currentChampionWins: 0, currentChampionWinRate: 0,
+      status: 'ready', updatedAt: 1
+    };
+    const cache = { get: vi.fn((id) => id === '1' ? cached : null), put: vi.fn() };
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
+      if (path.includes('/5/')) throw new Error('unavailable');
+      return history;
+    });
+    const updated: string[] = [];
+
+    const result = await new MatchService({ get } as LcuClient, { cache }).loadLiveMatch('ranked-solo', (player) => updated.push(player.playerId));
+
+    expect(get.mock.calls.some(([path]) => String(path).includes('/1/'))).toBe(false);
+    expect(result.players[0].displayName).toBe('Player 1');
+    expect(updated).toHaveLength(10);
+    expect(cache.put).toHaveBeenCalledTimes(8);
+    expect(cache.put.mock.calls.every(([player]) => player.status === 'ready')).toBe(true);
   });
 });
