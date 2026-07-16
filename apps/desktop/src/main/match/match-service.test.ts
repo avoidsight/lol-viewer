@@ -11,6 +11,7 @@ const participants = Array.from({ length: 10 }, (_, index) => ({
 }));
 
 const history = {
+  gameVersion: '15.14.1',
   games: [
     {
       gameId: 1,

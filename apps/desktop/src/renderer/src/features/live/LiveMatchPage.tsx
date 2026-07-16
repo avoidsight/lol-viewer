@@ -1,21 +1,55 @@
+import type { ReactNode } from 'react';
 import type { Lane, PlayerSnapshot, QueueScope } from '../../../../shared/domain';
 import type { LiveMatch } from '../../../../shared/ipc';
 import PlayerCard from './PlayerCard';
 import './live-match.css';
 
 const lanes: Exclude<Lane, 'UNKNOWN'>[] = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'];
-const orderedTeam = (players: PlayerSnapshot[], teamId: number): PlayerSnapshot[] => lanes.flatMap((lane) => players.filter((player) => player.teamId === teamId && player.lane === lane));
 
-interface Props { match: LiveMatch; scope?: QueueScope; onScopeChange?: (scope: QueueScope) => void }
+interface Slot { lane: Exclude<Lane, 'UNKNOWN'>; player?: PlayerSnapshot; uncertain: boolean }
 
-export default function LiveMatchPage({ match, scope = 'ranked-solo', onScopeChange }: Props) {
-  const teamIds = [...new Set(match.players.map((player) => player.teamId))];
+export function teamSlots(players: PlayerSnapshot[]): Slot[] {
+  const remaining = [...players];
+  const slots: Slot[] = lanes.map((lane) => {
+    const matches = remaining.filter((player) => player.lane === lane);
+    if (matches.length !== 1) return { lane, uncertain: false };
+    const player = matches[0];
+    remaining.splice(remaining.indexOf(player), 1);
+    return { lane, player, uncertain: false };
+  });
+  for (const slot of slots) {
+    if (!slot.player && remaining.length) {
+      slot.player = remaining.shift();
+      slot.uncertain = true;
+    }
+  }
+  return slots;
+}
+
+interface Props {
+  match?: LiveMatch;
+  players?: PlayerSnapshot[];
+  scope?: QueueScope;
+  onScopeChange?: (scope: QueueScope) => void;
+  notice?: ReactNode;
+}
+
+export default function LiveMatchPage({ match, players = [], scope = 'ranked-solo', onScopeChange, notice }: Props) {
+  const visiblePlayers = match?.players ?? players;
+  const knownTeamIds = [...new Set(visiblePlayers.map((player) => player.teamId))];
+  const teamIds: (number | undefined)[] = knownTeamIds.every((teamId) => teamId === 100 || teamId === 200)
+    ? [100, 200]
+    : [knownTeamIds[0], knownTeamIds[1]];
   return (
     <main className="live-match-page">
       <div className="live-match-page__toolbar"><h1>实时对局</h1><div className="scope-switch" role="group" aria-label="战绩模式"><button type="button" aria-pressed={scope === 'ranked-solo'} onClick={() => onScopeChange?.('ranked-solo')}>单双排</button><button type="button" aria-pressed={scope === 'all'} onClick={() => onScopeChange?.('all')}>全部模式</button></div></div>
-      <div className="live-match-page__scroll" tabIndex={0} aria-label="双方对局比较"><div className="live-match-grid">
-        <section className="team-row" role="group" aria-label="我方队伍">{orderedTeam(match.players, teamIds[0]).map((player) => <PlayerCard key={player.playerId} player={player} />)}</section>
-        <section className="team-row" role="group" aria-label="敌方队伍">{orderedTeam(match.players, teamIds[1]).map((player) => <PlayerCard key={player.playerId} player={player} />)}</section>
+      {notice}
+      <div className="live-match-page__scroll" style={{ overflowX: 'auto' }} tabIndex={0} aria-label="双方对局比较"><div className="live-match-grid" style={{ minWidth: 1050 }}>
+        {teamIds.map((teamId, teamIndex) => <section key={teamIndex} className="team-row" role="group" aria-label={teamIndex === 0 ? '我方队伍' : '敌方队伍'}>
+          {teamSlots(teamId === undefined ? [] : visiblePlayers.filter((player) => player.teamId === teamId)).map((slot) => slot.player ?
+            <PlayerCard key={slot.player.playerId} player={slot.player} displayLane={slot.lane} uncertain={slot.uncertain} /> :
+            <article key={slot.lane} className="player-card player-card--placeholder" data-testid="player-slot" data-lane={slot.lane} aria-label={`${slot.lane} 玩家加载中`}><span>{slot.lane}</span><p>玩家加载中…</p></article>)}
+        </section>)}
       </div></div>
     </main>
   );

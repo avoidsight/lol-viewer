@@ -1,22 +1,39 @@
 import { useEffect, useState } from 'react';
-import type { QueueScope } from '../../shared/domain';
+import type { PlayerSnapshot, QueueScope } from '../../shared/domain';
 import type { LiveMatch, LolViewerApi } from '../../shared/ipc';
 import LiveMatchPage from './features/live/LiveMatchPage';
 
 declare global { interface Window { lolViewer?: LolViewerApi } }
 
+const scopeName = (scope: QueueScope): string => scope === 'ranked-solo' ? '单双排' : '全部模式';
+
 export default function App() {
-  const [scope, setScope] = useState<QueueScope>('ranked-solo');
+  const [requestedScope, setRequestedScope] = useState<QueueScope>('ranked-solo');
+  const [displayedScope, setDisplayedScope] = useState<QueueScope>('ranked-solo');
   const [match, setMatch] = useState<LiveMatch | null>(null);
+  const [progress, setProgress] = useState<PlayerSnapshot[]>([]);
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
 
   useEffect(() => {
     let active = true;
     const api = window.lolViewer;
-    if (!api) return;
-    void api.getLiveMatch(scope).then((nextMatch) => { if (active) setMatch(nextMatch); }).catch(() => { if (active) setMatch(null); });
-    return () => { active = false; };
-  }, [scope]);
+    if (!api) { setState('error'); return; }
+    setState('loading');
+    setProgress([]);
+    const unsubscribe = api.onPlayerUpdated((player) => {
+      if (!active || player.scope !== requestedScope) return;
+      setProgress((current) => [...current.filter((entry) => entry.playerId !== player.playerId), player]);
+    });
+    void api.getLiveMatch(requestedScope).then((nextMatch) => {
+      if (!active) return;
+      setMatch(nextMatch);
+      setDisplayedScope(requestedScope);
+      setProgress([]);
+      setState('ready');
+    }).catch(() => { if (active) setState('error'); });
+    return () => { active = false; unsubscribe(); };
+  }, [requestedScope]);
 
-  if (!match) return <main><h1>国服对局查看器</h1><p>等待英雄联盟客户端</p></main>;
-  return <LiveMatchPage match={match} scope={scope} onScopeChange={setScope} />;
+  const notice = state === 'loading' ? <p className="live-match-page__notice" role="status">正在加载{scopeName(requestedScope)}对局…</p> : state === 'error' ? <p className="live-match-page__notice live-match-page__notice--error" role="alert">{window.lolViewer ? `${scopeName(requestedScope)}对局加载失败，请重试` : '未连接英雄联盟客户端'}</p> : null;
+  return <LiveMatchPage match={match ?? undefined} players={match ? undefined : progress} scope={displayedScope} onScopeChange={setRequestedScope} notice={notice} />;
 }

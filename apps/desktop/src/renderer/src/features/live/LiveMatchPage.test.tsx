@@ -13,6 +13,7 @@ function matches(playerIndex: number, count = 10): MatchSummary[] {
     endedAt: 1_700_000_000_000 - index,
     durationSeconds: 1_800,
     championId: playerIndex * 10 + index + 1,
+    gameVersion: '15.14.1',
     win: index % 2 === 0,
     kills: index === 0 ? 8 : index,
     deaths: index === 0 ? 3 : 2,
@@ -68,6 +69,8 @@ describe('LiveMatchPage', () => {
     expect(screen.getAllByText('胜')).toHaveLength(50);
     expect(screen.getAllByText('负')).toHaveLength(50);
     expect(screen.getAllByRole('img', { name: /英雄 \d+/ })).toHaveLength(100);
+    expect(screen.getAllByRole('img')[0]).toHaveAttribute('src', expect.stringContaining('/15.14.1/'));
+    expect(screen.getAllByRole('img')[0]).not.toHaveAttribute('src', expect.stringContaining('/latest/'));
   });
 
   it('shows loading, unavailable, and fewer-than-ten states explicitly', () => {
@@ -90,10 +93,32 @@ describe('LiveMatchPage', () => {
 
   it('calls the scope switch callback from accessible controls', () => {
     const onScopeChange = vi.fn();
-    render(<LiveMatchPage match={fixtureLiveMatch} scope="ranked-solo" onScopeChange={onScopeChange} />);
+    const { rerender } = render(<LiveMatchPage match={fixtureLiveMatch} scope="ranked-solo" onScopeChange={onScopeChange} />);
 
     fireEvent.click(screen.getByRole('button', { name: '全部模式' }));
     expect(onScopeChange).toHaveBeenCalledWith('all');
     expect(screen.getByRole('button', { name: '单双排' })).toHaveAttribute('aria-pressed', 'true');
+
+    rerender(<LiveMatchPage match={fixtureLiveMatch} scope="all" onScopeChange={onScopeChange} />);
+    expect(screen.getByRole('button', { name: '全部模式' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('renders exactly five deterministic slots per team for duplicate and unknown lanes', () => {
+    const uncertain: LiveMatch = {
+      players: fixtureLiveMatch.players.map((entry, index) => index === 1 || index === 6 ? { ...entry, lane: 'TOP' } : index === 2 || index === 7 ? { ...entry, lane: 'UNKNOWN' } : entry)
+    };
+    render(<LiveMatchPage match={uncertain} />);
+
+    const teams = screen.getAllByRole('group', { name: /方队伍/ });
+    expect(within(teams[0]).getAllByTestId('player-card')).toHaveLength(5);
+    expect(within(teams[1]).getAllByTestId('player-card')).toHaveLength(5);
+    expect(screen.getAllByText('位置待确认')).toHaveLength(6);
+    expect(new Set(screen.getAllByTestId('player-card').map((card) => card.getAttribute('aria-labelledby'))).size).toBe(10);
+  });
+
+  it('keeps a 1050px grid inside a horizontal scroll container', () => {
+    render(<LiveMatchPage match={fixtureLiveMatch} />);
+    expect(getComputedStyle(screen.getByLabelText('双方对局比较')).overflowX).toBe('auto');
+    expect(getComputedStyle(document.querySelector('.live-match-grid')!)).toHaveProperty('minWidth', '1050px');
   });
 });

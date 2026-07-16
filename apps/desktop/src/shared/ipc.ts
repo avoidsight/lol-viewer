@@ -12,6 +12,7 @@ const matchSummarySchema = z.object({
   endedAt: z.number(),
   durationSeconds: z.number(),
   championId: z.number().int().nonnegative(),
+  gameVersion: z.string().min(1),
   win: z.boolean(),
   kills: z.number().int().nonnegative(),
   deaths: z.number().int().nonnegative(),

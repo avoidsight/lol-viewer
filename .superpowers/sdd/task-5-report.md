@@ -43,5 +43,37 @@ Additional verification:
 
 ## Concerns
 
-- Champion images use CommunityDragon's `latest` HTTPS asset path and therefore require network availability; the numeric champion-ID fallback remains visible when an image fails.
-- The page treats the first team in the supplied `LiveMatch.players` order as local, matching the service's team-one-then-team-two contract.
+- Champion images require network availability; each URL is pinned to the validated match version and the numeric champion-ID fallback remains visible when an image fails.
+- Standard LCU team IDs 100 and 200 anchor progressive rows so out-of-order updates do not move enemy cards into the local row; non-standard team IDs retain deterministic first-seen ordering.
+
+## Reviewer follow-up
+
+### Root causes
+
+- `App` used one scope value for both the requested and displayed data and replaced every failed request with the same empty waiting view.
+- It invoked `getLiveMatch` without subscribing to the validated progressive player stream.
+- Lane rendering filtered by five lane values, so valid UNKNOWN players and duplicate lane assignments were dropped.
+- Recent-match icons used CommunityDragon's mutable `latest` alias because `MatchSummary` did not retain the validated LCU game version.
+
+### Follow-up RED evidence
+
+After adding integration and regression tests first, the focused command
+`pnpm --filter @lol-viewer/desktop test -- App.test.tsx LiveMatchPage.test.tsx match-adapter.test.ts`
+failed with 8 expected failures: missing loading/error states, request occurring before subscription, no progressive player visibility, stale scope relabeling, missing game version validation/data, a mutable `/latest/` image URL, and only four cards per team for duplicate/UNKNOWN lanes.
+
+### Follow-up GREEN evidence
+
+The same focused command then exited 0 with 8 files and 37 tests passing. Added coverage verifies:
+
+- initial ten-slot loading UI and always-available queue controls;
+- subscribe-before-request ordering, progressive player display, and cleanup unsubscribe;
+- distinct requested/displayed scopes, including retained old data and explicit error after a failed scope transition;
+- exactly five deterministic slots per team without dropped identities, plus visible uncertainty labels;
+- validated `gameVersion` propagation and version-specific CommunityDragon URLs without `/latest/`;
+- controlled scope rerender behavior and directly inspectable `min-width: 1050px` / `overflow-x: auto` invariants.
+
+Final verification:
+
+- `pnpm --filter @lol-viewer/desktop test` — exit 0; 8 test files, 37 tests passed.
+- `pnpm --filter @lol-viewer/desktop typecheck` — exit 0.
+- `pnpm --filter @lol-viewer/desktop build` — exit 0; main, preload, and renderer production bundles generated.

@@ -29,6 +29,7 @@ const gameSchema = z.object({
 });
 
 const matchHistorySchema = z.object({
+  gameVersion: z.string().min(1),
   games: z.array(gameSchema)
 });
 
@@ -37,7 +38,7 @@ function normalizeLane(lane: string | undefined): Lane | undefined {
   return laneSchema.safeParse(lane).success ? (lane as Lane) : 'UNKNOWN';
 }
 
-function mapGame(game: z.infer<typeof gameSchema>): MatchSummary {
+function mapGame(game: z.infer<typeof gameSchema>, gameVersion: string): MatchSummary {
   const participant = game.participants[0];
   const lane = normalizeLane(participant.timeline?.lane);
   const csFields = [participant.stats.totalMinionsKilled, participant.stats.neutralMinionsKilled];
@@ -51,6 +52,7 @@ function mapGame(game: z.infer<typeof gameSchema>): MatchSummary {
     endedAt: game.gameCreation + game.gameDuration * 1_000,
     durationSeconds: game.gameDuration,
     championId: participant.championId,
+    gameVersion,
     win: participant.stats.win,
     kills: participant.stats.kills,
     deaths: participant.stats.deaths,
@@ -61,10 +63,10 @@ function mapGame(game: z.infer<typeof gameSchema>): MatchSummary {
 }
 
 export function adaptMatchHistory(input: unknown, scope: QueueScope): MatchSummary[] {
-  return matchHistorySchema
-    .parse(input)
-    .games.filter((game) => scope === 'all' || game.queueId === 420)
-    .map(mapGame)
+  const history = matchHistorySchema.parse(input);
+  return history.games
+    .filter((game) => scope === 'all' || game.queueId === 420)
+    .map((game) => mapGame(game, history.gameVersion))
     .sort((left, right) => right.endedAt - left.endedAt)
     .slice(0, 10);
 }
