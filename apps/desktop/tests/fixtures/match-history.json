@@ -1,5 +1,4 @@
 {
-  "gameVersion": "15.14.1",
   "games": [
     { "gameId": 9002, "queueId": 420, "gameCreation": 1752690000000, "gameDuration": 1620, "participants": [{ "championId": 64, "stats": { "win": false, "kills": 3, "deaths": 6, "assists": 7, "totalMinionsKilled": 24, "neutralMinionsKilled": 126 }, "timeline": { "lane": "JUNGLE" } }] },
     { "gameId": 9003, "queueId": 430, "gameCreation": 1752685000000, "gameDuration": 1510, "participants": [{ "championId": 103, "stats": { "win": true, "kills": 6, "deaths": 2, "assists": 9, "totalMinionsKilled": 171, "neutralMinionsKilled": 4 }, "timeline": { "lane": "MIDDLE" } }] },

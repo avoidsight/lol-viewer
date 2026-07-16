@@ -12,7 +12,7 @@ export default function PlayerCard({ player, displayLane = player.lane, uncertai
         <p className="player-card__state" role="status">战绩暂不可用{player.error ? `：${player.error}` : ''}</p> : <>
           <dl className="player-card__summary"><div><dt>样本</dt><dd>{player.sampleSize} 场</dd></div><div><dt>胜率</dt><dd>{percent(player.winRate)}</dd></div><div><dt>当前英雄</dt><dd>{player.currentChampionGames} 场 / {percent(player.currentChampionWinRate)}</dd></div></dl>
           {player.matches.length < 10 && <p className="player-card__notice">仅获取到 {player.matches.length}/10 场</p>}
-          <ol className="player-card__matches" aria-label={`${player.displayName}最近对局`}>{player.matches.slice(0, 10).map((match) => <RecentMatch key={match.matchId} match={match} />)}</ol>
+          <ol className="player-card__matches" aria-label={`${player.displayName}最近对局`}>{player.matches.slice(0, 10).map((match) => <RecentMatch key={match.matchId} match={match} assetVersion={player.assetVersion} />)}</ol>
         </>}
     </article>
   );

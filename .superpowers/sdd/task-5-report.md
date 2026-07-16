@@ -43,7 +43,7 @@ Additional verification:
 
 ## Concerns
 
-- Champion images require network availability; each URL is pinned to the validated match version and the numeric champion-ID fallback remains visible when an image fails.
+- Champion images require network availability; each URL is pinned to a separately validated current client asset version and the numeric champion-ID fallback remains visible when a version or image is unavailable.
 - Standard LCU team IDs 100 and 200 anchor progressive rows so out-of-order updates do not move enemy cards into the local row; non-standard team IDs retain deterministic first-seen ordering.
 
 ## Reviewer follow-up
@@ -69,7 +69,7 @@ The same focused command then exited 0 with 8 files and 37 tests passing. Added 
 - subscribe-before-request ordering, progressive player display, and cleanup unsubscribe;
 - distinct requested/displayed scopes, including retained old data and explicit error after a failed scope transition;
 - exactly five deterministic slots per team without dropped identities, plus visible uncertainty labels;
-- validated `gameVersion` propagation and version-specific CommunityDragon URLs without `/latest/`;
+- version-specific CommunityDragon URLs without `/latest/`;
 - controlled scope rerender behavior and directly inspectable `min-width: 1050px` / `overflow-x: auto` invariants.
 
 Final verification:
@@ -77,3 +77,17 @@ Final verification:
 - `pnpm --filter @lol-viewer/desktop test` — exit 0; 8 test files, 37 tests passed.
 - `pnpm --filter @lol-viewer/desktop typecheck` — exit 0.
 - `pnpm --filter @lol-viewer/desktop build` — exit 0; main, preload, and renderer production bundles generated.
+
+## Final asset-version correction
+
+The prior follow-up incorrectly modeled a mandatory `gameVersion` inside the match-history envelope. The actual history adapter and fixture now contain no invented version requirement. `MatchService` obtains the current static-asset version independently from `/lol-patch/v1/game-version`, validates the response, and propagates it as optional `PlayerSnapshot.assetVersion` rather than historical match data.
+
+### RED evidence
+
+The focused command `pnpm --filter @lol-viewer/desktop test -- match-adapter.test.ts match-service.test.ts LiveMatchPage.test.tsx` exited 1 with 10 expected failures. Evidence included history rejection at the nonexistent `gameVersion` path, missing `assetVersion` propagation, `/undefined/` image URLs, and unwanted image elements when no version existed.
+
+### GREEN evidence
+
+After the correction, the focused command exited 0 with 8 files and 41 tests passing. New assertions prove that a real `{ games: [...] }` history envelope succeeds, a validated current version reaches every player and the versioned image URL, version lookup errors or invalid response shapes do not suppress history, absent versions render numeric fallbacks without creating image requests, and an image load error preserves the numeric fallback.
+
+Final verification also passed: full desktop Vitest 8 files/41 tests, `tsc --noEmit`, and all main/preload/renderer production builds exited 0.

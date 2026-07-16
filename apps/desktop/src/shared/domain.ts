@@ -10,7 +10,6 @@ export interface MatchSummary {
   endedAt: number;
   durationSeconds: number;
   championId: number;
-  gameVersion: string;
   win: boolean;
   kills: number;
   deaths: number;
@@ -25,6 +24,7 @@ export interface PlayerSnapshot {
   teamId: number;
   lane: Lane;
   championId: number;
+  assetVersion?: string;
   rank?: string;
   scope: QueueScope;
   matches: MatchSummary[];

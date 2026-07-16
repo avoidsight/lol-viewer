@@ -20,6 +20,7 @@ const sessionSchema = z.object({
 });
 
 const matchHistorySchema = z.object({ games: z.array(z.unknown()) });
+const assetVersionSchema = z.string().regex(/^\d+\.\d+(?:\.\d+){0,2}$/);
 const retryDelays = [250, 750] as const;
 const lanes = new Set<Lane>(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'UNKNOWN']);
 
@@ -59,6 +60,14 @@ export class MatchService {
     const session = sessionSchema.parse(
       await this.client.get('/lol-gameflow/v1/session', sessionSchema)
     );
+    let assetVersion: string | undefined;
+    try {
+      assetVersion = assetVersionSchema.parse(
+        await this.client.get('/lol-patch/v1/game-version', assetVersionSchema)
+      );
+    } catch {
+      assetVersion = undefined;
+    }
     const participants = [...session.gameData.teamOne, ...session.gameData.teamTwo];
     const players = await mapLimit(participants, 4, async (participant) => {
       const base = {
@@ -67,6 +76,7 @@ export class MatchService {
         teamId: participant.teamId,
         lane: laneOf(participant.selectedPosition),
         championId: participant.championId,
+        ...(assetVersion === undefined ? {} : { assetVersion }),
         scope,
         updatedAt: Date.now()
       };

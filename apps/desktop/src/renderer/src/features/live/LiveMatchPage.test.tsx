@@ -13,7 +13,6 @@ function matches(playerIndex: number, count = 10): MatchSummary[] {
     endedAt: 1_700_000_000_000 - index,
     durationSeconds: 1_800,
     championId: playerIndex * 10 + index + 1,
-    gameVersion: '15.14.1',
     win: index % 2 === 0,
     kills: index === 0 ? 8 : index,
     deaths: index === 0 ? 3 : 2,
@@ -29,6 +28,7 @@ function player(index: number, overrides: Partial<PlayerSnapshot> = {}): PlayerS
     teamId: index < 5 ? 100 : 200,
     lane: lanes[index % 5],
     championId: index + 1,
+    assetVersion: '15.14.1',
     rank: '黄金 I',
     scope: 'ranked-solo',
     matches: history,
@@ -71,6 +71,16 @@ describe('LiveMatchPage', () => {
     expect(screen.getAllByRole('img', { name: /英雄 \d+/ })).toHaveLength(100);
     expect(screen.getAllByRole('img')[0]).toHaveAttribute('src', expect.stringContaining('/15.14.1/'));
     expect(screen.getAllByRole('img')[0]).not.toHaveAttribute('src', expect.stringContaining('/latest/'));
+    fireEvent.error(screen.getAllByRole('img')[0]);
+    expect(screen.getByRole('img', { name: '英雄 1图标不可用' })).toHaveTextContent('1');
+  });
+
+  it('renders a numeric fallback without making an unversioned image request', () => {
+    const withoutVersion: LiveMatch = { players: fixtureLiveMatch.players.map((entry) => ({ ...entry, assetVersion: undefined })) };
+    render(<LiveMatchPage match={withoutVersion} />);
+    expect(screen.queryAllByRole('img', { name: /^英雄 \d+$/ })).toHaveLength(0);
+    expect(screen.getAllByRole('img', { name: /图标不可用/ })).toHaveLength(100);
+    expect(screen.getAllByRole('img', { name: /图标不可用/ })[0]).toHaveTextContent('1');
   });
 
   it('shows loading, unavailable, and fewer-than-ten states explicitly', () => {

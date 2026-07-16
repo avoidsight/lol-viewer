@@ -11,7 +11,6 @@ const participants = Array.from({ length: 10 }, (_, index) => ({
 }));
 
 const history = {
-  gameVersion: '15.14.1',
   games: [
     {
       gameId: 1,
@@ -30,6 +29,29 @@ const history = {
 };
 
 describe('MatchService', () => {
+  it('propagates a separately validated current asset version to every player', async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
+      if (path === '/lol-patch/v1/game-version') return '15.14.1';
+      return history;
+    });
+    const result = await new MatchService({ get } as LcuClient).loadLiveMatch('all', () => undefined);
+    expect(result.players.every((player) => player.assetVersion === '15.14.1')).toBe(true);
+  });
+
+  it.each([new Error('offline'), { version: 'invalid' }])('keeps history usable when version lookup is unavailable or invalid', async (versionResult) => {
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
+      if (path === '/lol-patch/v1/game-version') {
+        if (versionResult instanceof Error) throw versionResult;
+        return versionResult;
+      }
+      return history;
+    });
+    const result = await new MatchService({ get } as LcuClient).loadLiveMatch('all', () => undefined);
+    expect(result.players.every((player) => player.status === 'ready')).toBe(true);
+    expect(result.players.every((player) => player.assetVersion === undefined)).toBe(true);
+  });
   it('emits nine ready players and one unavailable player without rejecting', async () => {
     const get = vi.fn(async (path: string) => {
       if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
