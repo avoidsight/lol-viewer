@@ -1,0 +1,49 @@
+import Database from 'better-sqlite3';
+import { describe, expect, it } from 'vitest';
+import { MatchCache, migrateDatabase } from '../cache/database';
+import { SettingsService } from './settings-service';
+
+describe('SettingsService', () => {
+  it('persists validated partial setting updates', () => {
+    const database = new Database(':memory:');
+    migrateDatabase(database);
+    const service = new SettingsService(database);
+
+    expect(service.update({ autoOpenLiveMatch: false })).toEqual({
+      queueScope: 'ranked-solo',
+      autoOpenLiveMatch: false,
+      showLaneDifferences: true
+    });
+    expect(new SettingsService(database).get().autoOpenLiveMatch).toBe(false);
+    expect(() => service.update({ queueScope: 'invalid' } as never)).toThrow();
+  });
+
+  it('does not expose mutable default settings state', () => {
+    const database = new Database(':memory:');
+    migrateDatabase(database);
+    const service = new SettingsService(database);
+
+    (service.get() as { queueScope: string }).queueScope = 'invalid';
+
+    expect(service.get().queueScope).toBe('ranked-solo');
+  });
+
+  it('clears history without deleting settings', () => {
+    const database = new Database(':memory:');
+    migrateDatabase(database);
+    const cache = new MatchCache(database);
+    const service = new SettingsService(database);
+    service.update({ queueScope: 'ranked-solo' });
+    cache.put({
+      playerId: 'player-1', displayName: 'Player', teamId: 100, lane: 'TOP', championId: 1,
+      scope: 'ranked-solo', matches: [], sampleSize: 0, wins: 0, losses: 0, winRate: 0,
+      currentChampionGames: 0, currentChampionWins: 0, currentChampionWinRate: 0,
+      status: 'ready', updatedAt: 1
+    });
+
+    service.clearCache();
+
+    expect(service.get().queueScope).toBe('ranked-solo');
+    expect(cache.get('player-1', 'ranked-solo')).toBeNull();
+  });
+});

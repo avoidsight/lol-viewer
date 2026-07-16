@@ -12,6 +12,11 @@ const players = Array.from({ length: 10 }, (_, index): PlayerSnapshot => ({
   currentChampionWinRate: 0, status: 'ready', updatedAt: 1
 }));
 const liveMatch: LiveMatch = { players };
+const unusedSettingsApi = {
+  getSettings: vi.fn(),
+  updateSettings: vi.fn(),
+  clearCache: vi.fn()
+};
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -24,7 +29,7 @@ function installApi(getLiveMatch: LolViewerApi['getLiveMatch']) {
   let listener: ((player: PlayerSnapshot) => void) | undefined;
   const unsubscribe = vi.fn();
   const onPlayerUpdated = vi.fn((next: (player: PlayerSnapshot) => void) => { listener = next; return unsubscribe; });
-  window.lolViewer = { getLiveMatch, onPlayerUpdated };
+  window.lolViewer = { getLiveMatch, onPlayerUpdated, ...unusedSettingsApi };
   return { onPlayerUpdated, unsubscribe, emit: (player: PlayerSnapshot) => listener?.(player) };
 }
 
@@ -44,7 +49,7 @@ describe('App', () => {
     const order: string[] = [];
     let listener!: (player: PlayerSnapshot) => void;
     const unsubscribe = vi.fn();
-    window.lolViewer = { getLiveMatch: () => { order.push('request'); return request.promise; }, onPlayerUpdated: (next) => { order.push('subscribe'); listener = next; return unsubscribe; } };
+    window.lolViewer = { getLiveMatch: () => { order.push('request'); return request.promise; }, onPlayerUpdated: (next) => { order.push('subscribe'); listener = next; return unsubscribe; }, ...unusedSettingsApi };
     const { unmount } = render(<App />);
     expect(order).toEqual(['subscribe', 'request']);
     act(() => listener(players[0]));

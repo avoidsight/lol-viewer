@@ -49,4 +49,37 @@ describe('preload match API validation', () => {
     handler({}, validPlayer);
     expect(listener).toHaveBeenCalledOnce();
   });
+
+  it('rejects unknown fields at match IPC boundaries', async () => {
+    const api = await loadApi();
+    const listener = vi.fn();
+    api.onPlayerUpdated(listener);
+    const handler = electron.on.mock.calls.at(-1)?.[1];
+
+    handler({}, { ...validPlayer, unexpected: true });
+    expect(listener).not.toHaveBeenCalled();
+
+    electron.invoke.mockResolvedValue({
+      players: Array.from({ length: 10 }, (_, index) => ({ ...validPlayer, playerId: String(index) })),
+      unexpected: true
+    });
+    await expect(api.getLiveMatch('all')).rejects.toThrow();
+  });
+
+  it('validates settings updates before invoking and validates the response', async () => {
+    const api = await loadApi();
+
+    await expect(api.updateSettings({ queueScope: 'invalid' } as never)).rejects.toThrow();
+    expect(electron.invoke).not.toHaveBeenCalled();
+
+    electron.invoke.mockResolvedValue({ queueScope: 'ranked-solo' });
+    await expect(api.getSettings()).rejects.toThrow();
+  });
+
+  it('requires cache clearing to return no value', async () => {
+    electron.invoke.mockResolvedValue('unexpected');
+    const api = await loadApi();
+
+    await expect(api.clearCache()).rejects.toThrow();
+  });
 });
