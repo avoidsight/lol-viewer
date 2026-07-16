@@ -38,3 +38,27 @@ Implemented concurrent live-match player loading with partial-success streaming,
 - Player errors are generic and do not expose response bodies or credentials.
 - Result ordering follows session ordering even though player updates stream in completion order.
 - No Task 5+ UI work was included.
+
+## Reviewer follow-up
+
+### Additional RED evidence
+
+- Added preload boundary tests; invalid invoke output initially resolved to the consumer and an invalid player event initially reached its listener.
+- Added a nine-player session test; it initially returned a nine-player `LiveMatch`.
+- Added a throwing-callback test; the callback exception was initially caught as a history failure, invoked a second time, and rejected loading.
+- Focused RED result: 4 failed, 3 passed across the new preload and match-service cases.
+
+### Fixes
+
+- Exported runtime `playerSnapshotSchema` and `liveMatchSchema` from shared IPC definitions.
+- The preload now parses invoke results before resolving and uses `safeParse` to discard malformed player events before listener delivery.
+- Session validation now requires exactly five players in each team and also parses defensively in `MatchService`, preventing test doubles or future clients from bypassing the invariant.
+- The per-player catch now covers only history retrieval/adaptation. Each snapshot is constructed once and emitted once outside that catch; callback exceptions are isolated and cannot alter status or stop workers.
+
+### Additional GREEN evidence
+
+- Focused: 3 files passed, 8 tests passed.
+- Full desktop suite: 7 files passed, 27 tests passed.
+- Typecheck: `tsc --noEmit` exited 0.
+- Production build: main, preload, and renderer bundles built successfully.
+- Renderer Electron scan returned no matches (the expected `rg` exit code 1 for an empty result).

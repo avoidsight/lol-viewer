@@ -77,4 +77,35 @@ describe('MatchService', () => {
 
     expect(sleep.mock.calls).toEqual([[250], [750]]);
   });
+
+  it('rejects a structurally invalid nine-player session', async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') {
+        return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5, 9) } };
+      }
+      return history;
+    });
+
+    await expect(new MatchService({ get } as LcuClient).loadLiveMatch('all', () => undefined))
+      .rejects.toThrow();
+    expect(get).toHaveBeenCalledOnce();
+  });
+
+  it('isolates throwing callbacks while returning all successful players once', async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
+      return history;
+    });
+    const updated: string[] = [];
+
+    const result = await new MatchService({ get } as LcuClient).loadLiveMatch('all', (player) => {
+      updated.push(player.playerId);
+      if (player.playerId === '1') throw new Error('renderer gone');
+    });
+
+    expect(result.players).toHaveLength(10);
+    expect(result.players.every((player) => player.status === 'ready')).toBe(true);
+    expect(updated).toHaveLength(10);
+    expect(new Set(updated).size).toBe(10);
+  });
 });

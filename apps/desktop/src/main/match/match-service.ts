@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Lane, PlayerSnapshot, QueueScope } from '../../shared/domain';
+import type { Lane, MatchSummary, PlayerSnapshot, QueueScope } from '../../shared/domain';
 import type { LiveMatch } from '../../shared/ipc';
 import type { LcuClient, LcuError } from '../lcu/http-client';
 import { adaptMatchHistory } from '../lcu/match-adapter';
@@ -14,8 +14,8 @@ const participantSchema = z.object({
 
 const sessionSchema = z.object({
   gameData: z.object({
-    teamOne: z.array(participantSchema),
-    teamTwo: z.array(participantSchema)
+    teamOne: z.array(participantSchema).length(5),
+    teamTwo: z.array(participantSchema).length(5)
   })
 });
 
@@ -56,8 +56,10 @@ export class MatchService {
   }
 
   async loadLiveMatch(scope: QueueScope, onPlayer: (player: PlayerSnapshot) => void): Promise<LiveMatch> {
-    const session = await this.client.get('/lol-gameflow/v1/session', sessionSchema);
-    const participants = [...session.gameData.teamOne, ...session.gameData.teamTwo].slice(0, 10);
+    const session = sessionSchema.parse(
+      await this.client.get('/lol-gameflow/v1/session', sessionSchema)
+    );
+    const participants = [...session.gameData.teamOne, ...session.gameData.teamTwo];
     const players = await mapLimit(participants, 4, async (participant) => {
       const base = {
         playerId: String(participant.summonerId),
@@ -68,44 +70,36 @@ export class MatchService {
         scope,
         updatedAt: Date.now()
       };
-      let rawHistory: unknown;
+      let matches: MatchSummary[] | null;
       try {
-        rawHistory = await this.getHistoryWithRetry(base.playerId);
-        const matches = adaptMatchHistory(rawHistory, scope);
-        const wins = matches.filter((match) => match.win).length;
-        const championMatches = matches.filter((match) => match.championId === base.championId);
-        const currentChampionWins = championMatches.filter((match) => match.win).length;
-        const player: PlayerSnapshot = {
-          ...base,
-          matches,
-          sampleSize: matches.length,
-          wins,
-          losses: matches.length - wins,
-          winRate: matches.length ? wins / matches.length : 0,
-          currentChampionGames: championMatches.length,
-          currentChampionWins,
-          currentChampionWinRate: championMatches.length ? currentChampionWins / championMatches.length : 0,
-          status: 'ready'
-        };
-        onPlayer(player);
-        return player;
+        const rawHistory = await this.getHistoryWithRetry(base.playerId);
+        matches = adaptMatchHistory(rawHistory, scope);
       } catch {
-        const player: PlayerSnapshot = {
-          ...base,
-          matches: [],
-          sampleSize: 0,
-          wins: 0,
-          losses: 0,
-          winRate: 0,
-          currentChampionGames: 0,
-          currentChampionWins: 0,
-          currentChampionWinRate: 0,
-          status: 'unavailable',
-          error: 'Player history is unavailable'
-        };
-        onPlayer(player);
-        return player;
+        matches = null;
       }
+      const recentMatches = matches ?? [];
+      const wins = recentMatches.filter((match) => match.win).length;
+      const championMatches = recentMatches.filter((match) => match.championId === base.championId);
+      const currentChampionWins = championMatches.filter((match) => match.win).length;
+      const player: PlayerSnapshot = {
+        ...base,
+        matches: recentMatches,
+        sampleSize: recentMatches.length,
+        wins,
+        losses: recentMatches.length - wins,
+        winRate: recentMatches.length ? wins / recentMatches.length : 0,
+        currentChampionGames: championMatches.length,
+        currentChampionWins,
+        currentChampionWinRate: championMatches.length ? currentChampionWins / championMatches.length : 0,
+        status: matches === null ? 'unavailable' : 'ready',
+        ...(matches === null ? { error: 'Player history is unavailable' } : {})
+      };
+      try {
+        onPlayer(player);
+      } catch {
+        // A stale or faulty renderer listener must not affect match loading.
+      }
+      return player;
     });
     return { players };
   }
