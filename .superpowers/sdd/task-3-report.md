@@ -88,3 +88,49 @@ tsc --noEmit
 
 - Automatic process enumeration is Windows-specific, matching the desktop target. Tests cover injected process data and do not invoke PowerShell.
 - `LCU_LOCKFILE_PATH` is the configuration mechanism for non-standard installations.
+
+## Follow-up: schema-enforced responses and reviewer findings
+
+The global constraint was resolved in favor of requiring every parsed LCU response to pass a caller-provided Zod schema. The client API is now:
+
+```ts
+get<T>(path: string, schema: z.ZodType<T>): Promise<T>
+```
+
+There is no schema-free overload, so parsed JSON cannot leave the client without validation. JSON syntax failures and Zod validation failures both produce a sanitized `LCU_INVALID_RESPONSE`; neither raw response bodies nor authentication tokens are attached to the error.
+
+### Follow-up RED
+
+After changing the tests to require schemas, the focused command exited 1 with the new schema-mismatch test receiving the unvalidated response object instead of `LCU_INVALID_RESPONSE`:
+
+```text
+FAIL rejects valid JSON that does not match the caller schema without exposing the body
+expected { phase: 'secret-response-value' } to match object { code: 'LCU_INVALID_RESPONSE' }
+```
+
+The other 18 tests passed in this RED run.
+
+### Follow-up fixes
+
+- Added mandatory generic Zod validation via `safeParse` before resolving client responses.
+- Added a transport test that emits `timeout`, verifies `request.destroy()` is called exactly once, and verifies the returned `LCU_UNAVAILABLE` serializes without the token.
+- Added schema-failure assertions verifying neither a sensitive response value nor the authentication token leaks through string/JSON error serialization.
+- Changed temporary lockfile cleanup to an async `afterEach` registry, so cleanup runs even when an assertion fails.
+
+### Follow-up verification
+
+Fresh verification:
+
+```text
+pnpm --filter @lol-viewer/desktop test
+Test Files  4 passed (4)
+Tests       19 passed (19)
+
+pnpm --filter @lol-viewer/desktop typecheck
+tsc --noEmit (exit 0)
+
+pnpm --filter @lol-viewer/desktop build
+main, preload, and renderer bundles built (exit 0)
+```
+
+The first sandboxed build attempt could not traverse to the Electron Vite config because of filesystem restrictions. Re-running the same build with the required read permission succeeded; this was an execution-environment restriction rather than a source failure.

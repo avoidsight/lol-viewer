@@ -5,9 +5,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { discoverLcuConnection } from './discovery';
 
 describe('discoverLcuConnection', () => {
-  afterEach(() => {
+  const temporaryLockfiles = new Set<string>();
+
+  afterEach(async () => {
     vi.restoreAllMocks();
     delete process.env.LCU_LOCKFILE_PATH;
+    await Promise.all(
+      [...temporaryLockfiles].map((path) => fs.unlink(path).catch(() => undefined))
+    );
+    temporaryLockfiles.clear();
   });
 
   it('parses app-port and remoting-auth-token without logging the token', async () => {
@@ -24,6 +30,7 @@ describe('discoverLcuConnection', () => {
 
   it('prefers a LeagueClientUx command line over the lockfile', async () => {
     const lockfile = join(tmpdir(), `lcu-lockfile-${process.pid}-${Date.now()}`);
+    temporaryLockfiles.add(lockfile);
     await fs.writeFile(lockfile, 'LeagueClient:1:4000:lockfile-secret:https');
     process.env.LCU_LOCKFILE_PATH = lockfile;
 
@@ -36,11 +43,11 @@ describe('discoverLcuConnection', () => {
       ])
     ).resolves.toEqual({ port: 53122, password: 'process-secret', protocol: 'https' });
 
-    await fs.unlink(lockfile);
   });
 
   it('falls back to the configured lockfile path', async () => {
     const lockfile = join(tmpdir(), `lcu-lockfile-${process.pid}-${Date.now()}`);
+    temporaryLockfiles.add(lockfile);
     await fs.writeFile(lockfile, 'LeagueClient:1:4567:lockfile-secret:https');
     process.env.LCU_LOCKFILE_PATH = lockfile;
 
@@ -50,6 +57,5 @@ describe('discoverLcuConnection', () => {
       protocol: 'https'
     });
 
-    await fs.unlink(lockfile);
   });
 });

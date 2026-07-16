@@ -1,6 +1,7 @@
 import { request as httpsRequest } from 'node:https';
 import type { RequestOptions } from 'node:https';
 import type { ClientRequest, IncomingMessage } from 'node:http';
+import type { z } from 'zod';
 import type { LcuConnection } from './discovery';
 
 export interface LcuError extends Error {
@@ -11,6 +12,10 @@ export type HttpsRequest = (
   options: RequestOptions,
   callback: (response: IncomingMessage) => void
 ) => ClientRequest;
+
+export interface LcuClient {
+  get<T>(path: string, schema: z.ZodType<T>): Promise<T>;
+}
 
 function lcuError(code: LcuError['code'], message: string): LcuError {
   return Object.assign(new Error(message), { code });
@@ -23,9 +28,9 @@ function validPath(path: string): boolean {
 export function createLcuClient(
   connection: LcuConnection,
   request: HttpsRequest = httpsRequest
-): { get(path: string): Promise<unknown> } {
+): LcuClient {
   return {
-    get(path: string): Promise<unknown> {
+    get<T>(path: string, schema: z.ZodType<T>): Promise<T> {
       if (!validPath(path)) {
         return Promise.reject(lcuError('LCU_INVALID_RESPONSE', 'LCU request path is invalid'));
       }
@@ -70,7 +75,14 @@ export function createLcuClient(
               try {
                 const body = Buffer.concat(chunks).toString('utf8');
                 const value: unknown = body ? JSON.parse(body) : null;
-                finish(() => resolve(value));
+                const result = schema.safeParse(value);
+                if (!result.success) {
+                  finish(() =>
+                    reject(lcuError('LCU_INVALID_RESPONSE', 'LCU response did not match its schema'))
+                  );
+                  return;
+                }
+                finish(() => resolve(result.data));
               } catch {
                 finish(() => reject(lcuError('LCU_INVALID_RESPONSE', 'LCU returned invalid JSON')));
               }
