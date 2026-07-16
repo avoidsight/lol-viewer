@@ -156,4 +156,29 @@ describe('MatchService', () => {
     expect(cache.put).toHaveBeenCalledTimes(8);
     expect(cache.put.mock.calls.every(([player]) => player.status === 'ready')).toBe(true);
   });
+
+  it.each(['get', 'put'] as const)('keeps live-match loading operational when cache.%s throws', async (operation) => {
+    const cache = {
+      get: vi.fn(() => {
+        if (operation === 'get') throw new Error('cache read failed');
+        return null;
+      }),
+      put: vi.fn(() => {
+        if (operation === 'put') throw new Error('cache write failed');
+      })
+    };
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
+      return history;
+    });
+    const updated: string[] = [];
+
+    const result = await new MatchService({ get } as LcuClient, { cache })
+      .loadLiveMatch('ranked-solo', (player) => updated.push(player.playerId));
+
+    expect(result.players).toHaveLength(10);
+    expect(result.players.every((player) => player.status === 'ready')).toBe(true);
+    expect(result.players[0].matches).toHaveLength(1);
+    expect(updated).toHaveLength(10);
+  });
 });

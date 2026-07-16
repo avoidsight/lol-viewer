@@ -38,5 +38,8 @@ describe('registerSettingsIpc', () => {
 
     service.get.mockReturnValueOnce({ queueScope: 'invalid' } as never);
     await expect(get({ sender })).rejects.toThrow();
+
+    service.update.mockReturnValueOnce({ queueScope: 'invalid' } as never);
+    await expect(update({ sender }, {})).rejects.toThrow();
   });
 });

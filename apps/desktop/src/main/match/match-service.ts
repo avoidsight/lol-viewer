@@ -88,7 +88,12 @@ export class MatchService {
         scope,
         updatedAt: Date.now()
       };
-      const cached = this.cache?.get(base.playerId, scope);
+      let cached: PlayerSnapshot | null = null;
+      try {
+        cached = this.cache?.get(base.playerId, scope) ?? null;
+      } catch {
+        // Cache availability must not affect live LCU history loading.
+      }
       let matches: MatchSummary[] | null = cached?.matches ?? null;
       if (!cached) {
         try {
@@ -115,7 +120,13 @@ export class MatchService {
         status: matches === null ? 'unavailable' : 'ready',
         ...(matches === null ? { error: 'Player history is unavailable' } : {})
       };
-      if (player.status === 'ready' && !cached) this.cache?.put(player);
+      if (player.status === 'ready' && !cached) {
+        try {
+          this.cache?.put(player);
+        } catch {
+          // Persisting a fresh snapshot is best-effort.
+        }
+      }
       try {
         onPlayer(player);
       } catch {
