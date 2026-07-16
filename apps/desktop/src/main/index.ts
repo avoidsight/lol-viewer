@@ -1,6 +1,18 @@
 import { join } from 'node:path';
 import { app, BrowserWindow } from 'electron';
 import { is } from '@electron-toolkit/utils';
+import { discoverLcuConnection } from './lcu/discovery';
+import { createLcuClient } from './lcu/http-client';
+import { registerMatchIpc } from './ipc/register-match-ipc';
+import { MatchService } from './match/match-service';
+
+registerMatchIpc({
+  async loadLiveMatch(scope, onPlayer) {
+    const connection = await discoverLcuConnection();
+    if (!connection) throw new Error('League client is unavailable');
+    return new MatchService(createLcuClient(connection)).loadLiveMatch(scope, onPlayer);
+  }
+});
 
 function createWindow(): void {
   const window = new BrowserWindow({
