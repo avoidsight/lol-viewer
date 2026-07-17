@@ -1,4 +1,6 @@
 node_modules/
 out/
 work/
+.cache/
+.pnpm-store/
 .superpowers/

@@ -82,4 +82,12 @@ describe('preload match API validation', () => {
 
     await expect(api.clearCache()).rejects.toThrow();
   });
+
+  it('validates champion guide inputs and strict responses', async () => {
+    const api = await loadApi();
+    await expect(api.getChampionGuide(0, 'TOP')).rejects.toThrow();
+    expect(electron.invoke).not.toHaveBeenCalled();
+    electron.invoke.mockResolvedValue({ championId: 114, lane: 'TOP' });
+    await expect(api.getChampionGuide(114, 'TOP')).rejects.toThrow();
+  });
 });

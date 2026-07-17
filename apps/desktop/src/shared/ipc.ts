@@ -6,6 +6,7 @@ export const PLAYER_UPDATED_CHANNEL = 'match:player-updated' as const;
 export const SETTINGS_GET_CHANNEL = 'settings:get' as const;
 export const SETTINGS_UPDATE_CHANNEL = 'settings:update' as const;
 export const SETTINGS_CLEAR_CACHE_CHANNEL = 'settings:clear-cache' as const;
+export const CHAMPION_GUIDE_GET_CHANNEL = 'champions:get-guide' as const;
 
 const laneSchema = z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'UNKNOWN']);
 export const queueScopeSchema = z.enum(['ranked-solo', 'all']);
@@ -54,6 +55,22 @@ export const playerSnapshotSchema: z.ZodType<PlayerSnapshot> = z.object({
 
 export const liveMatchSchema = z.object({ players: z.array(playerSnapshotSchema).length(10) }).strict();
 
+export const championLaneSchema = z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']);
+export const championGuideSnapshotSchema = z.object({
+  championId: z.number().int().positive(), lane: championLaneSchema,
+  patch: z.string().regex(/^\d+\.\d+$/), source: z.enum(['CN_OFFICIAL', 'OPGG', 'MANUAL']),
+  region: z.string().min(2), tier: z.string().min(1), fetchedAt: z.string().datetime(),
+  builds: z.array(z.object({ itemIds: z.array(z.number().int().positive()).min(2), pickRate: z.number().min(0).max(1).optional() }).strict()),
+  favorable: z.array(z.object({ opponentChampionId: z.number().int().positive(), winRate: z.number().min(0).max(1), games: z.number().int().nonnegative().optional() }).strict()),
+  unfavorable: z.array(z.object({ opponentChampionId: z.number().int().positive(), winRate: z.number().min(0).max(1), games: z.number().int().nonnegative().optional() }).strict()),
+  notes: z.array(z.string().max(240)).max(5)
+}).strict();
+export const championGuideSchema = championGuideSnapshotSchema.extend({ stale: z.boolean() }).strict();
+export const championGuideRequestSchema = z.object({ championId: z.number().int().positive(), lane: championLaneSchema }).strict();
+export type ChampionLane = z.infer<typeof championLaneSchema>;
+export type ChampionGuideSnapshot = z.infer<typeof championGuideSnapshotSchema>;
+export type ChampionGuide = z.infer<typeof championGuideSchema>;
+
 export interface LiveMatch {
   players: PlayerSnapshot[];
 }
@@ -64,4 +81,5 @@ export interface LolViewerApi {
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
   clearCache(): Promise<void>;
+  getChampionGuide(championId: number, lane: ChampionLane): Promise<ChampionGuide>;
 }

@@ -1,0 +1,2 @@
+.champion-library { min-height: 100vh; padding: 24px; background: radial-gradient(circle at top,#192442,#0b1020 55%); }
+.champion-library header { display:flex; gap:18px; align-items:center; }.champion-library section { max-width:760px; margin:18px 0; padding:16px; border:1px solid #334155; border-radius:10px; background:#0f172a; }.champion-library h2 { margin-top:0 }.stale { color:#fbbf24 }

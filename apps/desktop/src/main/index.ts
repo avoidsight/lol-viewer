@@ -7,7 +7,9 @@ import { createLcuClient } from './lcu/http-client';
 import { registerMatchIpc } from './ipc/register-match-ipc';
 import { registerSettingsIpc } from './ipc/register-settings-ipc';
 import { MatchService } from './match/match-service';
-import { MatchCache, migrateDatabase } from './cache/database';
+import { ChampionGuideCache, MatchCache, migrateDatabase } from './cache/database';
+import { ChampionGuideClient } from './champions/champion-guide-client';
+import { registerChampionIpc } from './ipc/register-champion-ipc';
 import { SettingsService } from './settings/settings-service';
 
 let database: Database.Database | undefined;
@@ -35,7 +37,12 @@ void app.whenReady().then(() => {
   database = new Database(join(app.getPath('userData'), 'lol-viewer.sqlite3'));
   migrateDatabase(database);
   const cache = new MatchCache(database);
-  registerSettingsIpc(new SettingsService(database, cache));
+  const guideCache = new ChampionGuideCache(database);
+  registerChampionIpc(new ChampionGuideClient({
+    baseUrl: process.env.CHAMPION_GUIDE_SERVICE_URL ?? 'http://127.0.0.1:8787',
+    patch: process.env.CHAMPION_GUIDE_PATCH ?? '16.14', cache: guideCache
+  }));
+  registerSettingsIpc(new SettingsService(database, cache, guideCache));
   registerMatchIpc({
     async loadLiveMatch(scope, onPlayer) {
       const connection = await discoverLcuConnection();

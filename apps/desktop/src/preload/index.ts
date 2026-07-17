@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { PlayerSnapshot, QueueScope } from '../shared/domain';
 import {
   MATCH_GET_CHANNEL,
+  CHAMPION_GUIDE_GET_CHANNEL,
   PLAYER_UPDATED_CHANNEL,
   SETTINGS_CLEAR_CACHE_CHANNEL,
   SETTINGS_GET_CHANNEL,
@@ -12,7 +13,10 @@ import {
   liveMatchSchema,
   playerSnapshotSchema,
   queueScopeSchema,
+  championGuideRequestSchema,
+  championGuideSchema,
   type AppSettings,
+  type ChampionLane,
   type LiveMatch,
   type LolViewerApi
 } from '../shared/ipc';
@@ -39,6 +43,10 @@ const api: LolViewerApi = Object.freeze({
   clearCache: async (): Promise<void> => {
     const result: unknown = await ipcRenderer.invoke(SETTINGS_CLEAR_CACHE_CHANNEL);
     z.undefined().parse(result);
+  },
+  getChampionGuide: async (championId: number, lane: ChampionLane) => {
+    const input = championGuideRequestSchema.parse({ championId, lane });
+    return championGuideSchema.parse(await ipcRenderer.invoke(CHAMPION_GUIDE_GET_CHANNEL, input));
   }
 });
 

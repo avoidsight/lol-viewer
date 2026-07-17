@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MatchCache, migrateDatabase } from '../cache/database';
 import { SettingsService } from './settings-service';
 
@@ -45,6 +45,14 @@ describe('SettingsService', () => {
 
     expect(service.get().queueScope).toBe('ranked-solo');
     expect(cache.get('player-1', 'ranked-solo')).toBeNull();
+  });
+
+  it('also clears the public champion guide cache on an explicit cache clear', () => {
+    const database = new Database(':memory:');
+    migrateDatabase(database);
+    const guideCache = { clear: vi.fn() };
+    new SettingsService(database, new MatchCache(database), guideCache).clearCache();
+    expect(guideCache.clear).toHaveBeenCalledOnce();
   });
 
   it('rejects corrupt persisted boolean values instead of coercing them', () => {

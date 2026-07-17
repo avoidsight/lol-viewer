@@ -81,11 +81,11 @@ describe('MatchCache', () => {
     expect(new MatchCache(database).get('player-1', 'ranked-solo', 2)).toBeNull();
   });
 
-  it('runs migrations idempotently and records one version row', () => {
+  it('runs migrations idempotently and records each version once', () => {
     const database = new Database(':memory:');
     migrateDatabase(database);
     migrateDatabase(database);
 
-    expect(database.prepare('SELECT version FROM schema_migrations').all()).toEqual([{ version: 1 }]);
+    expect(database.prepare('SELECT version FROM schema_migrations ORDER BY version').all()).toEqual([{ version: 1 }, { version: 2 }]);
   });
 });

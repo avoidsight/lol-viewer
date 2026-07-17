@@ -15,7 +15,8 @@ const liveMatch: LiveMatch = { players };
 const unusedSettingsApi = {
   getSettings: vi.fn(),
   updateSettings: vi.fn(),
-  clearCache: vi.fn()
+  clearCache: vi.fn(),
+  getChampionGuide: vi.fn()
 };
 
 function deferred<T>() {
@@ -36,6 +37,19 @@ function installApi(getLiveMatch: LolViewerApi['getLiveMatch']) {
 afterEach(() => { delete window.lolViewer; });
 
 describe('App', () => {
+  it('navigates to the champion library while retaining the live page', async () => {
+    const getChampionGuide = vi.fn().mockRejectedValue(new Error('offline'));
+    installApi(vi.fn().mockResolvedValue(liveMatch));
+    window.lolViewer!.getChampionGuide = getChampionGuide;
+    render(<App />);
+    expect(await screen.findByText('Player 0')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '英雄资料库' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('英雄数据暂不可用');
+    expect(screen.getByText('Player 0')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '返回实时对局' }));
+    expect(screen.getByText('Player 0')).toBeVisible();
+  });
+
   it('shows initial loading while retaining scope controls', () => {
     installApi(() => new Promise(() => undefined));
     render(<App />);
