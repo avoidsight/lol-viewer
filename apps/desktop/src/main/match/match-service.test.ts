@@ -44,7 +44,7 @@ describe('MatchService', () => {
 
     expect(result).toMatchObject({ queueId: 450, modeName: '极地大乱斗', positionOrderReliable: false });
     expect(result.players.slice(0, 5).map((player) => player.playerId)).toEqual(['1', '2', '3', '4', '5']);
-    expect(result.players.every((player) => player.scope === 'ranked-solo')).toBe(true);
+    expect(result.players.every((player) => player.scope === 'all')).toBe(true);
     expect(result.players.every((player) => player.matches.map((match) => match.queueId).includes(430))).toBe(true);
   });
 
@@ -86,7 +86,7 @@ describe('MatchService', () => {
     expect(result.positionOrderReliable).toBe(false);
   });
 
-  it('rejects a session without validated queue metadata', async () => {
+  it('falls back to unknown mode and roster order when queue metadata is absent', async () => {
     const get = vi.fn(async (path: string) => {
       if (path === '/lol-gameflow/v1/session') {
         return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
@@ -94,9 +94,10 @@ describe('MatchService', () => {
       return history;
     });
 
-    await expect(new MatchService({ get } as LcuClient).loadLiveMatch('all', () => undefined))
-      .rejects.toThrow();
-    expect(get).toHaveBeenCalledOnce();
+    const result = await new MatchService({ get } as LcuClient).loadLiveMatch('all', () => undefined);
+
+    expect(result).toMatchObject({ queueId: 0, modeName: '其他模式', positionOrderReliable: false });
+    expect(result.players.slice(0, 5).map((player) => player.playerId)).toEqual(['1', '2', '3', '4', '5']);
   });
 
   it('orients team 200 first using the strictly validated current summoner', async () => {
@@ -227,28 +228,37 @@ describe('MatchService', () => {
     expect(new Set(updated).size).toBe(10);
   });
 
-  it('uses cached players before history calls and caches only successful snapshots', async () => {
+  it('uses only all-mode cache entries even when called with the legacy ranked scope', async () => {
     const cached: PlayerSnapshot = {
       playerId: '1', displayName: 'Old', teamId: 200, lane: 'JUNGLE', championId: 1,
       scope: 'ranked-solo', matches: [], sampleSize: 0, wins: 0, losses: 0, winRate: 0,
       currentChampionGames: 0, currentChampionWins: 0, currentChampionWinRate: 0,
       status: 'ready', updatedAt: 1
     };
-    const cache = { get: vi.fn((id) => id === '1' ? cached : null), put: vi.fn() };
+    const cache = { get: vi.fn((id, scope) => id === '1' && scope === 'ranked-solo' ? cached : null), put: vi.fn() };
+    const tenGameHistory = {
+      games: Array.from({ length: 10 }, (_, index) => ({
+        ...history.games[0], gameId: index + 1, queueId: index % 2 === 0 ? 420 : 430
+      }))
+    };
     const get = vi.fn(async (path: string) => {
       if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queueId: 420 } };
       if (path.includes('/5/')) throw new Error('unavailable');
-      return history;
+      return tenGameHistory;
     });
     const updated: string[] = [];
 
     const result = await new MatchService({ get } as LcuClient, { cache }).loadLiveMatch('ranked-solo', (player) => updated.push(player.playerId));
 
-    expect(get.mock.calls.some(([path]) => String(path).includes('/1/'))).toBe(false);
+    expect(get.mock.calls.some(([path]) => String(path).includes('/1/'))).toBe(true);
     expect(result.players[0].displayName).toBe('Player 1');
+    expect(result.players[0].scope).toBe('all');
+    expect(result.players[0].matches).toHaveLength(10);
+    expect(cache.get).toHaveBeenCalledWith('1', 'all');
+    expect(cache.get.mock.calls.every(([, scope]) => scope === 'all')).toBe(true);
     expect(updated).toHaveLength(10);
-    expect(cache.put).toHaveBeenCalledTimes(8);
-    expect(cache.put.mock.calls.every(([player]) => player.status === 'ready')).toBe(true);
+    expect(cache.put).toHaveBeenCalledTimes(9);
+    expect(cache.put.mock.calls.every(([player]) => player.status === 'ready' && player.scope === 'all')).toBe(true);
   });
 
   it.each(['get', 'put'] as const)('keeps live-match loading operational when cache.%s throws', async (operation) => {

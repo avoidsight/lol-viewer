@@ -172,6 +172,18 @@ describe('LiveMatchPage', () => {
     expect(screen.queryByText('位置待确认')).not.toBeInTheDocument();
   });
 
+  it('uses neutral roster order while progressive players arrive before match metadata', () => {
+    const scrambled = [player(3), player(0), player(4), player(1), player(2)];
+
+    render(<LiveMatchPage players={scrambled} />);
+
+    const team = screen.getByRole('group', { name: '队伍 1' });
+    expect(within(team).getAllByTestId('player-card').map((card) => card.getAttribute('aria-labelledby')))
+      .toEqual(scrambled.map((entry) => `player-${entry.playerId}`));
+    expect(within(team).getAllByText(/阵容 [1-5]/).map((label) => label.textContent))
+      .toEqual(['阵容 1', '阵容 2', '阵容 3', '阵容 4', '阵容 5']);
+  });
+
   it('keeps a 1050px grid inside a horizontal scroll container', () => {
     render(<LiveMatchPage match={fixtureLiveMatch} />);
     expect(getComputedStyle(screen.getByLabelText('双方对局比较')).overflowX).toBe('auto');

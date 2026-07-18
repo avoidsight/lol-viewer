@@ -18,8 +18,6 @@ const sessionSchema = z.object({
     teamTwo: z.array(participantSchema).length(5),
     queue: z.object({ id: z.number().int().nonnegative() }).optional(),
     queueId: z.number().int().nonnegative().optional()
-  }).refine((gameData) => gameData.queue !== undefined || gameData.queueId !== undefined, {
-    message: 'Live session queue metadata is required'
   })
 });
 
@@ -82,13 +80,13 @@ export class MatchService {
     this.cache = options.cache;
   }
 
-  async loadLiveMatch(scope: QueueScope, onPlayer: (player: PlayerSnapshot) => void): Promise<LiveMatch> {
+  async loadLiveMatch(_scope: QueueScope, onPlayer: (player: PlayerSnapshot) => void): Promise<LiveMatch> {
     const session = sessionSchema.parse(
       await this.client.get('/lol-gameflow/v1/session', sessionSchema)
     );
-    const queueId = session.gameData.queue?.id ?? session.gameData.queueId!;
+    const queueId = session.gameData.queue?.id ?? session.gameData.queueId ?? 0;
     const modeName = describeQueue(queueId);
-    const positionOrderReliable = queueId !== 450
+    const positionOrderReliable = queueId !== 0 && queueId !== 450
       && hasReliablePositions(session.gameData.teamOne)
       && hasReliablePositions(session.gameData.teamTwo);
     let currentSummoner: z.infer<typeof currentSummonerSchema> | undefined;
@@ -126,12 +124,12 @@ export class MatchService {
         lane: laneOf(participant.selectedPosition),
         championId: participant.championId,
         ...(assetVersion === undefined ? {} : { assetVersion }),
-        scope,
+        scope: 'all' as const,
         updatedAt: Date.now()
       };
       let cached: PlayerSnapshot | null = null;
       try {
-        cached = this.cache?.get(base.playerId, scope) ?? null;
+        cached = this.cache?.get(base.playerId, 'all') ?? null;
       } catch {
         // Cache availability must not affect live LCU history loading.
       }

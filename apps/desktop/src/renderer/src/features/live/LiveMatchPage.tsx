@@ -7,10 +7,10 @@ import './live-match.css';
 const lanes: Exclude<Lane, 'UNKNOWN'>[] = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'];
 interface Slot { lane: Exclude<Lane, 'UNKNOWN'>; player?: PlayerSnapshot; uncertain: boolean; label?: string }
 
-export function teamSlots(players: PlayerSnapshot[], reliable = true): Slot[] {
+export function teamSlots(players: PlayerSnapshot[], reliable: boolean): Slot[] {
   if (!reliable) {
-    return players.slice(0, 5).map((player, index) => ({
-      lane: lanes[index], player, uncertain: false, label: `阵容 ${index + 1}`
+    return lanes.map((lane, index) => ({
+      lane, player: players[index], uncertain: false, label: `阵容 ${index + 1}`
     }));
   }
   const remaining = [...players];
@@ -35,7 +35,7 @@ export default function LiveMatchPage({ match, players = [], scope = 'ranked-sol
   const progressiveLocal = visiblePlayers.find((player) => player.isLocalTeam)?.teamId;
   const localTeamId = match?.localTeamId === undefined ? progressiveLocal : match.localTeamId;
   const oriented = localTeamId !== undefined && localTeamId !== null;
-  const positionOrderReliable = match?.positionOrderReliable ?? true;
+  const positionOrderReliable = match?.positionOrderReliable ?? false;
   const teamIds: (number | undefined)[] = oriented
     ? [localTeamId, knownTeamIds.find((teamId) => teamId !== localTeamId)]
     : [knownTeamIds[0], knownTeamIds[1]];
