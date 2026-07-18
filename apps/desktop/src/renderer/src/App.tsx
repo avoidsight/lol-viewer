@@ -54,7 +54,7 @@ export default function App() {
   const update = async (patch: Partial<AppSettings>) => {
     if (!window.lolViewer) return;
     setMessage('Saving settings…');
-    try { const next = await window.lolViewer.updateSettings(patch); setSettings(next); setRequestedScope(next.queueScope); setMessage('Settings saved'); }
+    try { const next = await window.lolViewer.updateSettings(patch); if (patch.autoOpenLiveMatch === false) await window.lolViewer.cancelLiveMatch?.(); setSettings(next); setRequestedScope(next.queueScope); setMessage('Settings saved'); }
     catch { setMessage('Settings could not be saved'); }
   };
   const retry = () => { void window.lolViewer?.retryLiveMatch?.(); setLoadNonce((value) => value + 1); };

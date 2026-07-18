@@ -26,6 +26,7 @@ export function createFixtureLiveMatch(scope: QueueScope): LiveMatch {
       playerId: `fixture-player-${index}`,
       displayName: `Fixture Player ${index + 1}`,
       teamId: index < 5 ? 100 : 200,
+      isLocalTeam: index < 5,
       lane: lanes[index % 5],
       championId: index + 1,
       rank: 'Fixture',
@@ -42,7 +43,7 @@ export function createFixtureLiveMatch(scope: QueueScope): LiveMatch {
       updatedAt: Date.UTC(2026, 0, 1)
     };
   });
-  return { players };
+  return { players, localTeamId: 100 };
 }
 
 export function fixtureModeEnabled(

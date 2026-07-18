@@ -55,3 +55,32 @@ Real CN LCU smoke: **NOT RUN**. No consenting user with an open League client wa
 - The rank endpoint can vary between client releases; failures are deliberately isolated and surface as an unknown rank.
 - The current-summoner endpoint is preferred. The compatibility fallback uses only the already schema-validated session ordering when that endpoint is unavailable.
 - Guide calls contain only patch, champion ID, and lane; they never contain LCU credentials, summoner identity, or match history.
+
+## Second final-review wave
+
+### RED
+
+Focused regression tests reproduced five failures:
+
+- `localTeamId: 200` still rendered team 100 under the “our team” label;
+- patch discovery rejection escaped instead of reading the latest persisted guide, and exposed the injected detail;
+- coordinator disposal and scope replacement left both promises pending until the test timeout.
+
+The RED run had 5 failed tests and 93 passing tests. A separate UI test covered auto-open cancellation.
+
+### GREEN
+
+- `LiveMatch` now carries validated `localTeamId`; progressive snapshots carry `isLocalTeam`. Team 200 renders first when it is local. Missing current-summoner identity produces `localTeamId: null`, neutral Team 1/Team 2 labels, and an explicit orientation-unavailable notice.
+- Added strict `ChampionGuideCache.getLatest(championId, lane)` lookup ordered by cache time and patch. Patch discovery failure now returns that validated snapshot as stale, or a fixed sanitized unavailable error when no safe cache exists. Exact-patch lookup remains the online path.
+- Coordinator replacement, explicit cancellation, and disposal now settle superseded requests with fixed `MATCH_CANCELLED` / `Live match request cancelled` errors. No source error or LCU detail is attached.
+- Added authorized `match:cancel` IPC with undefined-input validation and preload output validation. Turning auto-open off invokes it after the settings update.
+- Existing rank population, response-size ceiling, settings persistence, security posture, and packaging behavior remain covered.
+
+### Fresh verification
+
+- Full unit suite: 18 files, 99 tests passed.
+- Typecheck: `tsc --noEmit`, exit 0.
+- Production build: main, preload, and renderer bundles built, exit 0.
+- Electron E2E: exact 10 cards and 100 records, 1 test passed in 1.1 seconds.
+- Electron 37 native rebuild completed; SQLite smoke passed with `value=42`.
+- Real CN LCU smoke remains **NOT RUN** because no consenting/open client was confirmed.

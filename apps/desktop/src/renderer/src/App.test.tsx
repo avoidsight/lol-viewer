@@ -37,6 +37,15 @@ function installApi(getLiveMatch: LolViewerApi['getLiveMatch']) {
 afterEach(() => { delete window.lolViewer; });
 
 describe('App', () => {
+  it('cancels the active coordinator when auto-open is turned off', async () => {
+    installApi(() => new Promise(() => undefined));
+    const cancelLiveMatch = vi.fn().mockResolvedValue(undefined);
+    window.lolViewer!.cancelLiveMatch = cancelLiveMatch;
+    render(<App />);
+    await screen.findByRole('status');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Auto-open live match' }));
+    await waitFor(() => expect(cancelLiveMatch).toHaveBeenCalledOnce());
+  });
   it('loads persisted queue settings and reports cache-clear success', async () => {
     const getLiveMatch = vi.fn().mockResolvedValue({ players: players.map((player) => ({ ...player, scope: 'all' as const })) });
     installApi(getLiveMatch);
@@ -97,7 +106,7 @@ describe('App', () => {
     render(<App />);
     expect(await screen.findByText('Player 0')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: '全部模式' }));
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('正在加载全部模式对局'));
+    await waitFor(() => expect(screen.getByText('正在加载全部模式对局')).toBeVisible());
     expect(screen.getByRole('button', { name: '单双排' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('Player 0')).toBeVisible();
     await act(async () => next.reject(new Error('offline')));

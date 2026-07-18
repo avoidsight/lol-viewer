@@ -25,6 +25,19 @@ describe('ChampionGuideClient', () => {
     await expect(client.getChampionGuide(114, 'TOP')).resolves.toMatchObject({ source: 'OPGG', stale: true });
   });
 
+  it('returns the latest persisted guide when current patch discovery fails', async () => {
+    database = new Database(':memory:'); migrateDatabase(database);
+    const cache = new ChampionGuideCache(database); cache.put(guide, 10);
+    const client = new ChampionGuideClient({ baseUrl: 'https://guides.test', getPatch: vi.fn().mockRejectedValue(new Error('LCU token detail')), cache, fetch: vi.fn() });
+    await expect(client.getChampionGuide(114, 'TOP')).resolves.toMatchObject({ patch: '16.14', stale: true });
+  });
+
+  it('sanitizes patch discovery and empty latest-cache failures', async () => {
+    const cache = { get: vi.fn(), getLatest: vi.fn(() => null), put: vi.fn() };
+    const client = new ChampionGuideClient({ baseUrl: 'https://guides.test', getPatch: vi.fn().mockRejectedValue(new Error('LCU token detail')), cache, fetch: vi.fn() });
+    await expect(client.getChampionGuide(114, 'TOP')).rejects.toThrow('Champion guide unavailable');
+  });
+
   it('validates a successful response and caches it as a fresh single-source snapshot', async () => {
     database = new Database(':memory:'); migrateDatabase(database);
     const cache = new ChampionGuideCache(database);

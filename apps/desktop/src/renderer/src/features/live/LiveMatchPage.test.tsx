@@ -46,10 +46,20 @@ function player(index: number, overrides: Partial<PlayerSnapshot> = {}): PlayerS
 }
 
 const fixtureLiveMatch: LiveMatch = {
-  players: Array.from({ length: 10 }, (_, index) => player(index))
+  players: Array.from({ length: 10 }, (_, index) => player(index)),
+  localTeamId: 100
 };
 
 describe('LiveMatchPage', () => {
+  it('renders validated team 200 as our top team and uses neutral labels without orientation', () => {
+    const team200 = { ...fixtureLiveMatch, localTeamId: 200 };
+    const { rerender } = render(<LiveMatchPage match={team200} />);
+    expect(within(screen.getByRole('group', { name: '我方队伍' })).getByText('Player 5')).toBeVisible();
+    rerender(<LiveMatchPage match={{ ...fixtureLiveMatch, localTeamId: null }} />);
+    expect(screen.queryByRole('group', { name: '我方队伍' })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: '队伍 1' })).toBeVisible();
+    expect(screen.getByText('阵营方向无法确认')).toBeVisible();
+  });
   it('renders two aligned teams and every available recent match', () => {
     render(<LiveMatchPage match={fixtureLiveMatch} />);
 
@@ -115,7 +125,8 @@ describe('LiveMatchPage', () => {
 
   it('renders exactly five deterministic slots per team for duplicate and unknown lanes', () => {
     const uncertain: LiveMatch = {
-      players: fixtureLiveMatch.players.map((entry, index) => index === 1 || index === 6 ? { ...entry, lane: 'TOP' } : index === 2 || index === 7 ? { ...entry, lane: 'UNKNOWN' } : entry)
+      players: fixtureLiveMatch.players.map((entry, index) => index === 1 || index === 6 ? { ...entry, lane: 'TOP' } : index === 2 || index === 7 ? { ...entry, lane: 'UNKNOWN' } : entry),
+      localTeamId: 100
     };
     render(<LiveMatchPage match={uncertain} />);
 

@@ -22,6 +22,7 @@ export interface PlayerSnapshot {
   playerId: string;
   displayName: string;
   teamId: number;
+  isLocalTeam?: boolean;
   lane: Lane;
   championId: number;
   assetVersion?: string;

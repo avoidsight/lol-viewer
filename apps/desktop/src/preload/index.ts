@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { PlayerSnapshot, QueueScope } from '../shared/domain';
 import {
   MATCH_GET_CHANNEL,
+  MATCH_CANCEL_CHANNEL,
   MATCH_RETRY_CHANNEL,
   CHAMPION_GUIDE_GET_CHANNEL,
   PLAYER_UPDATED_CHANNEL,
@@ -30,6 +31,7 @@ const api: LolViewerApi = Object.freeze({
     return liveMatchSchema.parse(await ipcRenderer.invoke(MATCH_GET_CHANNEL, input));
   },
   retryLiveMatch: async (): Promise<void> => z.undefined().parse(await ipcRenderer.invoke(MATCH_RETRY_CHANNEL)),
+  cancelLiveMatch: async (): Promise<void> => z.undefined().parse(await ipcRenderer.invoke(MATCH_CANCEL_CHANNEL)),
   onPlayerUpdated: (listener: (player: PlayerSnapshot, generation?: number) => void): (() => void) => {
     const handler = (_event: Electron.IpcRendererEvent, input: unknown): void => {
       const update = playerUpdateSchema.safeParse(input);

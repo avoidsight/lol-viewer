@@ -3,6 +3,11 @@ import type { LiveMatch } from '../../shared/ipc';
 
 type Load = (scope: QueueScope, onPlayer: (player: PlayerSnapshot) => void) => Promise<LiveMatch>;
 
+export interface MatchCancelledError extends Error { code: 'MATCH_CANCELLED' }
+function cancelled(): MatchCancelledError {
+  return Object.assign(new Error('Live match request cancelled'), { code: 'MATCH_CANCELLED' as const });
+}
+
 export class GameflowCoordinator {
   private disposed = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
@@ -30,7 +35,7 @@ export class GameflowCoordinator {
         this.clearWait();
       }
     }
-    return new Promise<LiveMatch>(() => undefined);
+    throw cancelled();
   }
 
   retry(): void {
@@ -39,6 +44,12 @@ export class GameflowCoordinator {
 
   dispose(): void {
     this.disposed = true;
+    this.generation += 1;
+    this.wake?.();
+    this.clearWait();
+  }
+
+  cancel(): void {
     this.generation += 1;
     this.wake?.();
     this.clearWait();

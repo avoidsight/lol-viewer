@@ -3,6 +3,7 @@ import type { PlayerSnapshot, QueueScope } from './domain';
 
 export const MATCH_GET_CHANNEL = 'match:get-live' as const;
 export const MATCH_RETRY_CHANNEL = 'match:retry' as const;
+export const MATCH_CANCEL_CHANNEL = 'match:cancel' as const;
 export const PLAYER_UPDATED_CHANNEL = 'match:player-updated' as const;
 export const SETTINGS_GET_CHANNEL = 'settings:get' as const;
 export const SETTINGS_UPDATE_CHANNEL = 'settings:update' as const;
@@ -36,6 +37,7 @@ export const playerSnapshotSchema: z.ZodType<PlayerSnapshot> = z.object({
   playerId: z.string(),
   displayName: z.string(),
   teamId: z.number().int(),
+  isLocalTeam: z.boolean().optional(),
   lane: laneSchema,
   championId: z.number().int().nonnegative(),
   assetVersion: z.string().min(1).optional(),
@@ -54,7 +56,7 @@ export const playerSnapshotSchema: z.ZodType<PlayerSnapshot> = z.object({
   updatedAt: z.number()
 }).strict();
 
-export const liveMatchSchema = z.object({ players: z.array(playerSnapshotSchema).length(10) }).strict();
+export const liveMatchSchema = z.object({ players: z.array(playerSnapshotSchema).length(10), localTeamId: z.number().int().nullable().optional() }).strict();
 export const liveMatchRequestSchema = z.object({ scope: queueScopeSchema, generation: z.number().int().nonnegative() }).strict();
 export const playerUpdateSchema = z.object({ generation: z.number().int().nonnegative(), player: playerSnapshotSchema }).strict();
 
@@ -76,11 +78,13 @@ export type ChampionGuide = z.infer<typeof championGuideSchema>;
 
 export interface LiveMatch {
   players: PlayerSnapshot[];
+  localTeamId?: number | null;
 }
 
 export interface LolViewerApi {
   getLiveMatch(scope: QueueScope, generation?: number): Promise<LiveMatch>;
   retryLiveMatch?(): Promise<void>;
+  cancelLiveMatch?(): Promise<void>;
   onPlayerUpdated(listener: (player: PlayerSnapshot, generation?: number) => void): () => void;
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;

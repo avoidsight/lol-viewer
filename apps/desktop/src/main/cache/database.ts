@@ -63,6 +63,14 @@ export class ChampionGuideCache {
     if (!row.success) return null;
     try { return championGuideSnapshotSchema.parse(JSON.parse(row.data.snapshot_json)); } catch { return null; }
   }
+  getLatest(championId: number, lane: ChampionLane): ChampionGuideSnapshot | null {
+    const row = snapshotRowSchema.safeParse(this.database.prepare(
+      `SELECT snapshot_json, cached_at FROM champion_guide_snapshots
+       WHERE champion_id = ? AND lane = ? ORDER BY cached_at DESC, patch DESC LIMIT 1`
+    ).get(championId, lane));
+    if (!row.success) return null;
+    try { return championGuideSnapshotSchema.parse(JSON.parse(row.data.snapshot_json)); } catch { return null; }
+  }
   put(snapshot: ChampionGuideSnapshot, cachedAt = Date.now()): void {
     const value = championGuideSnapshotSchema.parse(snapshot);
     this.database.prepare(`INSERT INTO champion_guide_snapshots (patch, champion_id, lane, snapshot_json, cached_at)

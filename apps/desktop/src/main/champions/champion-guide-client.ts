@@ -8,7 +8,7 @@ interface Options {
   baseUrl: string;
   patch?: string;
   getPatch?: () => Promise<string>;
-  cache: Pick<ChampionGuideCache, 'get' | 'put'>;
+  cache: Pick<ChampionGuideCache, 'get' | 'put'> & Partial<Pick<ChampionGuideCache, 'getLatest'>>;
   fetch?: typeof fetch;
   setTimeout?: ScheduleTimeout;
   clearTimeout?: CancelTimeout;
@@ -18,7 +18,15 @@ export class ChampionGuideClient {
   private readonly fetcher: typeof fetch;
   constructor(private readonly options: Options) { this.fetcher = options.fetch ?? fetch; }
   async getChampionGuide(championId: number, lane: ChampionLane): Promise<ChampionGuide> {
-    const patch = this.options.getPatch ? await this.options.getPatch() : this.options.patch;
+    let patch: string | undefined;
+    try { patch = this.options.getPatch ? await this.options.getPatch() : this.options.patch; }
+    catch {
+      try {
+        const latest = this.options.cache.getLatest?.(championId, lane);
+        if (latest) return { ...latest, stale: true };
+      } catch { /* sanitized below */ }
+      throw new Error('Champion guide unavailable');
+    }
     if (!patch || !/^\d+\.\d+$/.test(patch)) throw new Error('Champion guide unavailable');
     const controller = new AbortController();
     const timeout = (this.options.setTimeout ?? setTimeout)(() => controller.abort(), 5_000);

@@ -75,13 +75,13 @@ export class MatchService {
     const session = sessionSchema.parse(
       await this.client.get('/lol-gameflow/v1/session', sessionSchema)
     );
-    let currentSummoner: z.infer<typeof currentSummonerSchema>;
+    let currentSummoner: z.infer<typeof currentSummonerSchema> | undefined;
     try {
       currentSummoner = currentSummonerSchema.parse(
         await this.client.get('/lol-summoner/v1/current-summoner', currentSummonerSchema)
       );
     } catch {
-      currentSummoner = { summonerId: session.gameData.teamOne[0].summonerId };
+      currentSummoner = undefined;
     }
     let assetVersion: string | undefined;
     try {
@@ -92,17 +92,21 @@ export class MatchService {
       assetVersion = undefined;
     }
     const allParticipants = [...session.gameData.teamOne, ...session.gameData.teamTwo];
-    const local = allParticipants.find((participant) => String(participant.summonerId) === String(currentSummoner.summonerId));
-    if (!local) throw new Error('Current summoner is not part of the live session');
-    const participants = [
-      ...allParticipants.filter((participant) => participant.teamId === local.teamId),
-      ...allParticipants.filter((participant) => participant.teamId !== local.teamId)
-    ];
+    const local = currentSummoner
+      ? allParticipants.find((participant) => String(participant.summonerId) === String(currentSummoner.summonerId))
+      : undefined;
+    if (currentSummoner && !local) throw new Error('Current summoner is not part of the live session');
+    const localTeamId = local?.teamId ?? null;
+    const participants = local ? [
+      ...allParticipants.filter((participant) => participant.teamId === localTeamId),
+      ...allParticipants.filter((participant) => participant.teamId !== localTeamId)
+    ] : allParticipants;
     const players = await mapLimit(participants, 4, async (participant) => {
       const base = {
         playerId: String(participant.summonerId),
         displayName: participant.summonerName,
         teamId: participant.teamId,
+        ...(localTeamId === null ? {} : { isLocalTeam: participant.teamId === localTeamId }),
         lane: laneOf(participant.selectedPosition),
         championId: participant.championId,
         ...(assetVersion === undefined ? {} : { assetVersion }),
@@ -166,7 +170,7 @@ export class MatchService {
       }
       return player;
     });
-    return { players };
+    return { players, localTeamId };
   }
 
   private async getHistoryWithRetry(playerId: string): Promise<unknown> {
