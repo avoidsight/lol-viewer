@@ -30,9 +30,60 @@ const history = {
 };
 
 describe('MatchService', () => {
+  it.each([
+    [{ id: 420 }, undefined, '单双排'],
+    [{ id: 440 }, undefined, '灵活排位'],
+    [undefined, 400, '匹配模式'],
+    [undefined, 430, '匹配模式'],
+    [{ id: 450 }, undefined, '极地大乱斗'],
+    [{ id: 999 }, undefined, '其他模式']
+  ])('derives live mode metadata from a strictly parsed session', async (queue, queueId, modeName) => {
+    const positioned = participants.map((participant, index) => ({
+      ...participant,
+      selectedPosition: ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'][index % 5]
+    }));
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') {
+        return { gameData: { teamOne: positioned.slice(0, 5), teamTwo: positioned.slice(5), queue, queueId } };
+      }
+      return history;
+    });
+
+    const result = await new MatchService({ get } as LcuClient).loadLiveMatch('all', () => undefined);
+
+    expect(result).toMatchObject({ queueId: queue?.id ?? queueId, modeName });
+    expect(result.positionOrderReliable).toBe((queue?.id ?? queueId) !== 450);
+  });
+
+  it('marks position order unreliable when either team lacks unique standard positions', async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') {
+        return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queue: { id: 420 } } };
+      }
+      return history;
+    });
+
+    const result = await new MatchService({ get } as LcuClient).loadLiveMatch('all', () => undefined);
+
+    expect(result.positionOrderReliable).toBe(false);
+  });
+
+  it('rejects a session without validated queue metadata', async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') {
+        return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
+      }
+      return history;
+    });
+
+    await expect(new MatchService({ get } as LcuClient).loadLiveMatch('all', () => undefined))
+      .rejects.toThrow();
+    expect(get).toHaveBeenCalledOnce();
+  });
+
   it('orients team 200 first using the strictly validated current summoner', async () => {
     const get = vi.fn(async (path: string) => {
-      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queueId: 420 } };
       if (path === '/lol-summoner/v1/current-summoner') return { summonerId: 8 };
       if (path.includes('/ranked-stats/')) return { queues: [] };
       return history;
@@ -43,7 +94,7 @@ describe('MatchService', () => {
 
   it('populates solo rank and isolates a single rank lookup failure', async () => {
     const get = vi.fn(async (path: string) => {
-      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queueId: 420 } };
       if (path === '/lol-summoner/v1/current-summoner') return { summonerId: 1 };
       if (path.includes('/ranked-stats/2')) throw new Error('rank offline');
       if (path.includes('/ranked-stats/')) return { queues: [{ queueType: 'RANKED_SOLO_5x5', tier: 'GOLD', division: 'II', leaguePoints: 42 }] };
@@ -57,7 +108,7 @@ describe('MatchService', () => {
   });
   it('propagates a separately validated current asset version to every player', async () => {
     const get = vi.fn(async (path: string) => {
-      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queueId: 420 } };
       if (path === '/lol-patch/v1/game-version') return '15.14.1';
       return history;
     });
@@ -67,7 +118,7 @@ describe('MatchService', () => {
 
   it.each([new Error('offline'), { version: 'invalid' }])('keeps history usable when version lookup is unavailable or invalid', async (versionResult) => {
     const get = vi.fn(async (path: string) => {
-      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queueId: 420 } };
       if (path === '/lol-patch/v1/game-version') {
         if (versionResult instanceof Error) throw versionResult;
         return versionResult;
@@ -80,7 +131,7 @@ describe('MatchService', () => {
   });
   it('emits nine ready players and one unavailable player without rejecting', async () => {
     const get = vi.fn(async (path: string) => {
-      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queueId: 420 } };
       if (path.includes('/5/')) throw Object.assign(new Error('offline'), { code: 'LCU_AUTH' });
       return history;
     });
@@ -99,7 +150,7 @@ describe('MatchService', () => {
     let active = 0;
     let maximum = 0;
     const get = vi.fn(async (path: string) => {
-      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queueId: 420 } };
       active += 1;
       maximum = Math.max(maximum, active);
       await new Promise<void>((resolve) => setTimeout(resolve, 5));
@@ -116,7 +167,7 @@ describe('MatchService', () => {
     const sleep = vi.fn(async () => undefined);
     let attempts = 0;
     const get = vi.fn(async (path: string) => {
-      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queueId: 420 } };
       if (path.includes('/1/') && attempts++ < 2) throw Object.assign(new Error('offline'), { code: 'LCU_UNAVAILABLE' });
       return history;
     });
@@ -130,7 +181,7 @@ describe('MatchService', () => {
   it('rejects a structurally invalid nine-player session', async () => {
     const get = vi.fn(async (path: string) => {
       if (path === '/lol-gameflow/v1/session') {
-        return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5, 9) } };
+        return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5, 9), queueId: 420 } };
       }
       return history;
     });
@@ -142,7 +193,7 @@ describe('MatchService', () => {
 
   it('isolates throwing callbacks while returning all successful players once', async () => {
     const get = vi.fn(async (path: string) => {
-      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queueId: 420 } };
       return history;
     });
     const updated: string[] = [];
@@ -167,7 +218,7 @@ describe('MatchService', () => {
     };
     const cache = { get: vi.fn((id) => id === '1' ? cached : null), put: vi.fn() };
     const get = vi.fn(async (path: string) => {
-      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queueId: 420 } };
       if (path.includes('/5/')) throw new Error('unavailable');
       return history;
     });
@@ -193,7 +244,7 @@ describe('MatchService', () => {
       })
     };
     const get = vi.fn(async (path: string) => {
-      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queueId: 420 } };
       return history;
     });
     const updated: string[] = [];

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { liveMatchSchema, personalHistorySchema } from './ipc';
 
+const validPlayer = {
+  playerId: '1', displayName: 'Player', teamId: 100, lane: 'TOP' as const,
+  championId: 1, scope: 'ranked-solo' as const, matches: [], sampleSize: 0,
+  wins: 0, losses: 0, winRate: 0, currentChampionGames: 0,
+  currentChampionWins: 0, currentChampionWinRate: 0, status: 'ready' as const,
+  updatedAt: 1
+};
+
 describe('personalHistorySchema', () => {
   it('accepts exactly the validated personal snapshot and rejects unknown fields', () => {
     const value = {
@@ -13,6 +21,16 @@ describe('personalHistorySchema', () => {
   });
 
   it('requires live mode metadata', () => {
-    expect(() => liveMatchSchema.parse({ players: [], queueId: 450 })).toThrow();
+    const value = {
+      players: Array.from({ length: 10 }, (_, index) => ({
+        ...validPlayer, playerId: String(index), teamId: index < 5 ? 100 : 200
+      })),
+      localTeamId: 100, queueId: 450, modeName: '极地大乱斗', positionOrderReliable: false
+    };
+    for (const field of ['queueId', 'modeName', 'positionOrderReliable'] as const) {
+      const incomplete: Record<string, unknown> = { ...value };
+      delete incomplete[field];
+      expect(() => liveMatchSchema.parse(incomplete), field).toThrow();
+    }
   });
 });

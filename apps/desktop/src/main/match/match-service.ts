@@ -15,7 +15,11 @@ const participantSchema = z.object({
 const sessionSchema = z.object({
   gameData: z.object({
     teamOne: z.array(participantSchema).length(5),
-    teamTwo: z.array(participantSchema).length(5)
+    teamTwo: z.array(participantSchema).length(5),
+    queue: z.object({ id: z.number().int().nonnegative() }).optional(),
+    queueId: z.number().int().nonnegative().optional()
+  }).refine((gameData) => gameData.queue !== undefined || gameData.queueId !== undefined, {
+    message: 'Live session queue metadata is required'
   })
 });
 
@@ -30,6 +34,7 @@ const matchHistorySchema = z.object({ games: z.array(z.unknown()) });
 const assetVersionSchema = z.string().regex(/^\d+\.\d+(?:\.\d+){0,2}$/);
 const retryDelays = [250, 750] as const;
 const lanes = new Set<Lane>(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'UNKNOWN']);
+const standardPositions = new Set(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']);
 
 export interface MatchServiceOptions {
   sleep?: (milliseconds: number) => Promise<void>;
@@ -47,6 +52,20 @@ function laneOf(value: string | undefined): Lane {
 
 function isTransient(error: unknown): boolean {
   return (error as Partial<LcuError>)?.code === 'LCU_UNAVAILABLE';
+}
+
+function modeNameOf(queueId: number): string {
+  if (queueId === 420) return '单双排';
+  if (queueId === 440) return '灵活排位';
+  if (queueId === 400 || queueId === 430) return '匹配模式';
+  if (queueId === 450) return '极地大乱斗';
+  return '其他模式';
+}
+
+function hasReliablePositions(team: z.infer<typeof participantSchema>[]): boolean {
+  const positions = team.map((participant) => participant.selectedPosition);
+  return positions.every((position): position is string => position !== undefined && standardPositions.has(position))
+    && new Set(positions).size === standardPositions.size;
 }
 
 async function mapLimit<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
@@ -75,6 +94,11 @@ export class MatchService {
     const session = sessionSchema.parse(
       await this.client.get('/lol-gameflow/v1/session', sessionSchema)
     );
+    const queueId = session.gameData.queue?.id ?? session.gameData.queueId!;
+    const modeName = modeNameOf(queueId);
+    const positionOrderReliable = queueId !== 450
+      && hasReliablePositions(session.gameData.teamOne)
+      && hasReliablePositions(session.gameData.teamTwo);
     let currentSummoner: z.infer<typeof currentSummonerSchema> | undefined;
     try {
       currentSummoner = currentSummonerSchema.parse(
@@ -170,7 +194,7 @@ export class MatchService {
       }
       return player;
     });
-    return { players, localTeamId, queueId: 420, modeName: '单双排', positionOrderReliable: true };
+    return { players, localTeamId, queueId, modeName, positionOrderReliable };
   }
 
   private async getHistoryWithRetry(playerId: string): Promise<unknown> {
