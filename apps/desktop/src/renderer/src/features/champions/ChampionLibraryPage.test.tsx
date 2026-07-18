@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import ChampionLibraryPage from './ChampionLibraryPage';
+import type { ChampionGuide, ChampionLane } from '../../../../shared/ipc';
 
 const guide = {
   championId: 114, lane: 'TOP' as const, patch: '16.14', source: 'CN_OFFICIAL' as const,
@@ -30,5 +31,16 @@ describe('ChampionLibraryPage', () => {
     render(<ChampionLibraryPage getGuide={vi.fn().mockRejectedValue(new Error('offline'))} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('英雄数据暂不可用');
     expect(screen.queryByRole('heading', { name: '推荐出装' })).not.toBeInTheDocument();
+  });
+
+  it.each<[string, (id: number, lane: ChampionLane) => Promise<ChampionGuide>]>([
+    ['loading', () => new Promise<ChampionGuide>(() => undefined)],
+    ['unavailable', () => Promise.reject(new Error('offline'))]
+  ])('allows returning to the live page while %s', async (_state, getGuide) => {
+    const onBack = vi.fn();
+    render(<ChampionLibraryPage getGuide={getGuide} onBack={onBack} />);
+    const button = await screen.findByRole('button', { name: '返回实时对局' });
+    fireEvent.click(button);
+    expect(onBack).toHaveBeenCalledOnce();
   });
 });

@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
-import { describe, expect, it, vi } from 'vitest';
-import { MatchCache, migrateDatabase } from '../cache/database';
+import { describe, expect, it } from 'vitest';
+import { ChampionGuideCache, MatchCache, migrateDatabase } from '../cache/database';
 import { SettingsService } from './settings-service';
 
 describe('SettingsService', () => {
@@ -50,9 +50,10 @@ describe('SettingsService', () => {
   it('also clears the public champion guide cache on an explicit cache clear', () => {
     const database = new Database(':memory:');
     migrateDatabase(database);
-    const guideCache = { clear: vi.fn() };
+    const guideCache = new ChampionGuideCache(database);
+    guideCache.put({ championId: 114, lane: 'TOP', patch: '16.14', source: 'OPGG', region: 'KR', tier: 'EMERALD+', fetchedAt: '2026-07-16T00:00:00.000Z', builds: [], favorable: [], unfavorable: [], notes: [] });
     new SettingsService(database, new MatchCache(database), guideCache).clearCache();
-    expect(guideCache.clear).toHaveBeenCalledOnce();
+    expect(guideCache.get('16.14', 114, 'TOP')).toBeNull();
   });
 
   it('rejects corrupt persisted boolean values instead of coercing them', () => {
