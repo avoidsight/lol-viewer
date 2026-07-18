@@ -14,6 +14,7 @@ export class GameflowCoordinator {
   private wake: (() => void) | undefined;
   private retryRequested = false;
   private generation = 0;
+  private activeCancellation: { generation: number; reject: (error: MatchCancelledError) => void } | undefined;
   private readonly intervalMs: number;
 
   constructor(private readonly attempt: Load, options: { intervalMs?: number } = {}) {
@@ -21,21 +22,30 @@ export class GameflowCoordinator {
   }
 
   async loadLiveMatch(scope: QueueScope, onPlayer: (player: PlayerSnapshot) => void): Promise<LiveMatch> {
+    this.cancelActive();
     const generation = ++this.generation;
-    this.wake?.();
-    while (!this.disposed && generation === this.generation) {
-      try {
-        return await this.attempt(scope, onPlayer);
-      } catch {
+    const cancellation = new Promise<never>((_resolve, reject) => {
+      this.activeCancellation = { generation, reject };
+    });
+    try {
+      while (!this.disposed && generation === this.generation) {
+        try {
+          return await Promise.race([this.attempt(scope, onPlayer), cancellation]);
+        } catch (error) {
+          if ((error as Partial<MatchCancelledError>)?.code === 'MATCH_CANCELLED') throw error;
         if (this.retryRequested) { this.retryRequested = false; continue; }
-        await new Promise<void>((resolve) => {
+        const backoff = new Promise<void>((resolve) => {
           this.wake = resolve;
           this.timer = setTimeout(resolve, this.intervalMs);
         });
+        await Promise.race([backoff, cancellation]);
         this.clearWait();
+        }
       }
+      throw cancelled();
+    } finally {
+      if (this.activeCancellation?.generation === generation) this.activeCancellation = undefined;
     }
-    throw cancelled();
   }
 
   retry(): void {
@@ -45,12 +55,14 @@ export class GameflowCoordinator {
   dispose(): void {
     this.disposed = true;
     this.generation += 1;
+    this.cancelActive();
     this.wake?.();
     this.clearWait();
   }
 
   cancel(): void {
     this.generation += 1;
+    this.cancelActive();
     this.wake?.();
     this.clearWait();
   }
@@ -59,5 +71,11 @@ export class GameflowCoordinator {
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
     this.wake = undefined;
+  }
+
+  private cancelActive(): void {
+    const active = this.activeCancellation;
+    this.activeCancellation = undefined;
+    active?.reject(cancelled());
   }
 }

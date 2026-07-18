@@ -84,3 +84,19 @@ The RED run had 5 failed tests and 93 passing tests. A separate UI test covered 
 - Electron E2E: exact 10 cards and 100 records, 1 test passed in 1.1 seconds.
 - Electron 37 native rebuild completed; SQLite smoke passed with `value=42`.
 - Real CN LCU smoke remains **NOT RUN** because no consenting/open client was confirmed.
+
+## Final isolated coordinator cancellation race
+
+### RED/GREEN
+
+Added deterministic deferred-attempt tests for request replacement, explicit cancel, and dispose. Before the fix, all three hung until Vitest's five-second timeout. The coordinator now creates a cancellation promise per generation and races it against both the in-flight attempt and retry backoff. Replacement, cancel, and disposal reject promptly with the fixed `MATCH_CANCELLED` / `Live match request cancelled` error.
+
+Late success and late rejection are both exercised after cancellation. The superseded request cannot resolve from late success, and the raced attempt retains a rejection handler so late rejection is consumed without an unhandled rejection. Normal success and retry/backoff behavior remain covered.
+
+### Verification
+
+- Full unit suite: 18 files, 102 tests passed.
+- Typecheck passed.
+- Electron production build passed for main, preload, and renderer.
+- E2E exact 10 cards / 100 records passed in 1.1 seconds.
+- Electron 37 native rebuild and SQLite smoke passed (`value=42`).

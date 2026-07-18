@@ -1,7 +1,36 @@
 import { describe, expect, it, vi } from 'vitest';
 import { GameflowCoordinator } from './gameflow-coordinator';
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+
 describe('GameflowCoordinator', () => {
+  it.each(['replace', 'cancel', 'dispose'] as const)('promptly cancels a hung attempt on %s and ignores late settlement', async (action) => {
+    const hung = deferred<{ players: [] }>();
+    const replacementHung = deferred<{ players: [] }>();
+    let calls = 0;
+    const coordinator = new GameflowCoordinator(() => calls++ === 0 ? hung.promise : replacementHung.promise);
+    const old = coordinator.loadLiveMatch('all', () => undefined);
+    await Promise.resolve();
+    let replacement: Promise<unknown> | undefined;
+    if (action === 'replace') replacement = coordinator.loadLiveMatch('ranked-solo', () => undefined);
+    else if (action === 'cancel') coordinator.cancel();
+    else coordinator.dispose();
+    await expect(old).rejects.toMatchObject({ code: 'MATCH_CANCELLED', message: 'Live match request cancelled' });
+    if (action === 'replace') {
+      hung.resolve({ players: [] });
+      coordinator.cancel();
+      await expect(replacement).rejects.toMatchObject({ code: 'MATCH_CANCELLED' });
+      replacementHung.reject(new Error('late-replacement-rejection'));
+    } else {
+      hung.reject(new Error('late-secret-rejection'));
+      await Promise.resolve();
+    }
+  });
   it('recovers after startup-before-client and supports explicit retry', async () => {
     vi.useFakeTimers();
     const load = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ players: [] });
