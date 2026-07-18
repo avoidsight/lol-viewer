@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
-import { ChampionGuideCache, MatchCache, migrateDatabase } from '../cache/database';
+import { ChampionGuideCache, MatchCache, migrateDatabase, PersonalHistoryCache } from '../cache/database';
 import { SettingsService } from './settings-service';
 
 describe('SettingsService', () => {
@@ -54,6 +54,16 @@ describe('SettingsService', () => {
     guideCache.put({ championId: 114, lane: 'TOP', patch: '16.14', source: 'OPGG', region: 'KR', tier: 'EMERALD+', fetchedAt: '2026-07-16T00:00:00.000Z', builds: [], favorable: [], unfavorable: [], notes: [] });
     new SettingsService(database, new MatchCache(database), guideCache).clearCache();
     expect(guideCache.get('16.14', 114, 'TOP')).toBeNull();
+  });
+
+  it('also clears personal history on an explicit cache clear', () => {
+    const database = new Database(':memory:');
+    migrateDatabase(database);
+    const personalCache = new PersonalHistoryCache(database);
+    personalCache.put({ playerId: '7', displayName: 'Player', profileIconId: 29, matches: [], sampleSize: 0,
+      wins: 0, losses: 0, winRate: 0, averageKda: 0, favoriteChampions: [], cached: false, updatedAt: 1 });
+    new SettingsService(database, new MatchCache(database), undefined, personalCache).clearCache();
+    expect(personalCache.getLatest()).toBeNull();
   });
 
   it('rejects corrupt persisted boolean values instead of coercing them', () => {

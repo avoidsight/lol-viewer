@@ -19,7 +19,8 @@ export class SettingsService {
   constructor(
     private readonly database: Database.Database,
     private readonly cache: Pick<MatchCache, 'clearPlayerSnapshots'>,
-    private readonly publicGuideCache?: { clear(): void }
+    private readonly publicGuideCache?: { clear(): void },
+    private readonly personalHistoryCache?: { clear(): void }
   ) {}
 
   get(): AppSettings {
@@ -53,5 +54,6 @@ export class SettingsService {
   clearCache(): void {
     this.cache.clearPlayerSnapshots();
     this.publicGuideCache?.clear();
+    this.personalHistoryCache?.clear();
   }
 }

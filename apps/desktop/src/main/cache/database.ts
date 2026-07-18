@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3';
 import { z } from 'zod';
-import type { PlayerSnapshot, QueueScope } from '../../shared/domain';
-import { playerSnapshotSchema } from '../../shared/ipc';
+import type { PersonalHistorySnapshot, PlayerSnapshot, QueueScope } from '../../shared/domain';
+import { personalHistorySchema, playerSnapshotSchema } from '../../shared/ipc';
 import { championGuideSnapshotSchema, type ChampionGuideSnapshot, type ChampionLane } from '../../shared/ipc';
 
 const PLAYER_HISTORY_TTL_MS = 15 * 60_000;
@@ -51,7 +51,65 @@ export function migrateDatabase(database: Database.Database): void {
       );`);
       database.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)').run(2, Date.now());
     }
+    const personalHistoryMigration = database.prepare('SELECT 1 FROM schema_migrations WHERE version = ?').get(3);
+    if (!personalHistoryMigration) {
+      database.exec(`CREATE TABLE personal_history_snapshots (
+        player_id TEXT PRIMARY KEY,
+        snapshot_json TEXT NOT NULL,
+        cached_at INTEGER NOT NULL
+      );`);
+      database.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)').run(3, Date.now());
+    }
   })();
+}
+
+export class PersonalHistoryCache {
+  constructor(private readonly database: Database.Database) {}
+
+  getFresh(playerId: string, now = Date.now()): PersonalHistorySnapshot | null {
+    const row = this.readRow(
+      'SELECT snapshot_json, cached_at FROM personal_history_snapshots WHERE player_id = ?',
+      playerId
+    );
+    if (!row || row.cached_at > now || now - row.cached_at > PLAYER_HISTORY_TTL_MS) return null;
+    return this.parseSnapshot(row.snapshot_json, false);
+  }
+
+  getLatest(playerId?: string): PersonalHistorySnapshot | null {
+    const row = playerId === undefined
+      ? this.readRow('SELECT snapshot_json, cached_at FROM personal_history_snapshots ORDER BY cached_at DESC LIMIT 1')
+      : this.readRow(
+        'SELECT snapshot_json, cached_at FROM personal_history_snapshots WHERE player_id = ?',
+        playerId
+      );
+    if (!row || row.cached_at > Date.now()) return null;
+    return this.parseSnapshot(row.snapshot_json, true);
+  }
+
+  put(snapshot: PersonalHistorySnapshot, cachedAt = Date.now()): void {
+    const value = personalHistorySchema.parse(snapshot);
+    this.database.prepare(`INSERT INTO personal_history_snapshots (player_id, snapshot_json, cached_at)
+      VALUES (?, ?, ?) ON CONFLICT(player_id) DO UPDATE SET
+        snapshot_json = excluded.snapshot_json, cached_at = excluded.cached_at`
+    ).run(value.playerId, JSON.stringify(value), cacheTimeSchema.parse(cachedAt));
+  }
+
+  clear(): void {
+    this.database.prepare('DELETE FROM personal_history_snapshots').run();
+  }
+
+  private readRow(sql: string, ...parameters: unknown[]): z.infer<typeof snapshotRowSchema> | null {
+    const row = snapshotRowSchema.safeParse(this.database.prepare(sql).get(...parameters));
+    return row.success ? row.data : null;
+  }
+
+  private parseSnapshot(json: string, cached: boolean): PersonalHistorySnapshot | null {
+    try {
+      return personalHistorySchema.parse({ ...personalHistorySchema.parse(JSON.parse(json)), cached });
+    } catch {
+      return null;
+    }
+  }
 }
 
 export class ChampionGuideCache {

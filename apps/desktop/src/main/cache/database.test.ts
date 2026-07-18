@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
-import type { PlayerSnapshot } from '../../shared/domain';
-import { MatchCache, migrateDatabase } from './database';
+import type { PersonalHistorySnapshot, PlayerSnapshot } from '../../shared/domain';
+import { MatchCache, migrateDatabase, PersonalHistoryCache } from './database';
 
 const snapshot: PlayerSnapshot = {
   playerId: 'player-1',
@@ -86,6 +86,56 @@ describe('MatchCache', () => {
     migrateDatabase(database);
     migrateDatabase(database);
 
-    expect(database.prepare('SELECT version FROM schema_migrations ORDER BY version').all()).toEqual([{ version: 1 }, { version: 2 }]);
+    expect(database.prepare('SELECT version FROM schema_migrations ORDER BY version').all()).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
+  });
+});
+
+const personalSnapshot: PersonalHistorySnapshot = {
+  playerId: '7', displayName: 'Local Player', profileIconId: 29, matches: [], sampleSize: 0,
+  wins: 0, losses: 0, winRate: 0, averageKda: 0, favoriteChampions: [], cached: false,
+  updatedAt: 1_000
+};
+
+describe('PersonalHistoryCache', () => {
+  it('returns a fresh personal snapshot and marks latest fallback cached', () => {
+    const database = new Database(':memory:');
+    migrateDatabase(database);
+    const cache = new PersonalHistoryCache(database);
+    cache.put(personalSnapshot, 1_000);
+
+    expect(cache.getFresh('7', 1_001)).toEqual(personalSnapshot);
+    expect(cache.getLatest('7')).toEqual({ ...personalSnapshot, cached: true });
+    expect(cache.getLatest()).toEqual({ ...personalSnapshot, cached: true });
+  });
+
+  it('uses the globally newest snapshot for offline startup and clears all snapshots', () => {
+    const database = new Database(':memory:');
+    migrateDatabase(database);
+    const cache = new PersonalHistoryCache(database);
+    cache.put(personalSnapshot, 1_000);
+    cache.put({ ...personalSnapshot, playerId: '8', displayName: 'Newest' }, 2_000);
+
+    expect(cache.getLatest()?.playerId).toBe('8');
+    cache.clear();
+    expect(cache.getLatest()).toBeNull();
+  });
+
+  it('safely ignores stale, future, malformed timestamp, bad JSON, and invalid snapshots', () => {
+    const database = new Database(':memory:');
+    migrateDatabase(database);
+    const cache = new PersonalHistoryCache(database);
+    cache.put(personalSnapshot, 1_000);
+    expect(cache.getFresh('7', 1_000 + 15 * 60_000 + 1)).toBeNull();
+    expect(cache.getFresh('7', 999)).toBeNull();
+
+    database.prepare('UPDATE personal_history_snapshots SET cached_at = ?').run(1.5);
+    expect(cache.getFresh('7', 2)).toBeNull();
+    database.prepare('UPDATE personal_history_snapshots SET cached_at = ?').run(Date.now() + 60_000);
+    expect(cache.getLatest('7')).toBeNull();
+    expect(cache.getLatest()).toBeNull();
+    database.prepare('UPDATE personal_history_snapshots SET cached_at = ?, snapshot_json = ?').run(1, '{');
+    expect(cache.getLatest('7')).toBeNull();
+    database.prepare('UPDATE personal_history_snapshots SET snapshot_json = ?').run(JSON.stringify({ playerId: '7' }));
+    expect(cache.getLatest('7')).toBeNull();
   });
 });

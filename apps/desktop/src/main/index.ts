@@ -7,7 +7,7 @@ import { createLcuClient } from './lcu/http-client';
 import { registerMatchIpc } from './ipc/register-match-ipc';
 import { registerSettingsIpc } from './ipc/register-settings-ipc';
 import { MatchService } from './match/match-service';
-import { ChampionGuideCache, MatchCache, migrateDatabase } from './cache/database';
+import { ChampionGuideCache, MatchCache, migrateDatabase, PersonalHistoryCache } from './cache/database';
 import { ChampionGuideClient } from './champions/champion-guide-client';
 import { registerChampionIpc } from './ipc/register-champion-ipc';
 import { SettingsService } from './settings/settings-service';
@@ -55,7 +55,7 @@ void app.whenReady().then(() => {
       }
     }), cache: guideCache
   }));
-  registerSettingsIpc(new SettingsService(database, cache, guideCache));
+  registerSettingsIpc(new SettingsService(database, cache, guideCache, new PersonalHistoryCache(database)));
   coordinator = new GameflowCoordinator(async (scope, onPlayer) => {
       if (fixtureMode) return createFixtureLiveMatch(scope);
       const connection = await discoverLcuConnection();
