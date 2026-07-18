@@ -1,4 +1,4 @@
-import type { MatchSummary, PersonalHistorySnapshot, PlayerSnapshot, QueueScope } from '../../shared/domain';
+import type { FavoriteChampion, MatchSummary, PersonalHistorySnapshot, PlayerSnapshot, QueueScope } from '../../shared/domain';
 import type { LiveMatch } from '../../shared/ipc';
 
 const lanes = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'] as const;
@@ -29,6 +29,22 @@ function personalMatchesFor(): MatchSummary[] {
   }));
 }
 
+function favoriteChampionsFor(matches: MatchSummary[]): FavoriteChampion[] {
+  const groups = new Map<number, { games: number; wins: number }>();
+  for (const match of matches) {
+    const group = groups.get(match.championId) ?? { games: 0, wins: 0 };
+    group.games += 1;
+    if (match.win) group.wins += 1;
+    groups.set(match.championId, group);
+  }
+  return [...groups.entries()]
+    .map(([championId, group]) => ({
+      championId, games: group.games, wins: group.wins, winRate: group.wins / group.games
+    }))
+    .sort((left, right) => right.games - left.games || left.championId - right.championId)
+    .slice(0, 5);
+}
+
 export function createFixturePersonalHistory(): PersonalHistorySnapshot {
   const matches = personalMatchesFor();
   const wins = matches.filter((match) => match.win).length;
@@ -46,9 +62,7 @@ export function createFixturePersonalHistory(): PersonalHistorySnapshot {
     losses: matches.length - wins,
     winRate: wins / matches.length,
     averageKda: (kills + assists) / deaths,
-    favoriteChampions: matches.slice(0, 5).map((match) => ({
-      championId: match.championId, games: 1, wins: Number(match.win), winRate: Number(match.win)
-    })),
+    favoriteChampions: favoriteChampionsFor(matches),
     assetVersion: '26.1.1',
     cached: false,
     updatedAt: Date.UTC(2026, 0, 1)

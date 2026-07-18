@@ -10,9 +10,23 @@ describe('fixture live match', () => {
 
   it('provides a deterministic personal snapshot with twenty matches', () => {
     const first = createFixturePersonalHistory();
+    const groups = new Map<number, { games: number; wins: number }>();
+    for (const match of first.matches) {
+      const group = groups.get(match.championId) ?? { games: 0, wins: 0 };
+      group.games += 1;
+      if (match.win) group.wins += 1;
+      groups.set(match.championId, group);
+    }
+    const expectedFavorites = [...groups.entries()]
+      .map(([championId, group]) => ({
+        championId, games: group.games, wins: group.wins, winRate: group.wins / group.games
+      }))
+      .sort((left, right) => right.games - left.games || left.championId - right.championId)
+      .slice(0, 5);
     expect(first.matches).toHaveLength(20);
     expect(first.sampleSize).toBe(20);
     expect(new Set(first.matches.map((match) => match.queueId))).toEqual(new Set([420, 430, 440, 450]));
+    expect(first.favoriteChampions).toEqual(expectedFavorites);
     expect(createFixturePersonalHistory()).toEqual(first);
   });
 
