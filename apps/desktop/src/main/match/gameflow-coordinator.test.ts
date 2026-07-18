@@ -10,8 +10,8 @@ function deferred<T>() {
 
 describe('GameflowCoordinator', () => {
   it.each(['replace', 'cancel', 'dispose'] as const)('promptly cancels a hung attempt on %s and ignores late settlement', async (action) => {
-    const hung = deferred<{ players: [] }>();
-    const replacementHung = deferred<{ players: [] }>();
+    const hung = deferred<{ players: []; queueId: 420; modeName: '单双排'; positionOrderReliable: true }>();
+    const replacementHung = deferred<{ players: []; queueId: 420; modeName: '单双排'; positionOrderReliable: true }>();
     let calls = 0;
     const coordinator = new GameflowCoordinator(() => calls++ === 0 ? hung.promise : replacementHung.promise);
     const old = coordinator.loadLiveMatch('all', () => undefined);
@@ -22,7 +22,7 @@ describe('GameflowCoordinator', () => {
     else coordinator.dispose();
     await expect(old).rejects.toMatchObject({ code: 'MATCH_CANCELLED', message: 'Live match request cancelled' });
     if (action === 'replace') {
-      hung.resolve({ players: [] });
+      hung.resolve({ players: [], queueId: 420, modeName: '单双排', positionOrderReliable: true });
       coordinator.cancel();
       await expect(replacement).rejects.toMatchObject({ code: 'MATCH_CANCELLED' });
       replacementHung.reject(new Error('late-replacement-rejection'));
@@ -33,17 +33,18 @@ describe('GameflowCoordinator', () => {
   });
   it('recovers after startup-before-client and supports explicit retry', async () => {
     vi.useFakeTimers();
-    const load = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ players: [] });
+    const liveMatch = { players: [], queueId: 420, modeName: '单双排', positionOrderReliable: true } as const;
+    const load = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(liveMatch);
     const coordinator = new GameflowCoordinator(load, { intervalMs: 1_000 });
     const first = coordinator.loadLiveMatch('all', () => undefined);
     await Promise.resolve();
     await vi.advanceTimersByTimeAsync(1_000);
-    await expect(first).resolves.toEqual({ players: [] });
-    load.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ players: [] });
+    await expect(first).resolves.toEqual(liveMatch);
+    load.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(liveMatch);
     const retrying = coordinator.loadLiveMatch('all', () => undefined);
     await Promise.resolve();
     coordinator.retry();
-    await expect(retrying).resolves.toEqual({ players: [] });
+    await expect(retrying).resolves.toEqual(liveMatch);
     coordinator.dispose();
     vi.useRealTimers();
   });

@@ -170,7 +170,7 @@ export class MatchService {
       }
       return player;
     });
-    return { players, localTeamId };
+    return { players, localTeamId, queueId: 420, modeName: '单双排', positionOrderReliable: true };
   }
 
   private async getHistoryWithRetry(playerId: string): Promise<unknown> {

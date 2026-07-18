@@ -1,11 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { z } from 'zod';
-import type { PlayerSnapshot, QueueScope } from '../shared/domain';
+import type { PersonalHistorySnapshot, PlayerSnapshot, QueueScope } from '../shared/domain';
 import {
   MATCH_GET_CHANNEL,
   MATCH_CANCEL_CHANNEL,
   MATCH_RETRY_CHANNEL,
   CHAMPION_GUIDE_GET_CHANNEL,
+  PERSONAL_HISTORY_GET_CHANNEL,
   PLAYER_UPDATED_CHANNEL,
   SETTINGS_CLEAR_CACHE_CHANNEL,
   SETTINGS_GET_CHANNEL,
@@ -19,6 +20,7 @@ import {
   queueScopeSchema,
   championGuideRequestSchema,
   championGuideSchema,
+  personalHistorySchema,
   type AppSettings,
   type ChampionLane,
   type LiveMatch,
@@ -26,6 +28,8 @@ import {
 } from '../shared/ipc';
 
 const api: LolViewerApi = Object.freeze({
+  getPersonalHistory: async (): Promise<PersonalHistorySnapshot> =>
+    personalHistorySchema.parse(await ipcRenderer.invoke(PERSONAL_HISTORY_GET_CHANNEL)),
   getLiveMatch: async (scope: QueueScope, generation = 0): Promise<LiveMatch> => {
     const input = liveMatchRequestSchema.parse({ scope: queueScopeSchema.parse(scope), generation });
     return liveMatchSchema.parse(await ipcRenderer.invoke(MATCH_GET_CHANNEL, input));

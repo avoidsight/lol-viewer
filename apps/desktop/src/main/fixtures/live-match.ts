@@ -43,7 +43,7 @@ export function createFixtureLiveMatch(scope: QueueScope): LiveMatch {
       updatedAt: Date.UTC(2026, 0, 1)
     };
   });
-  return { players, localTeamId: 100 };
+  return { players, localTeamId: 100, queueId: 420, modeName: '单双排', positionOrderReliable: true };
 }
 
 export function fixtureModeEnabled(

@@ -47,7 +47,10 @@ function player(index: number, overrides: Partial<PlayerSnapshot> = {}): PlayerS
 
 const fixtureLiveMatch: LiveMatch = {
   players: Array.from({ length: 10 }, (_, index) => player(index)),
-  localTeamId: 100
+  localTeamId: 100,
+  queueId: 420,
+  modeName: '单双排',
+  positionOrderReliable: true
 };
 
 describe('LiveMatchPage', () => {
@@ -86,7 +89,7 @@ describe('LiveMatchPage', () => {
   });
 
   it('renders a numeric fallback without making an unversioned image request', () => {
-    const withoutVersion: LiveMatch = { players: fixtureLiveMatch.players.map((entry) => ({ ...entry, assetVersion: undefined })) };
+    const withoutVersion: LiveMatch = { ...fixtureLiveMatch, players: fixtureLiveMatch.players.map((entry) => ({ ...entry, assetVersion: undefined })) };
     render(<LiveMatchPage match={withoutVersion} />);
     expect(screen.queryAllByRole('img', { name: /^英雄 \d+$/ })).toHaveLength(0);
     expect(screen.getAllByRole('img', { name: /图标不可用/ })).toHaveLength(100);
@@ -96,6 +99,7 @@ describe('LiveMatchPage', () => {
   it('shows loading, unavailable, and fewer-than-ten states explicitly', () => {
     const partial = matches(2, 3);
     const stateMatch: LiveMatch = {
+      ...fixtureLiveMatch,
       players: fixtureLiveMatch.players.map((entry, index) => {
         if (index === 0) return player(index, { status: 'loading', matches: [], sampleSize: 0 });
         if (index === 1) return player(index, { status: 'unavailable', matches: [], sampleSize: 0, error: '暂时无法读取' });
@@ -125,6 +129,7 @@ describe('LiveMatchPage', () => {
 
   it('renders exactly five deterministic slots per team for duplicate and unknown lanes', () => {
     const uncertain: LiveMatch = {
+      ...fixtureLiveMatch,
       players: fixtureLiveMatch.players.map((entry, index) => index === 1 || index === 6 ? { ...entry, lane: 'TOP' } : index === 2 || index === 7 ? { ...entry, lane: 'UNKNOWN' } : entry),
       localTeamId: 100
     };

@@ -11,12 +11,13 @@ const players = Array.from({ length: 10 }, (_, index): PlayerSnapshot => ({
   wins: 0, losses: 0, winRate: 0, currentChampionGames: 0, currentChampionWins: 0,
   currentChampionWinRate: 0, status: 'ready', updatedAt: 1
 }));
-const liveMatch: LiveMatch = { players };
+const liveMatch: LiveMatch = { players, queueId: 420, modeName: '单双排', positionOrderReliable: true };
 const unusedSettingsApi = {
   getSettings: vi.fn().mockResolvedValue({ queueScope: 'ranked-solo', autoOpenLiveMatch: true, showLaneDifferences: true }),
   updateSettings: vi.fn(async (patch) => ({ queueScope: 'ranked-solo', autoOpenLiveMatch: true, showLaneDifferences: true, ...patch })),
   clearCache: vi.fn().mockResolvedValue(undefined),
-  getChampionGuide: vi.fn()
+  getChampionGuide: vi.fn(),
+  getPersonalHistory: vi.fn()
 };
 
 function deferred<T>() {
@@ -47,7 +48,10 @@ describe('App', () => {
     await waitFor(() => expect(cancelLiveMatch).toHaveBeenCalledOnce());
   });
   it('loads persisted queue settings and reports cache-clear success', async () => {
-    const getLiveMatch = vi.fn().mockResolvedValue({ players: players.map((player) => ({ ...player, scope: 'all' as const })) });
+    const getLiveMatch = vi.fn().mockResolvedValue({
+      players: players.map((player) => ({ ...player, scope: 'all' as const })),
+      queueId: 420, modeName: '单双排', positionOrderReliable: true
+    });
     installApi(getLiveMatch);
     window.lolViewer!.getSettings = vi.fn().mockResolvedValue({ queueScope: 'all', autoOpenLiveMatch: true, showLaneDifferences: false });
     render(<App />);

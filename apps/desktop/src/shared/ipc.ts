@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { PlayerSnapshot, QueueScope } from './domain';
+import type { PersonalHistorySnapshot, PlayerSnapshot, QueueScope } from './domain';
 
 export const MATCH_GET_CHANNEL = 'match:get-live' as const;
 export const MATCH_RETRY_CHANNEL = 'match:retry' as const;
@@ -9,6 +9,7 @@ export const SETTINGS_GET_CHANNEL = 'settings:get' as const;
 export const SETTINGS_UPDATE_CHANNEL = 'settings:update' as const;
 export const SETTINGS_CLEAR_CACHE_CHANNEL = 'settings:clear-cache' as const;
 export const CHAMPION_GUIDE_GET_CHANNEL = 'champions:get-guide' as const;
+export const PERSONAL_HISTORY_GET_CHANNEL = 'history:get-personal' as const;
 
 const laneSchema = z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'UNKNOWN']);
 export const queueScopeSchema = z.enum(['ranked-solo', 'all']);
@@ -19,7 +20,7 @@ export const appSettingsSchema = z.object({
 }).strict();
 export const appSettingsPatchSchema = appSettingsSchema.partial().strict();
 export type AppSettings = z.infer<typeof appSettingsSchema>;
-const matchSummarySchema = z.object({
+export const matchSummarySchema = z.object({
   matchId: z.string(),
   queueId: z.number().int(),
   endedAt: z.number(),
@@ -31,6 +32,30 @@ const matchSummarySchema = z.object({
   assists: z.number().int().nonnegative(),
   cs: z.number().optional(),
   lane: laneSchema.optional()
+}).strict();
+
+const favoriteChampionSchema = z.object({
+  championId: z.number().int().nonnegative(),
+  games: z.number().int().nonnegative(),
+  wins: z.number().int().nonnegative(),
+  winRate: z.number().min(0).max(1)
+}).strict();
+
+export const personalHistorySchema: z.ZodType<PersonalHistorySnapshot> = z.object({
+  playerId: z.string(),
+  displayName: z.string(),
+  profileIconId: z.number().int().nonnegative(),
+  rank: z.string().optional(),
+  matches: z.array(matchSummarySchema).max(20),
+  sampleSize: z.number().int().min(0).max(20),
+  wins: z.number().int().nonnegative(),
+  losses: z.number().int().nonnegative(),
+  winRate: z.number().min(0).max(1),
+  averageKda: z.number().nonnegative(),
+  favoriteChampions: z.array(favoriteChampionSchema).max(5),
+  assetVersion: z.string().min(1).optional(),
+  cached: z.boolean(),
+  updatedAt: z.number()
 }).strict();
 
 export const playerSnapshotSchema: z.ZodType<PlayerSnapshot> = z.object({
@@ -56,7 +81,13 @@ export const playerSnapshotSchema: z.ZodType<PlayerSnapshot> = z.object({
   updatedAt: z.number()
 }).strict();
 
-export const liveMatchSchema = z.object({ players: z.array(playerSnapshotSchema).length(10), localTeamId: z.number().int().nullable().optional() }).strict();
+export const liveMatchSchema = z.object({
+  players: z.array(playerSnapshotSchema).length(10),
+  localTeamId: z.number().int().nullable().optional(),
+  queueId: z.number().int().nonnegative(),
+  modeName: z.string().min(1),
+  positionOrderReliable: z.boolean()
+}).strict();
 export const liveMatchRequestSchema = z.object({ scope: queueScopeSchema, generation: z.number().int().nonnegative() }).strict();
 export const playerUpdateSchema = z.object({ generation: z.number().int().nonnegative(), player: playerSnapshotSchema }).strict();
 
@@ -79,9 +110,13 @@ export type ChampionGuide = z.infer<typeof championGuideSchema>;
 export interface LiveMatch {
   players: PlayerSnapshot[];
   localTeamId?: number | null;
+  queueId: number;
+  modeName: string;
+  positionOrderReliable: boolean;
 }
 
 export interface LolViewerApi {
+  getPersonalHistory(): Promise<PersonalHistorySnapshot>;
   getLiveMatch(scope: QueueScope, generation?: number): Promise<LiveMatch>;
   retryLiveMatch?(): Promise<void>;
   cancelLiveMatch?(): Promise<void>;

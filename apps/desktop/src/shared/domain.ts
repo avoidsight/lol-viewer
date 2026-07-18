@@ -2,6 +2,8 @@ export type Lane = 'TOP' | 'JUNGLE' | 'MIDDLE' | 'BOTTOM' | 'UTILITY' | 'UNKNOWN
 
 export type QueueScope = 'ranked-solo' | 'all';
 
+export type QueueMode = 'RANKED' | 'NORMAL' | 'ARAM' | 'OTHER';
+
 export type DataStatus = 'loading' | 'ready' | 'unavailable';
 
 export interface MatchSummary {
@@ -16,6 +18,30 @@ export interface MatchSummary {
   assists: number;
   cs?: number;
   lane?: Lane;
+}
+
+export interface FavoriteChampion {
+  championId: number;
+  games: number;
+  wins: number;
+  winRate: number;
+}
+
+export interface PersonalHistorySnapshot {
+  playerId: string;
+  displayName: string;
+  profileIconId: number;
+  rank?: string;
+  matches: MatchSummary[];
+  sampleSize: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  averageKda: number;
+  favoriteChampions: FavoriteChampion[];
+  assetVersion?: string;
+  cached: boolean;
+  updatedAt: number;
 }
 
 export interface PlayerSnapshot {
