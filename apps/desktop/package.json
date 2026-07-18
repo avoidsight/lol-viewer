@@ -10,19 +10,22 @@
     "rebuild:native": "electron-rebuild -f -w better-sqlite3",
     "rebuild:test-native": "node scripts/rebuild-node-sqlite.cjs",
     "smoke:sqlite": "electron scripts/sqlite-smoke.cjs",
+    "lcu:smoke": "tsx scripts/lcu-smoke.ts",
     "test": "pnpm rebuild:test-native && vitest run --configLoader runner",
     "typecheck": "tsc --noEmit",
+    "test:e2e": "pnpm build && playwright test",
+    "package:win": "pnpm build && electron-builder --win nsis --x64 --publish never",
     "verify": "pnpm test && pnpm typecheck && pnpm rebuild:native && pnpm smoke:sqlite && electron-vite build"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
     "better-sqlite3": "^12.11.1",
-    "electron": "^37.2.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.1",
     "@electron/rebuild": "^4.2.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
@@ -30,11 +33,29 @@
     "@types/node": "^22.16.4",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "electron-builder": "^26.0.12",
+    "electron": "^37.2.3",
     "@vitejs/plugin-react": "^4.6.0",
     "electron-vite": "^3.1.0",
     "jsdom": "^26.1.0",
+    "tsx": "^4.20.3",
     "typescript": "^5.8.3",
     "vite": "6.4.3",
     "vitest": "^3.2.4"
+  },
+  "build": {
+    "appId": "cn.lolviewer.desktop",
+    "productName": "LOL Viewer",
+    "directories": { "output": "dist" },
+    "files": ["out/**/*", "package.json"],
+    "asar": true,
+    "asarUnpack": ["node_modules/better-sqlite3/**/*"],
+    "npmRebuild": false,
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "signAndEditExecutable": false,
+      "artifactName": "lol-viewer-${version}-windows-${arch}-setup.${ext}"
+    },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
   }
 }

@@ -11,6 +11,7 @@ import { ChampionGuideCache, MatchCache, migrateDatabase } from './cache/databas
 import { ChampionGuideClient } from './champions/champion-guide-client';
 import { registerChampionIpc } from './ipc/register-champion-ipc';
 import { SettingsService } from './settings/settings-service';
+import { createFixtureLiveMatch, fixtureModeEnabled } from './fixtures/live-match';
 
 let database: Database.Database | undefined;
 
@@ -19,7 +20,7 @@ function createWindow(): void {
     width: 1200,
     height: 800,
     webPreferences: {
-      preload: join(__dirname, '../preload/index.mjs'),
+      preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false
@@ -34,6 +35,7 @@ function createWindow(): void {
 }
 
 void app.whenReady().then(() => {
+  const fixtureMode = fixtureModeEnabled(process.argv, app.isPackaged, process.env);
   database = new Database(join(app.getPath('userData'), 'lol-viewer.sqlite3'));
   migrateDatabase(database);
   const cache = new MatchCache(database);
@@ -45,6 +47,7 @@ void app.whenReady().then(() => {
   registerSettingsIpc(new SettingsService(database, cache, guideCache));
   registerMatchIpc({
     async loadLiveMatch(scope, onPlayer) {
+      if (fixtureMode) return createFixtureLiveMatch(scope);
       const connection = await discoverLcuConnection();
       if (!connection) throw new Error('League client is unavailable');
       return new MatchService(createLcuClient(connection), { cache }).loadLiveMatch(scope, onPlayer);
