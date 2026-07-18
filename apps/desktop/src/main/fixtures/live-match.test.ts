@@ -12,6 +12,7 @@ describe('fixture live match', () => {
     const first = createFixturePersonalHistory();
     expect(first.matches).toHaveLength(20);
     expect(first.sampleSize).toBe(20);
+    expect(new Set(first.matches.map((match) => match.queueId))).toEqual(new Set([420, 430, 440, 450]));
     expect(createFixturePersonalHistory()).toEqual(first);
   });
 

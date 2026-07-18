@@ -3,8 +3,8 @@ import type { LiveMatch } from '../../shared/ipc';
 
 const lanes = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'] as const;
 
-function matchesFor(playerIndex: number, count = 10): MatchSummary[] {
-  return Array.from({ length: count }, (_, matchIndex) => ({
+function liveMatchesFor(playerIndex: number): MatchSummary[] {
+  return Array.from({ length: 10 }, (_, matchIndex) => ({
     matchId: `fixture-${playerIndex}-${matchIndex}`,
     queueId: 420,
     endedAt: Date.UTC(2026, 0, 1) - matchIndex * 1_800_000,
@@ -18,8 +18,19 @@ function matchesFor(playerIndex: number, count = 10): MatchSummary[] {
   }));
 }
 
+function personalMatchesFor(): MatchSummary[] {
+  const queueIds = [420, 430, 440, 450] as const;
+  const templates = liveMatchesFor(0);
+  return Array.from({ length: 20 }, (_, matchIndex) => ({
+    ...templates[matchIndex % templates.length],
+    matchId: `fixture-personal-${matchIndex}`,
+    queueId: queueIds[matchIndex % queueIds.length],
+    endedAt: Date.UTC(2026, 0, 1) - matchIndex * 1_800_000
+  }));
+}
+
 export function createFixturePersonalHistory(): PersonalHistorySnapshot {
-  const matches = matchesFor(0, 20);
+  const matches = personalMatchesFor();
   const wins = matches.filter((match) => match.win).length;
   const kills = matches.reduce((sum, match) => sum + match.kills, 0);
   const deaths = matches.reduce((sum, match) => sum + match.deaths, 0);
@@ -46,7 +57,7 @@ export function createFixturePersonalHistory(): PersonalHistorySnapshot {
 
 export function createFixtureLiveMatch(scope: QueueScope): LiveMatch {
   const players: PlayerSnapshot[] = Array.from({ length: 10 }, (_, index) => {
-    const matches = matchesFor(index);
+    const matches = liveMatchesFor(index);
     const wins = matches.filter((match) => match.win).length;
     return {
       playerId: `fixture-player-${index}`,
