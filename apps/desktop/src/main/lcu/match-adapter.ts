@@ -28,9 +28,14 @@ const gameSchema = z.object({
   participants: z.array(participantSchema).min(1)
 });
 
-const matchHistorySchema = z.object({
+export const matchHistoryResponseSchema = z.object({
   games: z.array(gameSchema)
 });
+
+interface AdaptOptions {
+  scope: QueueScope;
+  limit: 10 | 20;
+}
 
 function normalizeLane(lane: string | undefined): Lane | undefined {
   if (lane === undefined) return undefined;
@@ -60,11 +65,19 @@ function mapGame(game: z.infer<typeof gameSchema>): MatchSummary {
   };
 }
 
-export function adaptMatchHistory(input: unknown, scope: QueueScope): MatchSummary[] {
-  const history = matchHistorySchema.parse(input);
+export function describeQueue(queueId: number): string {
+  if (queueId === 420) return '单双排';
+  if (queueId === 440) return '灵活排位';
+  if (queueId === 400 || queueId === 430) return '匹配模式';
+  if (queueId === 450) return '极地大乱斗';
+  return '其他模式';
+}
+
+export function adaptMatchHistory(input: unknown, { scope, limit }: AdaptOptions): MatchSummary[] {
+  const history = matchHistoryResponseSchema.parse(input);
   return history.games
     .filter((game) => scope === 'all' || game.queueId === 420)
     .map(mapGame)
     .sort((left, right) => right.endedAt - left.endedAt)
-    .slice(0, 10);
+    .slice(0, limit);
 }

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { Lane, MatchSummary, PlayerSnapshot, QueueScope } from '../../shared/domain';
 import type { LiveMatch } from '../../shared/ipc';
 import type { LcuClient, LcuError } from '../lcu/http-client';
-import { adaptMatchHistory } from '../lcu/match-adapter';
+import { adaptMatchHistory, describeQueue } from '../lcu/match-adapter';
 
 const participantSchema = z.object({
   summonerId: z.union([z.string(), z.number()]),
@@ -54,14 +54,6 @@ function isTransient(error: unknown): boolean {
   return (error as Partial<LcuError>)?.code === 'LCU_UNAVAILABLE';
 }
 
-function modeNameOf(queueId: number): string {
-  if (queueId === 420) return '单双排';
-  if (queueId === 440) return '灵活排位';
-  if (queueId === 400 || queueId === 430) return '匹配模式';
-  if (queueId === 450) return '极地大乱斗';
-  return '其他模式';
-}
-
 function hasReliablePositions(team: z.infer<typeof participantSchema>[]): boolean {
   const positions = team.map((participant) => participant.selectedPosition);
   return positions.every((position): position is string => position !== undefined && standardPositions.has(position))
@@ -95,7 +87,7 @@ export class MatchService {
       await this.client.get('/lol-gameflow/v1/session', sessionSchema)
     );
     const queueId = session.gameData.queue?.id ?? session.gameData.queueId!;
-    const modeName = modeNameOf(queueId);
+    const modeName = describeQueue(queueId);
     const positionOrderReliable = queueId !== 450
       && hasReliablePositions(session.gameData.teamOne)
       && hasReliablePositions(session.gameData.teamTwo);
@@ -157,7 +149,7 @@ export class MatchService {
       if (!cached) {
         try {
           const rawHistory = await this.getHistoryWithRetry(base.playerId);
-          matches = adaptMatchHistory(rawHistory, scope);
+          matches = adaptMatchHistory(rawHistory, { scope, limit: 10 });
         } catch {
           matches = null;
         }
