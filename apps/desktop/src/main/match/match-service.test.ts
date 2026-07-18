@@ -30,6 +30,24 @@ const history = {
 };
 
 describe('MatchService', () => {
+  it('returns ARAM metadata, preserves roster order, and keeps all-mode histories', async () => {
+    const aramParticipants = participants.map(({ selectedPosition: _selectedPosition, ...participant }) => participant);
+    const normalHistory = { games: history.games.map((game) => ({ ...game, queueId: 430 })) };
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') {
+        return { gameData: { teamOne: aramParticipants.slice(0, 5), teamTwo: aramParticipants.slice(5), queue: { id: 450 } } };
+      }
+      return normalHistory;
+    });
+
+    const result = await new MatchService({ get } as LcuClient).loadLiveMatch('ranked-solo', vi.fn());
+
+    expect(result).toMatchObject({ queueId: 450, modeName: '极地大乱斗', positionOrderReliable: false });
+    expect(result.players.slice(0, 5).map((player) => player.playerId)).toEqual(['1', '2', '3', '4', '5']);
+    expect(result.players.every((player) => player.scope === 'ranked-solo')).toBe(true);
+    expect(result.players.every((player) => player.matches.map((match) => match.queueId).includes(430))).toBe(true);
+  });
+
   it.each([
     [{ id: 420 }, undefined, '单双排'],
     [{ id: 440 }, undefined, '灵活排位'],

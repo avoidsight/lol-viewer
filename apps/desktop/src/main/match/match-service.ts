@@ -149,7 +149,7 @@ export class MatchService {
       if (!cached) {
         try {
           const rawHistory = await this.getHistoryWithRetry(base.playerId);
-          matches = adaptMatchHistory(rawHistory, { scope, limit: 10 });
+          matches = adaptMatchHistory(rawHistory, { scope: 'all', limit: 10 });
         } catch {
           matches = null;
         }

@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { Lane, MatchSummary, PlayerSnapshot } from '../../../../shared/domain';
 import type { LiveMatch } from '../../../../shared/ipc';
-import LiveMatchPage from './LiveMatchPage';
+import LiveMatchPage, { teamSlots } from './LiveMatchPage';
 
 const lanes: Lane[] = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'];
 
@@ -140,6 +140,36 @@ describe('LiveMatchPage', () => {
     expect(within(teams[1]).getAllByTestId('player-card')).toHaveLength(5);
     expect(screen.getAllByText('位置待确认')).toHaveLength(6);
     expect(new Set(screen.getAllByTestId('player-card').map((card) => card.getAttribute('aria-labelledby'))).size).toBe(10);
+  });
+
+  it('keeps client roster order and uses neutral lineup labels when positions are unreliable', () => {
+    const scrambled = [
+      player(3, { lane: 'BOTTOM' }),
+      player(0, { lane: 'TOP' }),
+      player(4, { lane: 'UTILITY' }),
+      player(1, { lane: 'JUNGLE' }),
+      player(2, { lane: 'MIDDLE' })
+    ];
+
+    expect(teamSlots(scrambled, false).map((slot) => slot.player?.playerId))
+      .toEqual(scrambled.map((entry) => entry.playerId));
+    expect(teamSlots(scrambled, true).map((slot) => slot.player?.playerId))
+      .toEqual(['0', '1', '2', '3', '4']);
+    expect(teamSlots(scrambled, false).map((slot) => slot.label))
+      .toEqual(['阵容 1', '阵容 2', '阵容 3', '阵容 4', '阵容 5']);
+
+    render(<LiveMatchPage match={{
+      ...fixtureLiveMatch,
+      positionOrderReliable: false,
+      players: [...scrambled, ...fixtureLiveMatch.players.slice(5)]
+    }} />);
+    const ourTeam = screen.getByRole('group', { name: '我方队伍' });
+    expect(within(ourTeam).getAllByTestId('player-card').map((card) => card.getAttribute('aria-labelledby')))
+      .toEqual(scrambled.map((entry) => `player-${entry.playerId}`));
+    for (const label of ['阵容 1', '阵容 2', '阵容 3', '阵容 4', '阵容 5']) {
+      expect(within(ourTeam).getByText(label)).toBeVisible();
+    }
+    expect(screen.queryByText('位置待确认')).not.toBeInTheDocument();
   });
 
   it('keeps a 1050px grid inside a horizontal scroll container', () => {
