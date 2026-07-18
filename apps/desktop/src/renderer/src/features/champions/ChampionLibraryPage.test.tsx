@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import ChampionLibraryPage from './ChampionLibraryPage';
 import type { ChampionGuide, ChampionLane } from '../../../../shared/ipc';
@@ -36,11 +36,9 @@ describe('ChampionLibraryPage', () => {
   it.each<[string, (id: number, lane: ChampionLane) => Promise<ChampionGuide>]>([
     ['loading', () => new Promise<ChampionGuide>(() => undefined)],
     ['unavailable', () => Promise.reject(new Error('offline'))]
-  ])('allows returning to the live page while %s', async (_state, getGuide) => {
-    const onBack = vi.fn();
-    render(<ChampionLibraryPage getGuide={getGuide} onBack={onBack} />);
-    const button = await screen.findByRole('button', { name: '返回实时对局' });
-    fireEvent.click(button);
-    expect(onBack).toHaveBeenCalledOnce();
+  ])('does not render internal navigation while %s', async (state, getGuide) => {
+    render(<ChampionLibraryPage getGuide={getGuide} />);
+    await screen.findByRole(state === 'loading' ? 'status' : 'alert');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });

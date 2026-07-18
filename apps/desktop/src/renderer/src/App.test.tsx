@@ -38,11 +38,21 @@ function installApi(getLiveMatch: LolViewerApi['getLiveMatch']) {
 afterEach(() => { delete window.lolViewer; });
 
 describe('App', () => {
+  it('opens on personal history inside the fixed three-tab shell', async () => {
+    installApi(vi.fn().mockResolvedValue(liveMatch));
+    window.lolViewer!.getPersonalHistory = vi.fn().mockResolvedValue({
+      playerId: 'me', displayName: '召唤师', profileIconId: 1, matches: [], sampleSize: 0,
+      wins: 0, losses: 0, winRate: 0, averageKda: 0, favoriteChampions: [], cached: false, updatedAt: 1
+    });
+    render(<App />);
+    expect(screen.getByRole('tab', { name: '战绩' })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByText('召唤师')).toBeVisible();
+  });
   it('cancels the active coordinator when auto-open is turned off', async () => {
     installApi(() => new Promise(() => undefined));
     const cancelLiveMatch = vi.fn().mockResolvedValue(undefined);
     window.lolViewer!.cancelLiveMatch = cancelLiveMatch;
-    render(<App />);
+    render(<App initialTab="live" />);
     await screen.findByRole('status');
     fireEvent.click(screen.getByRole('checkbox', { name: 'Auto-open live match' }));
     await waitFor(() => expect(cancelLiveMatch).toHaveBeenCalledOnce());
@@ -54,27 +64,27 @@ describe('App', () => {
     });
     installApi(getLiveMatch);
     window.lolViewer!.getSettings = vi.fn().mockResolvedValue({ queueScope: 'all', autoOpenLiveMatch: true, showLaneDifferences: false });
-    render(<App />);
+    render(<App initialTab="live" />);
     await waitFor(() => expect(getLiveMatch).toHaveBeenCalledWith('all', expect.any(Number)));
     fireEvent.click(screen.getByRole('button', { name: 'Clear cache' }));
     expect(await screen.findByText('Cache cleared')).toBeVisible();
   });
-  it('navigates to the champion library while retaining the live page', async () => {
+  it('navigates between live information and the champion library through tabs', async () => {
     const getChampionGuide = vi.fn().mockRejectedValue(new Error('offline'));
     installApi(vi.fn().mockResolvedValue(liveMatch));
     window.lolViewer!.getChampionGuide = getChampionGuide;
-    render(<App />);
+    render(<App initialTab="live" />);
     expect(await screen.findByText('Player 0')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: '英雄资料库' }));
+    fireEvent.click(screen.getByRole('tab', { name: '英雄资料库' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('英雄数据暂不可用');
-    expect(screen.getByText('Player 0')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '返回实时对局' }));
+    expect(screen.queryByText('Player 0')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '对战信息' }));
     expect(screen.getByText('Player 0')).toBeVisible();
   });
 
   it('shows initial loading while retaining scope controls', () => {
     installApi(() => new Promise(() => undefined));
-    render(<App />);
+    render(<App initialTab="live" />);
     expect(screen.getByRole('status')).toHaveTextContent('正在加载单双排对局');
     expect(screen.getByRole('button', { name: '全部模式' })).toBeEnabled();
     expect(screen.getAllByTestId('player-slot')).toHaveLength(10);
@@ -86,7 +96,7 @@ describe('App', () => {
     let listener!: (player: PlayerSnapshot) => void;
     const unsubscribe = vi.fn();
     window.lolViewer = { getLiveMatch: () => { order.push('request'); return request.promise; }, onPlayerUpdated: (next) => { order.push('subscribe'); listener = next; return unsubscribe; }, ...unusedSettingsApi };
-    const { unmount } = render(<App />);
+    const { unmount } = render(<App initialTab="live" />);
     await waitFor(() => expect(order).toEqual(['subscribe', 'request']));
     act(() => listener(players[0]));
     expect(screen.getByText('Player 0')).toBeVisible();
@@ -97,7 +107,7 @@ describe('App', () => {
   it('shows a request error instead of the waiting-client state', async () => {
     const request = deferred<LiveMatch>();
     installApi(() => request.promise);
-    render(<App />);
+    render(<App initialTab="live" />);
     await act(async () => request.reject(new Error('offline')));
     expect(screen.getByRole('alert')).toHaveTextContent('加载失败');
     expect(screen.queryByText('等待英雄联盟客户端')).not.toBeInTheDocument();
@@ -107,7 +117,7 @@ describe('App', () => {
     const next = deferred<LiveMatch>();
     const getLiveMatch = vi.fn().mockResolvedValueOnce(liveMatch).mockImplementationOnce(() => next.promise);
     installApi(getLiveMatch);
-    render(<App />);
+    render(<App initialTab="live" />);
     expect(await screen.findByText('Player 0')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: '全部模式' }));
     await waitFor(() => expect(screen.getByText('正在加载全部模式对局')).toBeVisible());

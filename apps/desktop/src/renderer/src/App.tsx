@@ -1,25 +1,38 @@
 import { useEffect, useRef, useState } from 'react';
-import type { PlayerSnapshot, QueueScope } from '../../shared/domain';
+import type { PersonalHistorySnapshot, PlayerSnapshot, QueueScope } from '../../shared/domain';
 import type { AppSettings, LiveMatch, LolViewerApi } from '../../shared/ipc';
 import LiveMatchPage from './features/live/LiveMatchPage';
 import ChampionLibraryPage from './features/champions/ChampionLibraryPage';
+import AppShell, { type AppTab } from './AppShell';
+import PersonalHistoryPage from './features/history/PersonalHistoryPage';
 
 declare global { interface Window { lolViewer?: LolViewerApi } }
 
 const defaults: AppSettings = { queueScope: 'ranked-solo', autoOpenLiveMatch: true, showLaneDifferences: true };
 const scopeName = (scope: QueueScope): string => scope === 'ranked-solo' ? '单双排' : '全部模式';
 
-export default function App() {
+export default function App({ initialTab = 'history' }: { initialTab?: AppTab } = {}) {
   const [requestedScope, setRequestedScope] = useState<QueueScope>('ranked-solo');
   const [displayedScope, setDisplayedScope] = useState<QueueScope>('ranked-solo');
   const [match, setMatch] = useState<LiveMatch | null>(null);
   const [progress, setProgress] = useState<PlayerSnapshot[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
-  const [page, setPage] = useState<'live' | 'champions'>('live');
+  const [page, setPage] = useState<AppTab>(initialTab);
+  const [history, setHistory] = useState<PersonalHistorySnapshot>();
+  const [historyState, setHistoryState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [message, setMessage] = useState('');
   const [loadNonce, setLoadNonce] = useState(0);
   const generation = useRef(0);
+
+  useEffect(() => {
+    const api = window.lolViewer;
+    if (!api) { setHistoryState('unavailable'); return; }
+    void Promise.resolve(api.getPersonalHistory()).then((snapshot) => {
+      if (!snapshot) { setHistoryState('unavailable'); return; }
+      setHistory(snapshot); setHistoryState('ready');
+    }).catch(() => setHistoryState('unavailable'));
+  }, []);
 
   useEffect(() => {
     const api = window.lolViewer;
@@ -61,9 +74,10 @@ export default function App() {
   const clearCache = async () => { setMessage('Clearing cache…'); try { await window.lolViewer?.clearCache(); setMessage('Cache cleared'); } catch { setMessage('Cache could not be cleared'); } };
   const notice = state === 'loading' ? <p role="status">正在加载{scopeName(requestedScope)}对局</p> : state === 'error' ? <p role="alert">{scopeName(requestedScope)}对局加载失败，请在客户端和十人对局就绪后重试</p> : null;
 
-  return <><div style={{ display: page === 'live' ? 'block' : 'none' }} aria-hidden={page !== 'live'}>
-    <button type="button" onClick={() => setPage('champions')}>英雄资料库</button>
+  const livePage = <div>
     <aside aria-label="Settings"><label>Auto-open live match <input type="checkbox" checked={settings?.autoOpenLiveMatch ?? true} onChange={(event) => void update({ autoOpenLiveMatch: event.target.checked })} /></label><label>Show lane differences <input type="checkbox" checked={settings?.showLaneDifferences ?? true} onChange={(event) => void update({ showLaneDifferences: event.target.checked })} /></label><button type="button" onClick={retry}>Retry live match</button><button type="button" onClick={() => void clearCache()}>Clear cache</button>{message && <span aria-live="polite">{message}</span>}</aside>
     <LiveMatchPage match={match ?? undefined} players={match ? undefined : progress} scope={displayedScope} onScopeChange={(scope) => void update({ queueScope: scope })} showLaneDifferences={settings?.showLaneDifferences ?? true} notice={notice} />
-  </div>{page === 'champions' && <ChampionLibraryPage getGuide={(id, lane) => window.lolViewer?.getChampionGuide(id, lane) ?? Promise.reject(new Error('unavailable'))} onBack={() => setPage('live')} />}</>;
+  </div>;
+  const content = page === 'history' ? <PersonalHistoryPage snapshot={history} state={historyState} /> : page === 'live' ? livePage : <ChampionLibraryPage getGuide={(id, lane) => window.lolViewer?.getChampionGuide(id, lane) ?? Promise.reject(new Error('unavailable'))} />;
+  return <AppShell active={page} onChange={setPage}>{content}</AppShell>;
 }

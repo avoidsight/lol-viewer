@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Lane, MatchSummary, QueueScope } from '../../shared/domain';
+export { describeQueue } from '../../shared/queue';
 
 const laneSchema = z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']);
 
@@ -63,14 +64,6 @@ function mapGame(game: z.infer<typeof gameSchema>): MatchSummary {
     ...(cs === undefined ? {} : { cs }),
     ...(lane === undefined ? {} : { lane })
   };
-}
-
-export function describeQueue(queueId: number): string {
-  if (queueId === 420) return '单双排';
-  if (queueId === 440) return '灵活排位';
-  if (queueId === 400 || queueId === 430) return '匹配模式';
-  if (queueId === 450) return '极地大乱斗';
-  return '其他模式';
 }
 
 export function adaptMatchHistory(input: unknown, { scope, limit }: AdaptOptions): MatchSummary[] {
