@@ -6,14 +6,16 @@ import { discoverLcuConnection } from './lcu/discovery';
 import { createLcuClient } from './lcu/http-client';
 import { registerMatchIpc } from './ipc/register-match-ipc';
 import { registerSettingsIpc } from './ipc/register-settings-ipc';
+import { registerHistoryIpc } from './ipc/register-history-ipc';
 import { MatchService } from './match/match-service';
 import { ChampionGuideCache, MatchCache, migrateDatabase, PersonalHistoryCache } from './cache/database';
 import { ChampionGuideClient } from './champions/champion-guide-client';
 import { registerChampionIpc } from './ipc/register-champion-ipc';
 import { SettingsService } from './settings/settings-service';
-import { createFixtureLiveMatch, fixtureModeEnabled } from './fixtures/live-match';
+import { createFixtureLiveMatch, createFixturePersonalHistory, fixtureModeEnabled } from './fixtures/live-match';
 import { z } from 'zod';
 import { GameflowCoordinator } from './match/gameflow-coordinator';
+import { PersonalHistoryService } from './history/personal-history-service';
 
 let database: Database.Database | undefined;
 let coordinator: GameflowCoordinator | undefined;
@@ -43,6 +45,7 @@ void app.whenReady().then(() => {
   migrateDatabase(database);
   const cache = new MatchCache(database);
   const guideCache = new ChampionGuideCache(database);
+  const personalHistoryCache = new PersonalHistoryCache(database);
   const patchSchema = z.string().regex(/^\d+\.\d+(?:\.\d+){0,2}$/);
   registerChampionIpc(new ChampionGuideClient({
     baseUrl: process.env.CHAMPION_GUIDE_SERVICE_URL ?? 'http://127.0.0.1:8787',
@@ -55,7 +58,15 @@ void app.whenReady().then(() => {
       }
     }), cache: guideCache
   }));
-  registerSettingsIpc(new SettingsService(database, cache, guideCache, new PersonalHistoryCache(database)));
+  registerSettingsIpc(new SettingsService(database, cache, guideCache, personalHistoryCache));
+  registerHistoryIpc({
+    load: async () => {
+      if (fixtureMode) return createFixturePersonalHistory();
+      const connection = await discoverLcuConnection();
+      if (!connection) throw new Error('League client is unavailable');
+      return new PersonalHistoryService(createLcuClient(connection), personalHistoryCache).load();
+    }
+  });
   coordinator = new GameflowCoordinator(async (scope, onPlayer) => {
       if (fixtureMode) return createFixtureLiveMatch(scope);
       const connection = await discoverLcuConnection();

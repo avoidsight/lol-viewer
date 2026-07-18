@@ -13,6 +13,8 @@ vi.mock('electron', () => ({
 }));
 
 import type { LolViewerApi } from '../shared/ipc';
+import { PERSONAL_HISTORY_GET_CHANNEL } from '../shared/ipc';
+import { createFixturePersonalHistory } from '../main/fixtures/live-match';
 
 const validPlayer = {
   playerId: '1', displayName: 'Player 1', teamId: 100, lane: 'TOP', championId: 1,
@@ -89,5 +91,17 @@ describe('preload match API validation', () => {
     expect(electron.invoke).not.toHaveBeenCalled();
     electron.invoke.mockResolvedValue({ championId: 114, lane: 'TOP' });
     await expect(api.getChampionGuide(114, 'TOP')).rejects.toThrow();
+  });
+
+  it('invokes personal history without input and validates its response strictly', async () => {
+    const snapshot = createFixturePersonalHistory();
+    electron.invoke.mockResolvedValue(snapshot);
+    const api = await loadApi();
+
+    await expect(api.getPersonalHistory()).resolves.toEqual(snapshot);
+    expect(electron.invoke).toHaveBeenCalledWith(PERSONAL_HISTORY_GET_CHANNEL);
+
+    electron.invoke.mockResolvedValue({ ...snapshot, unexpected: true });
+    await expect(api.getPersonalHistory()).rejects.toThrow();
   });
 });

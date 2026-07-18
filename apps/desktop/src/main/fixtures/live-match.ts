@@ -1,10 +1,10 @@
-import type { MatchSummary, PlayerSnapshot, QueueScope } from '../../shared/domain';
+import type { MatchSummary, PersonalHistorySnapshot, PlayerSnapshot, QueueScope } from '../../shared/domain';
 import type { LiveMatch } from '../../shared/ipc';
 
 const lanes = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'] as const;
 
-function matchesFor(playerIndex: number): MatchSummary[] {
-  return Array.from({ length: 10 }, (_, matchIndex) => ({
+function matchesFor(playerIndex: number, count = 10): MatchSummary[] {
+  return Array.from({ length: count }, (_, matchIndex) => ({
     matchId: `fixture-${playerIndex}-${matchIndex}`,
     queueId: 420,
     endedAt: Date.UTC(2026, 0, 1) - matchIndex * 1_800_000,
@@ -16,6 +16,32 @@ function matchesFor(playerIndex: number): MatchSummary[] {
     assists: 5 + matchIndex,
     cs: 180 + matchIndex
   }));
+}
+
+export function createFixturePersonalHistory(): PersonalHistorySnapshot {
+  const matches = matchesFor(0, 20);
+  const wins = matches.filter((match) => match.win).length;
+  const kills = matches.reduce((sum, match) => sum + match.kills, 0);
+  const deaths = matches.reduce((sum, match) => sum + match.deaths, 0);
+  const assists = matches.reduce((sum, match) => sum + match.assists, 0);
+  return {
+    playerId: 'fixture-personal-player',
+    displayName: 'Fixture Personal Player',
+    profileIconId: 29,
+    rank: 'GOLD IV 50 LP',
+    matches,
+    sampleSize: matches.length,
+    wins,
+    losses: matches.length - wins,
+    winRate: wins / matches.length,
+    averageKda: (kills + assists) / deaths,
+    favoriteChampions: matches.slice(0, 5).map((match) => ({
+      championId: match.championId, games: 1, wins: Number(match.win), winRate: Number(match.win)
+    })),
+    assetVersion: '26.1.1',
+    cached: false,
+    updatedAt: Date.UTC(2026, 0, 1)
+  };
 }
 
 export function createFixtureLiveMatch(scope: QueueScope): LiveMatch {

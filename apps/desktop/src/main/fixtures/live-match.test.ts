@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { createFixtureLiveMatch, fixtureModeEnabled } from './live-match';
+import { createFixtureLiveMatch, createFixturePersonalHistory, fixtureModeEnabled } from './live-match';
 
 describe('fixture live match', () => {
   it('contains ten players with ten history records each', () => {
     const fixture = createFixtureLiveMatch('ranked-solo');
     expect(fixture.players).toHaveLength(10);
     expect(fixture.players.flatMap((player) => player.matches)).toHaveLength(100);
+  });
+
+  it('provides a deterministic personal snapshot with twenty matches', () => {
+    const first = createFixturePersonalHistory();
+    expect(first.matches).toHaveLength(20);
+    expect(first.sampleSize).toBe(20);
+    expect(createFixturePersonalHistory()).toEqual(first);
   });
 
   it('requires the flag and an explicit test guard in an unpackaged app', () => {
