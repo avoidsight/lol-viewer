@@ -6,7 +6,7 @@
 pnpm --filter @lol-viewer/desktop lcu:smoke
 ```
 
-命令仅打印 phase、participants 和 history 端点是否可用及其 schema 是否兼容。输出不会包含召唤师名称、召唤师 ID、认证 token、端口或原始响应。客户端未打开时命令返回退出码 2；这应记录为 `NOT RUN`，不能当作通过。
+命令始终打印 phase、participants 和 history 三行固定结果矩阵。每行只包含端点标签、`compatible` 或 `unavailable-or-incompatible`，以及封闭允许列表中的安全分类码。三个检查会尽可能独立继续；任一失败后命令返回非零。输出不会包含召唤师名称、召唤师 ID、URL、端口、认证 token、原始响应、schema issues 或任意底层错误消息。客户端未打开时三行均报告 `LCU_UNAVAILABLE` 并返回退出码 2；这应记录为 `NOT RUN`，不能当作通过。
 
 若 schema 不兼容，在获得测试者同意后保存最小化夹具：删除名称、ID、认证信息和其他个人数据，仅保留重现 schema 差异所需的字段。先添加失败测试，再修改适配器。
 
