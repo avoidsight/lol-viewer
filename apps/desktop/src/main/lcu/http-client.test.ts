@@ -141,4 +141,15 @@ describe('createLcuClient', () => {
     });
     expect(transport.request).not.toHaveBeenCalled();
   });
+
+  it('rejects an oversized response with a sanitized typed error', async () => {
+    const transport = requestDouble({ statusCode: 200, body: JSON.stringify({ value: 'x'.repeat(64) }) });
+    const client = createLcuClient(
+      { port: 53122, password: 'secret-token', protocol: 'https' }, transport.request, 32
+    );
+    const error = await client.get('/endpoint', unknownSchema).catch((caught) => caught);
+    expect(error).toMatchObject({ code: 'LCU_RESPONSE_TOO_LARGE' });
+    expect(String(error)).not.toContain('secret-token');
+    expect(String(error)).not.toContain('xxxxx');
+  });
 });

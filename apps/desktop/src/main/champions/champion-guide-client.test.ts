@@ -93,6 +93,20 @@ describe('ChampionGuideClient', () => {
     expect(cache.get('16.14', 114, 'TOP')).toEqual(guide);
   });
 
+  it('uses the validated current patch for each request and cache key', async () => {
+    database = new Database(':memory:'); migrateDatabase(database);
+    const cache = new ChampionGuideCache(database);
+    let patch = '16.14';
+    const fetch = vi.fn(async (_url: string | URL | Request) => new Response(JSON.stringify({ ...guide, patch })));
+    const client = new ChampionGuideClient({ baseUrl: 'https://guides.test', getPatch: async () => patch, cache, fetch });
+    await client.getChampionGuide(114, 'TOP');
+    patch = '16.15';
+    await client.getChampionGuide(114, 'TOP');
+    expect(fetch.mock.calls[0]?.[0]).toContain('/16.14/');
+    expect(fetch.mock.calls[1]?.[0]).toContain('/16.15/');
+    expect(cache.get('16.15', 114, 'TOP')).toMatchObject({ patch: '16.15' });
+  });
+
   it('persists the last successful guide across database close and reopen', () => {
     databasePath = join(process.cwd(), `champion-guide-${Date.now()}-${Math.random()}.sqlite`);
     database = new Database(databasePath); migrateDatabase(database);

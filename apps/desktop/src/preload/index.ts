@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { PlayerSnapshot, QueueScope } from '../shared/domain';
 import {
   MATCH_GET_CHANNEL,
+  MATCH_RETRY_CHANNEL,
   CHAMPION_GUIDE_GET_CHANNEL,
   PLAYER_UPDATED_CHANNEL,
   SETTINGS_CLEAR_CACHE_CHANNEL,
@@ -11,6 +12,8 @@ import {
   appSettingsPatchSchema,
   appSettingsSchema,
   liveMatchSchema,
+  liveMatchRequestSchema,
+  playerUpdateSchema,
   playerSnapshotSchema,
   queueScopeSchema,
   championGuideRequestSchema,
@@ -22,14 +25,15 @@ import {
 } from '../shared/ipc';
 
 const api: LolViewerApi = Object.freeze({
-  getLiveMatch: async (scope: QueueScope): Promise<LiveMatch> => {
-    const input = queueScopeSchema.parse(scope);
+  getLiveMatch: async (scope: QueueScope, generation = 0): Promise<LiveMatch> => {
+    const input = liveMatchRequestSchema.parse({ scope: queueScopeSchema.parse(scope), generation });
     return liveMatchSchema.parse(await ipcRenderer.invoke(MATCH_GET_CHANNEL, input));
   },
-  onPlayerUpdated: (listener: (player: PlayerSnapshot) => void): (() => void) => {
+  retryLiveMatch: async (): Promise<void> => z.undefined().parse(await ipcRenderer.invoke(MATCH_RETRY_CHANNEL)),
+  onPlayerUpdated: (listener: (player: PlayerSnapshot, generation?: number) => void): (() => void) => {
     const handler = (_event: Electron.IpcRendererEvent, input: unknown): void => {
-      const player = playerSnapshotSchema.safeParse(input);
-      if (player.success) listener(player.data);
+      const update = playerUpdateSchema.safeParse(input);
+      if (update.success) listener(update.data.player, update.data.generation);
     };
     ipcRenderer.on(PLAYER_UPDATED_CHANNEL, handler);
     return () => ipcRenderer.removeListener(PLAYER_UPDATED_CHANNEL, handler);

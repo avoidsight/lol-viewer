@@ -30,6 +30,31 @@ const history = {
 };
 
 describe('MatchService', () => {
+  it('orients team 200 first using the strictly validated current summoner', async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
+      if (path === '/lol-summoner/v1/current-summoner') return { summonerId: 8 };
+      if (path.includes('/ranked-stats/')) return { queues: [] };
+      return history;
+    });
+    const result = await new MatchService({ get } as LcuClient).loadLiveMatch('all', () => undefined);
+    expect(result.players.slice(0, 5).every((player) => player.teamId === 200)).toBe(true);
+  });
+
+  it('populates solo rank and isolates a single rank lookup failure', async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };
+      if (path === '/lol-summoner/v1/current-summoner') return { summonerId: 1 };
+      if (path.includes('/ranked-stats/2')) throw new Error('rank offline');
+      if (path.includes('/ranked-stats/')) return { queues: [{ queueType: 'RANKED_SOLO_5x5', tier: 'GOLD', division: 'II', leaguePoints: 42 }] };
+      return history;
+    });
+    const result = await new MatchService({ get } as LcuClient).loadLiveMatch('all', () => undefined);
+    expect(result.players[0].rank).toBe('GOLD II 42 LP');
+    expect(result.players[1].rank).toBeUndefined();
+    expect(result.players[1].matches).toHaveLength(1);
+    expect(result.players.slice(2).every((player) => player.rank === 'GOLD II 42 LP')).toBe(true);
+  });
   it('propagates a separately validated current asset version to every player', async () => {
     const get = vi.fn(async (path: string) => {
       if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5) } };

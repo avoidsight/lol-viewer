@@ -32,9 +32,10 @@ interface Props {
   scope?: QueueScope;
   onScopeChange?: (scope: QueueScope) => void;
   notice?: ReactNode;
+  showLaneDifferences?: boolean;
 }
 
-export default function LiveMatchPage({ match, players = [], scope = 'ranked-solo', onScopeChange, notice }: Props) {
+export default function LiveMatchPage({ match, players = [], scope = 'ranked-solo', onScopeChange, notice, showLaneDifferences = true }: Props) {
   const visiblePlayers = match?.players ?? players;
   const knownTeamIds = [...new Set(visiblePlayers.map((player) => player.teamId))];
   const teamIds: (number | undefined)[] = knownTeamIds.every((teamId) => teamId === 100 || teamId === 200)
@@ -47,7 +48,7 @@ export default function LiveMatchPage({ match, players = [], scope = 'ranked-sol
       <div className="live-match-page__scroll" style={{ overflowX: 'auto' }} tabIndex={0} aria-label="双方对局比较"><div className="live-match-grid" style={{ minWidth: 1050 }}>
         {teamIds.map((teamId, teamIndex) => <section key={teamIndex} className="team-row" role="group" aria-label={teamIndex === 0 ? '我方队伍' : '敌方队伍'}>
           {teamSlots(teamId === undefined ? [] : visiblePlayers.filter((player) => player.teamId === teamId)).map((slot) => slot.player ?
-            <PlayerCard key={slot.player.playerId} player={slot.player} displayLane={slot.lane} uncertain={slot.uncertain} /> :
+            <PlayerCard key={slot.player.playerId} player={slot.player} displayLane={slot.lane} uncertain={showLaneDifferences && slot.uncertain} /> :
             <article key={slot.lane} className="player-card player-card--placeholder" data-testid="player-slot" data-lane={slot.lane} aria-label={`${slot.lane} 玩家加载中`}><span>{slot.lane}</span><p>玩家加载中…</p></article>)}
         </section>)}
       </div></div>

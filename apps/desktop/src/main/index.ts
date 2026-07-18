@@ -12,8 +12,11 @@ import { ChampionGuideClient } from './champions/champion-guide-client';
 import { registerChampionIpc } from './ipc/register-champion-ipc';
 import { SettingsService } from './settings/settings-service';
 import { createFixtureLiveMatch, fixtureModeEnabled } from './fixtures/live-match';
+import { z } from 'zod';
+import { GameflowCoordinator } from './match/gameflow-coordinator';
 
 let database: Database.Database | undefined;
+let coordinator: GameflowCoordinator | undefined;
 
 function createWindow(): void {
   const window = new BrowserWindow({
@@ -40,19 +43,26 @@ void app.whenReady().then(() => {
   migrateDatabase(database);
   const cache = new MatchCache(database);
   const guideCache = new ChampionGuideCache(database);
+  const patchSchema = z.string().regex(/^\d+\.\d+(?:\.\d+){0,2}$/);
   registerChampionIpc(new ChampionGuideClient({
     baseUrl: process.env.CHAMPION_GUIDE_SERVICE_URL ?? 'http://127.0.0.1:8787',
-    patch: process.env.CHAMPION_GUIDE_PATCH ?? '16.14', cache: guideCache
+    ...(process.env.CHAMPION_GUIDE_PATCH ? { patch: process.env.CHAMPION_GUIDE_PATCH } : {
+      getPatch: async () => {
+        const connection = await discoverLcuConnection();
+        if (!connection) throw new Error('League client is unavailable');
+        const version = patchSchema.parse(await createLcuClient(connection).get('/lol-patch/v1/game-version', patchSchema));
+        return version.split('.').slice(0, 2).join('.');
+      }
+    }), cache: guideCache
   }));
   registerSettingsIpc(new SettingsService(database, cache, guideCache));
-  registerMatchIpc({
-    async loadLiveMatch(scope, onPlayer) {
+  coordinator = new GameflowCoordinator(async (scope, onPlayer) => {
       if (fixtureMode) return createFixtureLiveMatch(scope);
       const connection = await discoverLcuConnection();
       if (!connection) throw new Error('League client is unavailable');
       return new MatchService(createLcuClient(connection), { cache }).loadLiveMatch(scope, onPlayer);
-    }
   });
+  registerMatchIpc(coordinator);
   createWindow();
 
   app.on('activate', () => {
@@ -61,6 +71,8 @@ void app.whenReady().then(() => {
 });
 
 app.on('before-quit', () => {
+  coordinator?.dispose();
+  coordinator = undefined;
   database?.close();
   database = undefined;
 });

@@ -46,7 +46,7 @@ describe('preload match API validation', () => {
     handler({}, { playerId: 'missing-fields' });
     expect(listener).not.toHaveBeenCalled();
 
-    handler({}, validPlayer);
+    handler({}, { generation: 1, player: validPlayer });
     expect(listener).toHaveBeenCalledOnce();
   });
 
@@ -56,7 +56,7 @@ describe('preload match API validation', () => {
     api.onPlayerUpdated(listener);
     const handler = electron.on.mock.calls.at(-1)?.[1];
 
-    handler({}, { ...validPlayer, unexpected: true });
+    handler({}, { generation: 1, player: { ...validPlayer, unexpected: true } });
     expect(listener).not.toHaveBeenCalled();
 
     electron.invoke.mockResolvedValue({

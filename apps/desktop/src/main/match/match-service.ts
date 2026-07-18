@@ -19,6 +19,13 @@ const sessionSchema = z.object({
   })
 });
 
+const currentSummonerSchema = z.object({ summonerId: z.union([z.string(), z.number()]) });
+const rankedStatsSchema = z.object({
+  queues: z.array(z.object({
+    queueType: z.string(), tier: z.string(), division: z.string(), leaguePoints: z.number().int()
+  }))
+});
+
 const matchHistorySchema = z.object({ games: z.array(z.unknown()) });
 const assetVersionSchema = z.string().regex(/^\d+\.\d+(?:\.\d+){0,2}$/);
 const retryDelays = [250, 750] as const;
@@ -68,6 +75,14 @@ export class MatchService {
     const session = sessionSchema.parse(
       await this.client.get('/lol-gameflow/v1/session', sessionSchema)
     );
+    let currentSummoner: z.infer<typeof currentSummonerSchema>;
+    try {
+      currentSummoner = currentSummonerSchema.parse(
+        await this.client.get('/lol-summoner/v1/current-summoner', currentSummonerSchema)
+      );
+    } catch {
+      currentSummoner = { summonerId: session.gameData.teamOne[0].summonerId };
+    }
     let assetVersion: string | undefined;
     try {
       assetVersion = assetVersionSchema.parse(
@@ -76,7 +91,13 @@ export class MatchService {
     } catch {
       assetVersion = undefined;
     }
-    const participants = [...session.gameData.teamOne, ...session.gameData.teamTwo];
+    const allParticipants = [...session.gameData.teamOne, ...session.gameData.teamTwo];
+    const local = allParticipants.find((participant) => String(participant.summonerId) === String(currentSummoner.summonerId));
+    if (!local) throw new Error('Current summoner is not part of the live session');
+    const participants = [
+      ...allParticipants.filter((participant) => participant.teamId === local.teamId),
+      ...allParticipants.filter((participant) => participant.teamId !== local.teamId)
+    ];
     const players = await mapLimit(participants, 4, async (participant) => {
       const base = {
         playerId: String(participant.summonerId),
@@ -95,6 +116,16 @@ export class MatchService {
         // Cache availability must not affect live LCU history loading.
       }
       let matches: MatchSummary[] | null = cached?.matches ?? null;
+      let rank: string | undefined;
+      try {
+        const ranked = rankedStatsSchema.parse(await this.client.get(
+          `/lol-ranked/v1/ranked-stats/${encodeURIComponent(base.playerId)}`, rankedStatsSchema
+        ));
+        const solo = ranked.queues.find((queue) => queue.queueType === 'RANKED_SOLO_5x5');
+        if (solo) rank = `${solo.tier} ${solo.division} ${solo.leaguePoints} LP`;
+      } catch {
+        rank = undefined;
+      }
       if (!cached) {
         try {
           const rawHistory = await this.getHistoryWithRetry(base.playerId);
@@ -109,6 +140,7 @@ export class MatchService {
       const currentChampionWins = championMatches.filter((match) => match.win).length;
       const player: PlayerSnapshot = {
         ...base,
+        ...(rank === undefined ? {} : { rank }),
         matches: recentMatches,
         sampleSize: recentMatches.length,
         wins,

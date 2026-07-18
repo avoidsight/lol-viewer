@@ -5,7 +5,7 @@ import type { z } from 'zod';
 import type { LcuConnection } from './discovery';
 
 export interface LcuError extends Error {
-  code: 'LCU_UNAVAILABLE' | 'LCU_AUTH' | 'LCU_INVALID_RESPONSE';
+  code: 'LCU_UNAVAILABLE' | 'LCU_AUTH' | 'LCU_INVALID_RESPONSE' | 'LCU_RESPONSE_TOO_LARGE';
 }
 
 export type HttpsRequest = (
@@ -27,7 +27,8 @@ function validPath(path: string): boolean {
 
 export function createLcuClient(
   connection: LcuConnection,
-  request: HttpsRequest = httpsRequest
+  request: HttpsRequest = httpsRequest,
+  maxResponseBytes = 2 * 1024 * 1024
 ): LcuClient {
   return {
     get<T>(path: string, schema: z.ZodType<T>): Promise<T> {
@@ -59,7 +60,17 @@ export function createLcuClient(
           },
           (response) => {
             const chunks: Buffer[] = [];
-            response.on('data', (chunk: Buffer | string) => chunks.push(Buffer.from(chunk)));
+            let receivedBytes = 0;
+            response.on('data', (chunk: Buffer | string) => {
+              const buffer = Buffer.from(chunk);
+              receivedBytes += buffer.length;
+              if (receivedBytes > maxResponseBytes) {
+                response.destroy?.();
+                finish(() => reject(lcuError('LCU_RESPONSE_TOO_LARGE', 'LCU response exceeded the size limit')));
+                return;
+              }
+              chunks.push(buffer);
+            });
             response.on('error', () =>
               finish(() => reject(lcuError('LCU_INVALID_RESPONSE', 'LCU response could not be read')))
             );

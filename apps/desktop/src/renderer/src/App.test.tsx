@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PlayerSnapshot } from '../../shared/domain';
 import type { LiveMatch, LolViewerApi } from '../../shared/ipc';
@@ -13,9 +13,9 @@ const players = Array.from({ length: 10 }, (_, index): PlayerSnapshot => ({
 }));
 const liveMatch: LiveMatch = { players };
 const unusedSettingsApi = {
-  getSettings: vi.fn(),
-  updateSettings: vi.fn(),
-  clearCache: vi.fn(),
+  getSettings: vi.fn().mockResolvedValue({ queueScope: 'ranked-solo', autoOpenLiveMatch: true, showLaneDifferences: true }),
+  updateSettings: vi.fn(async (patch) => ({ queueScope: 'ranked-solo', autoOpenLiveMatch: true, showLaneDifferences: true, ...patch })),
+  clearCache: vi.fn().mockResolvedValue(undefined),
   getChampionGuide: vi.fn()
 };
 
@@ -27,16 +27,25 @@ function deferred<T>() {
 }
 
 function installApi(getLiveMatch: LolViewerApi['getLiveMatch']) {
-  let listener: ((player: PlayerSnapshot) => void) | undefined;
+  let listener: ((player: PlayerSnapshot, generation?: number) => void) | undefined;
   const unsubscribe = vi.fn();
-  const onPlayerUpdated = vi.fn((next: (player: PlayerSnapshot) => void) => { listener = next; return unsubscribe; });
+  const onPlayerUpdated = vi.fn((next: (player: PlayerSnapshot, generation?: number) => void) => { listener = next; return unsubscribe; });
   window.lolViewer = { getLiveMatch, onPlayerUpdated, ...unusedSettingsApi };
-  return { onPlayerUpdated, unsubscribe, emit: (player: PlayerSnapshot) => listener?.(player) };
+  return { onPlayerUpdated, unsubscribe, emit: (player: PlayerSnapshot, generation?: number) => listener?.(player, generation) };
 }
 
 afterEach(() => { delete window.lolViewer; });
 
 describe('App', () => {
+  it('loads persisted queue settings and reports cache-clear success', async () => {
+    const getLiveMatch = vi.fn().mockResolvedValue({ players: players.map((player) => ({ ...player, scope: 'all' as const })) });
+    installApi(getLiveMatch);
+    window.lolViewer!.getSettings = vi.fn().mockResolvedValue({ queueScope: 'all', autoOpenLiveMatch: true, showLaneDifferences: false });
+    render(<App />);
+    await waitFor(() => expect(getLiveMatch).toHaveBeenCalledWith('all', expect.any(Number)));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear cache' }));
+    expect(await screen.findByText('Cache cleared')).toBeVisible();
+  });
   it('navigates to the champion library while retaining the live page', async () => {
     const getChampionGuide = vi.fn().mockRejectedValue(new Error('offline'));
     installApi(vi.fn().mockResolvedValue(liveMatch));
@@ -65,7 +74,7 @@ describe('App', () => {
     const unsubscribe = vi.fn();
     window.lolViewer = { getLiveMatch: () => { order.push('request'); return request.promise; }, onPlayerUpdated: (next) => { order.push('subscribe'); listener = next; return unsubscribe; }, ...unusedSettingsApi };
     const { unmount } = render(<App />);
-    expect(order).toEqual(['subscribe', 'request']);
+    await waitFor(() => expect(order).toEqual(['subscribe', 'request']));
     act(() => listener(players[0]));
     expect(screen.getByText('Player 0')).toBeVisible();
     unmount();
@@ -88,7 +97,7 @@ describe('App', () => {
     render(<App />);
     expect(await screen.findByText('Player 0')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: '全部模式' }));
-    expect(screen.getByRole('status')).toHaveTextContent('正在加载全部模式对局');
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('正在加载全部模式对局'));
     expect(screen.getByRole('button', { name: '单双排' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('Player 0')).toBeVisible();
     await act(async () => next.reject(new Error('offline')));
