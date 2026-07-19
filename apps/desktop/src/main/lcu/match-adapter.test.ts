@@ -20,6 +20,16 @@ describe('adaptMatchHistory', () => {
     expect(adaptMatchHistory({ games: fixture.games.slice(0, 1) }, { scope: 'all', limit: 10 })).toHaveLength(1);
   });
 
+  it('accepts the Tencent history response with nested games metadata', () => {
+    const response = {
+      accountId: 'redacted',
+      games: { gameCount: 1, gameIndexBegin: 0, gameIndexEnd: 1, games: fixture.games.slice(0, 1) },
+      platformId: 'HN1'
+    };
+
+    expect(adaptMatchHistory(response, { scope: 'all', limit: 10 })).toHaveLength(1);
+  });
+
   it('returns the actual sample when fewer than ten matches exist', () => {
     expect(adaptMatchHistory({ games: fixture.games.slice(0, 3) }, { scope: 'all', limit: 10 })).toHaveLength(3);
   });

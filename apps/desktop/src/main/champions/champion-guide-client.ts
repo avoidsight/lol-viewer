@@ -1,4 +1,4 @@
-import { championGuideSnapshotSchema, type ChampionGuide, type ChampionLane } from '../../shared/ipc';
+import { championGuideSnapshotSchema, type ChampionGuide, type ChampionGuideSnapshot, type ChampionLane } from '../../shared/ipc';
 import type { ChampionGuideCache } from '../cache/database';
 
 type ScheduleTimeout = (callback: () => void, milliseconds: number) => ReturnType<typeof setTimeout>;
@@ -12,11 +12,20 @@ interface Options {
   fetch?: typeof fetch;
   setTimeout?: ScheduleTimeout;
   clearTimeout?: CancelTimeout;
+  bundledGuide?: (championId: number, lane: ChampionLane) => ChampionGuideSnapshot | null;
 }
 
 export class ChampionGuideClient {
   private readonly fetcher: typeof fetch;
   constructor(private readonly options: Options) { this.fetcher = options.fetch ?? fetch; }
+  private bundled(championId: number, lane: ChampionLane): ChampionGuide | null {
+    try {
+      const snapshot = this.options.bundledGuide?.(championId, lane);
+      return snapshot ? { ...championGuideSnapshotSchema.parse(snapshot), stale: true } : null;
+    } catch {
+      return null;
+    }
+  }
   async getChampionGuide(championId: number, lane: ChampionLane): Promise<ChampionGuide> {
     let patch: string | undefined;
     try { patch = this.options.getPatch ? await this.options.getPatch() : this.options.patch; }
@@ -25,6 +34,8 @@ export class ChampionGuideClient {
         const latest = this.options.cache.getLatest?.(championId, lane);
         if (latest) return { ...latest, stale: true };
       } catch { /* sanitized below */ }
+      const bundled = this.bundled(championId, lane);
+      if (bundled) return bundled;
       throw new Error('Champion guide unavailable');
     }
     if (!patch || !/^\d+\.\d+$/.test(patch)) throw new Error('Champion guide unavailable');
@@ -42,6 +53,12 @@ export class ChampionGuideClient {
       let cached;
       try { cached = this.options.cache.get(patch, championId, lane); } catch { cached = null; }
       if (cached) return { ...cached, stale: true };
+      try {
+        const latest = this.options.cache.getLatest?.(championId, lane);
+        if (latest) return { ...latest, stale: true };
+      } catch { /* sanitized below */ }
+      const bundled = this.bundled(championId, lane);
+      if (bundled) return bundled;
       throw new Error('Champion guide unavailable');
     } finally {
       (this.options.clearTimeout ?? clearTimeout)(timeout);

@@ -64,7 +64,7 @@ describe('PersonalHistoryService', () => {
     expect(result.favoriteChampions[0]).toMatchObject({ championId: 1, games: 4 });
     expect(result).toMatchObject({ playerId: '7', rank: 'GOLD II 42 LP', assetVersion: '15.14.1', cached: false });
     expect(cache.getLatest('7')).toEqual({ ...result, cached: true });
-    expect(get).toHaveBeenCalledWith('/lol-match-history/v1/products/lol/7/matches?begIndex=0&endIndex=40', expect.anything());
+    expect(get).toHaveBeenCalledWith('/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=40', expect.anything());
   });
 
   it('keeps successful history when optional rank and patch requests fail', async () => {

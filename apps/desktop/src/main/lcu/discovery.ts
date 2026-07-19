@@ -19,8 +19,10 @@ const execFileAsync = promisify(execFile);
 function commandLineConnection(process: ProcessInfo): LcuConnection | null {
   if (process.name && !/^LeagueClientUx(?:\.exe)?$/i.test(process.name)) return null;
 
-  const port = /(?:^|\s)--app-port=(?:"(\d+)"|(\d+))(?:\s|$)/.exec(process.commandLine);
-  const token = /(?:^|\s)--remoting-auth-token=(?:"([^"]+)"|([^\s]+))(?:\s|$)/.exec(
+  const port = /(?:^|\s)"?--app-port=(?:"(\d+)"|(\d+))"?(?:\s|$)/.exec(
+    process.commandLine
+  );
+  const token = /(?:^|\s)"?--remoting-auth-token=(?:"([^"]+)"|([^"\s]+))"?(?:\s|$)/.exec(
     process.commandLine
   );
   const portNumber = Number(port?.[1] ?? port?.[2]);

@@ -54,7 +54,9 @@
     "npmRebuild": false,
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }],
-      "signAndEditExecutable": false,
+      "requestedExecutionLevel": "requireAdministrator",
+      "signAndEditExecutable": true,
+      "signExecutable": false,
       "artifactName": "lol-viewer-${version}-windows-${arch}-setup.${ext}"
     },
     "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }

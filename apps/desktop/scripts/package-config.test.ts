@@ -9,4 +9,14 @@ describe('desktop packaging metadata', () => {
     expect(desktop.packageManager).toBe('pnpm@10.13.1');
     expect(desktop.packageManager).toBe(workspace.packageManager);
   });
+
+  it('requests administrator rights for Tencent LCU process discovery', () => {
+    const desktop = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as {
+      build?: { win?: { requestedExecutionLevel?: string; signAndEditExecutable?: boolean; signExecutable?: boolean } };
+    };
+
+    expect(desktop.build?.win?.requestedExecutionLevel).toBe('requireAdministrator');
+    expect(desktop.build?.win?.signAndEditExecutable).toBe(true);
+    expect(desktop.build?.win?.signExecutable).toBe(false);
+  });
 });

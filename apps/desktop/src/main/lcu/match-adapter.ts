@@ -29,9 +29,14 @@ const gameSchema = z.object({
   participants: z.array(participantSchema).min(1)
 });
 
-export const matchHistoryResponseSchema = z.object({
-  games: z.array(gameSchema)
-});
+export const matchHistoryResponseSchema = z.preprocess((input) => {
+  if (!input || typeof input !== 'object') return input;
+  const root = input as Record<string, unknown>;
+  const gamesEnvelope = root.games;
+  if (!gamesEnvelope || typeof gamesEnvelope !== 'object' || Array.isArray(gamesEnvelope)) return input;
+  const nestedGames = (gamesEnvelope as Record<string, unknown>).games;
+  return Array.isArray(nestedGames) ? { ...root, games: nestedGames } : input;
+}, z.object({ games: z.array(gameSchema) }));
 
 interface AdaptOptions {
   scope: QueueScope;

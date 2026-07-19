@@ -28,6 +28,18 @@ describe('discoverLcuConnection', () => {
     expect(JSON.stringify([...log.mock.calls, ...error.mock.calls])).not.toContain('secret');
   });
 
+  it('parses Tencent client arguments when each complete argument is quoted', async () => {
+    const result = await discoverLcuConnection([
+      {
+        name: 'LeagueClientUx.exe',
+        commandLine:
+          'LeagueClientUx.exe "--riotclient-tencent" "--remoting-auth-token=tencent-secret" "--app-port=50846"'
+      }
+    ]);
+
+    expect(result).toEqual({ port: 50846, password: 'tencent-secret', protocol: 'https' });
+  });
+
   it('prefers a LeagueClientUx command line over the lockfile', async () => {
     const lockfile = join(tmpdir(), `lcu-lockfile-${process.pid}-${Date.now()}`);
     temporaryLockfiles.add(lockfile);

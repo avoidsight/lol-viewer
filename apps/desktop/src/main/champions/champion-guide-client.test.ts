@@ -4,6 +4,7 @@ import { existsSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { ChampionGuideCache, migrateDatabase } from '../cache/database';
 import { ChampionGuideClient } from './champion-guide-client';
+import { getBundledGuide } from './bundled-guide';
 
 const guide = {
   championId: 114, lane: 'TOP' as const, patch: '16.14', source: 'OPGG' as const,
@@ -84,6 +85,20 @@ describe('ChampionGuideClient', () => {
     const cache = { get: vi.fn(() => { throw new Error('sqlite details'); }), put: vi.fn() };
     const client = new ChampionGuideClient({ baseUrl: 'https://guides.test', patch: '16.14', cache, fetch: vi.fn().mockRejectedValue(new Error('network details')) });
     await expect(client.getChampionGuide(114, 'TOP')).rejects.toThrow('Champion guide unavailable');
+  });
+
+  it('uses the bundled guide as the final first-run offline fallback', async () => {
+    database = new Database(':memory:'); migrateDatabase(database);
+    const cache = new ChampionGuideCache(database);
+    const client = new ChampionGuideClient({
+      baseUrl: 'https://offline.invalid', patch: '16.14', cache,
+      fetch: vi.fn().mockRejectedValue(new Error('offline')),
+      bundledGuide: getBundledGuide
+    });
+
+    await expect(client.getChampionGuide(114, 'TOP')).resolves.toMatchObject({
+      championId: 114, lane: 'TOP', source: 'MANUAL', stale: true
+    });
   });
 
   it.each([

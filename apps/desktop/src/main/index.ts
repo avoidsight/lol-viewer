@@ -10,6 +10,7 @@ import { registerHistoryIpc } from './ipc/register-history-ipc';
 import { MatchService } from './match/match-service';
 import { ChampionGuideCache, MatchCache, migrateDatabase, PersonalHistoryCache } from './cache/database';
 import { ChampionGuideClient } from './champions/champion-guide-client';
+import { getBundledGuide } from './champions/bundled-guide';
 import { registerChampionIpc } from './ipc/register-champion-ipc';
 import { SettingsService } from './settings/settings-service';
 import { createFixtureAramLiveMatch, createFixtureLiveMatch, createFixturePersonalHistory, fixtureModeEnabled } from './fixtures/live-match';
@@ -57,7 +58,7 @@ void app.whenReady().then(() => {
         const version = patchSchema.parse(await createLcuClient(connection).get('/lol-patch/v1/game-version', patchSchema));
         return version.split('.').slice(0, 2).join('.');
       }
-    }), cache: guideCache
+    }), cache: guideCache, bundledGuide: getBundledGuide
   }));
   registerSettingsIpc(new SettingsService(database, cache, guideCache, personalHistoryCache));
   registerHistoryIpc({

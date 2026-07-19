@@ -57,7 +57,7 @@ export class PersonalHistoryService {
         // A cache read failure must not prevent an online refresh.
       }
       const history = adaptMatchHistory(await this.client.get(
-        `/lol-match-history/v1/products/lol/${encodeURIComponent(playerId)}/matches?begIndex=0&endIndex=40`,
+        '/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=40',
         matchHistoryResponseSchema
       ), { scope: 'all', limit: 20 });
       const [rankResult, patchResult] = await Promise.allSettled([
