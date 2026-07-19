@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PersonalHistorySnapshot, PlayerSnapshot } from '../../shared/domain';
 import type { LiveMatch, LolViewerApi } from '../../shared/ipc';
@@ -27,6 +28,16 @@ function install(getLiveMatch: LolViewerApi['getLiveMatch'] = vi.fn().mockResolv
 afterEach(() => { delete window.lolViewer; });
 
 describe('App tab lifecycle', () => {
+  it.each(['deferred', 'resolved'] as const)('deduplicates a %s personal history request during StrictMode effect replay', async (kind) => {
+    const pending = deferred<PersonalHistorySnapshot>();
+    const { api } = install();
+    vi.mocked(api.getPersonalHistory).mockImplementation(() => kind === 'deferred' ? pending.promise : Promise.resolve(history));
+    render(<StrictMode><App /></StrictMode>);
+    if (kind === 'deferred') await act(async () => pending.resolve(history));
+    expect(await screen.findByText('召唤师')).toBeVisible();
+    expect(api.getPersonalHistory).toHaveBeenCalledOnce();
+  });
+
   it('loads only personal history on startup', async () => {
     const { api } = install(); render(<App />);
     expect(await screen.findByText('召唤师')).toBeVisible();
@@ -43,6 +54,26 @@ describe('App tab lifecycle', () => {
     fireEvent.click(screen.getByRole('tab', { name: '英雄资料库' }));
     await waitFor(() => expect(api.cancelLiveMatch).toHaveBeenCalledOnce());
     expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('absorbs a rejected live cancellation during cleanup', async () => {
+    const { api } = install(vi.fn(() => new Promise<LiveMatch>(() => undefined)));
+    const rejected = Promise.reject(new Error('cancel failed'));
+    void rejected.then(undefined, () => undefined);
+    const catchCall = vi.spyOn(rejected, 'catch');
+    vi.mocked(api.cancelLiveMatch!).mockReturnValue(rejected);
+    const unhandled = vi.fn();
+    window.addEventListener('unhandledrejection', unhandled);
+    render(<StrictMode><App /></StrictMode>);
+    fireEvent.click(screen.getByRole('tab', { name: '对战信息' }));
+    await waitFor(() => expect(api.getLiveMatch).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole('tab', { name: '战绩' }));
+    await waitFor(() => expect(api.cancelLiveMatch).toHaveBeenCalledOnce());
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(catchCall).toHaveBeenCalledOnce();
+    expect(unhandled).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    window.removeEventListener('unhandledrejection', unhandled);
   });
 
   it('shows lobby waiting without ten placeholder slots', async () => {

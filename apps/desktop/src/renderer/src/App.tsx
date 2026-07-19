@@ -21,17 +21,22 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   const [message, setMessage] = useState('');
   const [retryNonce, setRetryNonce] = useState(0);
   const generation = useRef(0);
+  const historyRequest = useRef<Promise<PersonalHistorySnapshot> | undefined>(undefined);
 
   useEffect(() => {
     if (page !== 'history' || history) return;
     let active = true;
     const api = window.lolViewer;
     if (!api) { setHistoryState('unavailable'); return; }
-    void Promise.resolve(api.getPersonalHistory()).then((snapshot) => {
+    const request = historyRequest.current ?? Promise.resolve(api.getPersonalHistory());
+    historyRequest.current = request;
+    void request.then((snapshot) => {
       if (!active) return;
       if (!snapshot) { setHistoryState('unavailable'); return; }
       setHistory(snapshot); setHistoryState('ready');
-    }).catch(() => { if (active) setHistoryState('unavailable'); });
+    }).catch(() => { if (active) setHistoryState('unavailable'); }).finally(() => {
+      if (historyRequest.current === request) historyRequest.current = undefined;
+    });
     return () => { active = false; };
   }, [page, history]);
 
@@ -60,7 +65,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     return () => {
       active = false;
       unsubscribe();
-      void api.cancelLiveMatch?.();
+      void Promise.resolve(api.cancelLiveMatch?.()).catch(() => undefined);
     };
   }, [page, retryNonce]);
 
