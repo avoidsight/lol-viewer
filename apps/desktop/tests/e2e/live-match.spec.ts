@@ -17,7 +17,9 @@ test('three tabs load personal history first and live comparison on demand', asy
     await page.getByRole('tab', { name: '对战信息' }).click();
     await expect(page.getByTestId('player-card')).toHaveCount(10);
     await expect(page.getByTestId('recent-match')).toHaveCount(100);
-    await expect(page.getByText('单双排', { exact: true })).toBeVisible();
+    const modeHeading = page.locator('.live-match-page__mode');
+    await expect(modeHeading).toBeVisible();
+    await expect(modeHeading).toHaveText('单双排');
     await page.getByRole('tab', { name: '英雄资料库' }).click();
     await expect(page.getByRole('heading', { name: '英雄资料库' })).toBeVisible();
     expect(Date.now() - startedAt).toBeLessThan(15_000);
