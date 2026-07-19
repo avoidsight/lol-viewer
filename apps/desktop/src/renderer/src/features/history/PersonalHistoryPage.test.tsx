@@ -1,5 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { PersonalHistorySnapshot } from '../../../../shared/domain';
 import PersonalHistoryPage from './PersonalHistoryPage';
 
@@ -21,6 +23,13 @@ describe('PersonalHistoryPage', () => {
     expect(screen.getAllByTestId('personal-match')).toHaveLength(20);
     expect(screen.getAllByText('极地大乱斗')).toHaveLength(10);
     expect(screen.getAllByText('8 / 2 / 6')).toHaveLength(20);
+  });
+
+  it('uses readable dark text inside light history cards', () => {
+    const css = readFileSync(resolve('src/renderer/src/features/history/personal-history.css'), 'utf8');
+    expect(css).toMatch(/\.personal-history__summary div[^}]*color:\s*#0f172a/s);
+    expect(css).toMatch(/\.personal-history__favorites article[^}]*color:\s*#0f172a/s);
+    expect(css).toMatch(/\.personal-history__matches article[^}]*color:\s*#0f172a/s);
   });
 
   it('renders loading and unavailable states explicitly', () => {

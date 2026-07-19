@@ -67,7 +67,11 @@ export class PersonalHistoryService {
       let rank: string | undefined;
       if (rankResult.status === 'fulfilled') {
         const solo = rankResult.value.queues.find((queue) => queue.queueType === 'RANKED_SOLO_5x5');
-        if (solo) rank = `${solo.tier} ${solo.division} ${solo.leaguePoints} LP`;
+        if (solo && solo.tier.trim() && solo.tier.trim().toUpperCase() !== 'NA') {
+          rank = [solo.tier.trim(), solo.division.trim(), `${solo.leaguePoints} LP`]
+            .filter(Boolean)
+            .join(' ');
+        }
       }
       const wins = history.filter((match) => match.win).length;
       const kills = history.reduce((total, match) => total + match.kills, 0);

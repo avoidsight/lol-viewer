@@ -79,6 +79,18 @@ describe('PersonalHistoryService', () => {
     expect(result.matches).toHaveLength(1);
   });
 
+  it('does not render the Tencent unranked sentinel as NA 0 LP', async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-summoner/v1/current-summoner') return { summonerId: 7, displayName: 'Player', profileIconId: 29 };
+      if (path.includes('/matches?')) return { games: [game(0)] };
+      if (path.includes('/ranked-stats/')) return { queues: [{ queueType: 'RANKED_SOLO_5x5', tier: 'NA', division: '', leaguePoints: 0 }] };
+      if (path === '/lol-patch/v1/game-version') return '16.14.1';
+      throw new Error('unexpected path');
+    }) as LcuClient['get'];
+
+    await expect(createService(get).service.load()).resolves.not.toHaveProperty('rank');
+  });
+
   it('returns latest player cache when history becomes unavailable', async () => {
     const { cache, service } = createService((async (path: string) => {
       if (path === '/lol-summoner/v1/current-summoner') return { summonerId: 7, displayName: 'Player', profileIconId: 29 };
