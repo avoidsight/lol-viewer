@@ -17,7 +17,7 @@ function install(getLiveMatch: LolViewerApi['getLiveMatch'] = vi.fn().mockResolv
   const api = {
     getPersonalHistory: vi.fn().mockResolvedValue(history), getLiveMatch,
     onPlayerUpdated: vi.fn((next) => { order?.push('subscribe'); listener = next; return unsubscribe; }),
-    cancelLiveMatch: vi.fn().mockResolvedValue(undefined), getChampionGuide: vi.fn().mockRejectedValue(new Error('offline')),
+    cancelLiveMatch: vi.fn().mockResolvedValue(undefined), retryLiveMatch: vi.fn().mockResolvedValue(undefined), getChampionGuide: vi.fn().mockRejectedValue(new Error('offline')),
     getSettings: vi.fn().mockResolvedValue({ queueScope: 'ranked-solo', autoOpenLiveMatch: true, showLaneDifferences: true }),
     updateSettings: vi.fn(), clearCache: vi.fn()
   } as unknown as LolViewerApi;
@@ -104,6 +104,17 @@ describe('App tab lifecycle', () => {
     fireEvent.click(screen.getByRole('tab', { name: '对战信息' }));
     await act(async () => request.reject(new Error('offline')));
     expect(screen.getByRole('alert')).toHaveTextContent('对战信息暂时无法读取，请重试');
+  });
+
+  it('starts exactly one new request lifecycle for one retry click', async () => {
+    const getLiveMatch = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(match);
+    const { api } = install(getLiveMatch);
+    render(<App initialTab="live" />);
+    expect(await screen.findByRole('alert')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry live match' }));
+    await waitFor(() => expect(api.getLiveMatch).toHaveBeenCalledTimes(2));
+    expect(api.retryLiveMatch).not.toHaveBeenCalled();
+    expect(api.cancelLiveMatch).toHaveBeenCalledTimes(1);
   });
 
   it('shows the resolved match mode and has no scope controls', async () => {

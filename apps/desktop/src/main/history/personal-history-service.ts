@@ -40,7 +40,7 @@ function favoriteChampions(matches: PersonalHistorySnapshot['matches']): Favorit
 export class PersonalHistoryService {
   constructor(
     private readonly client: LcuClient,
-    private readonly cache: Pick<PersonalHistoryCache, 'getLatest' | 'put'>
+    private readonly cache: Pick<PersonalHistoryCache, 'getFresh' | 'getLatest' | 'put'>
   ) {}
 
   async load(): Promise<PersonalHistorySnapshot> {
@@ -50,6 +50,12 @@ export class PersonalHistoryService {
         await this.client.get('/lol-summoner/v1/current-summoner', currentSummonerSchema)
       );
       playerId = String(summoner.summonerId);
+      try {
+        const fresh = this.cache.getFresh(playerId);
+        if (fresh) return fresh;
+      } catch {
+        // A cache read failure must not prevent an online refresh.
+      }
       const history = adaptMatchHistory(await this.client.get(
         `/lol-match-history/v1/products/lol/${encodeURIComponent(playerId)}/matches?begIndex=0&endIndex=40`,
         matchHistoryResponseSchema

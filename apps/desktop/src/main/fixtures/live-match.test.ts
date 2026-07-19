@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createFixtureLiveMatch, createFixturePersonalHistory, fixtureModeEnabled } from './live-match';
+import { createFixtureAramLiveMatch, createFixtureLiveMatch, createFixturePersonalHistory, fixtureModeEnabled } from './live-match';
 
 describe('fixture live match', () => {
   it('contains ten players with ten history records each', () => {
@@ -30,14 +30,28 @@ describe('fixture live match', () => {
     expect(createFixturePersonalHistory()).toEqual(first);
   });
 
+  it('provides deterministic ARAM teams in client roster order rather than lane order', () => {
+    const fixture = createFixtureAramLiveMatch('all');
+    expect(fixture).toMatchObject({ queueId: 450, modeName: '极地大乱斗', positionOrderReliable: false });
+    expect(fixture.players.slice(0, 5).map((player) => player.displayName)).toEqual([
+      'ARAM Ally Zoe', 'ARAM Ally Garen', 'ARAM Ally Lux', 'ARAM Ally Ashe', 'ARAM Ally Braum'
+    ]);
+    expect(fixture.players.slice(5).map((player) => player.displayName)).toEqual([
+      'ARAM Enemy Jinx', 'ARAM Enemy Darius', 'ARAM Enemy Ahri', 'ARAM Enemy Lee', 'ARAM Enemy Lulu'
+    ]);
+    expect(fixture.players.slice(0, 5).map((player) => player.lane)).not.toEqual(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']);
+  });
+
   it('requires the flag and an explicit test guard in an unpackaged app', () => {
     expect(fixtureModeEnabled(['--fixture-live-match'], false, { PLAYWRIGHT_TEST: '1' })).toBe(true);
+    expect(fixtureModeEnabled(['--fixture-aram'], false, { PLAYWRIGHT_TEST: '1' })).toBe(true);
     expect(fixtureModeEnabled([], false, { PLAYWRIGHT_TEST: '1' })).toBe(false);
     expect(fixtureModeEnabled(['--fixture-live-match'], false, {})).toBe(false);
   });
 
   it('can never run in a packaged production app', () => {
     expect(fixtureModeEnabled(['--fixture-live-match'], true, { PLAYWRIGHT_TEST: '1' })).toBe(false);
+    expect(fixtureModeEnabled(['--fixture-aram'], true, { PLAYWRIGHT_TEST: '1' })).toBe(false);
     expect(fixtureModeEnabled(['--fixture-live-match'], true, { NODE_ENV: 'development' })).toBe(false);
   });
 });

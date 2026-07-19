@@ -97,11 +97,32 @@ export function createFixtureLiveMatch(scope: QueueScope): LiveMatch {
   return { players, localTeamId: 100, queueId: 420, modeName: '单双排', positionOrderReliable: true };
 }
 
+export function createFixtureAramLiveMatch(scope: QueueScope): LiveMatch {
+  const base = createFixtureLiveMatch(scope);
+  const names = [
+    'ARAM Ally Zoe', 'ARAM Ally Garen', 'ARAM Ally Lux', 'ARAM Ally Ashe', 'ARAM Ally Braum',
+    'ARAM Enemy Jinx', 'ARAM Enemy Darius', 'ARAM Enemy Ahri', 'ARAM Enemy Lee', 'ARAM Enemy Lulu'
+  ];
+  const rosterLanes = ['MIDDLE', 'TOP', 'UTILITY', 'BOTTOM', 'JUNGLE'] as const;
+  return {
+    ...base,
+    players: base.players.map((player, index) => ({
+      ...player,
+      displayName: names[index],
+      lane: rosterLanes[index % rosterLanes.length]
+    })),
+    queueId: 450,
+    modeName: '极地大乱斗',
+    positionOrderReliable: false
+  };
+}
+
 export function fixtureModeEnabled(
   argv: readonly string[],
   isPackaged: boolean,
   environment: NodeJS.ProcessEnv
 ): boolean {
   const explicitTestGuard = environment.PLAYWRIGHT_TEST === '1' || environment.NODE_ENV === 'development';
-  return !isPackaged && explicitTestGuard && argv.includes('--fixture-live-match');
+  return !isPackaged && explicitTestGuard
+    && (argv.includes('--fixture-live-match') || argv.includes('--fixture-aram'));
 }

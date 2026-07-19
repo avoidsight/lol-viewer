@@ -29,7 +29,38 @@ const history = {
   ]
 };
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((yes) => { resolve = yes; });
+  return { promise, resolve };
+}
+
 describe('MatchService', () => {
+  it('stops starting LCU requests, player events, and cache writes after cancellation', async () => {
+    const controller = new AbortController();
+    const rankStarted = deferred<void>();
+    const releaseRank = deferred<void>();
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queueId: 420 } };
+      if (path.includes('/ranked-stats/')) {
+        rankStarted.resolve();
+        await releaseRank.promise;
+        return { queues: [] };
+      }
+      return history;
+    });
+    const cache = { get: vi.fn(() => null), put: vi.fn() };
+    const onPlayer = vi.fn();
+    const pending = new MatchService({ get } as LcuClient, { cache }).loadLiveMatch('all', onPlayer, controller.signal);
+    await rankStarted.promise;
+    controller.abort();
+    releaseRank.resolve();
+
+    await expect(pending).rejects.toMatchObject({ code: 'MATCH_CANCELLED', message: 'Live match request cancelled' });
+    expect(onPlayer).not.toHaveBeenCalled();
+    expect(cache.put).not.toHaveBeenCalled();
+    expect(get.mock.calls.filter(([path]) => String(path).includes('/matches?'))).toHaveLength(0);
+  });
   it('returns ARAM metadata, preserves roster order, and keeps all-mode histories', async () => {
     const aramParticipants = participants.map(({ selectedPosition: _selectedPosition, ...participant }) => participant);
     const normalHistory = { games: history.games.map((game) => ({ ...game, queueId: 430 })) };

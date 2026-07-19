@@ -12,7 +12,7 @@ import { ChampionGuideCache, MatchCache, migrateDatabase, PersonalHistoryCache }
 import { ChampionGuideClient } from './champions/champion-guide-client';
 import { registerChampionIpc } from './ipc/register-champion-ipc';
 import { SettingsService } from './settings/settings-service';
-import { createFixtureLiveMatch, createFixturePersonalHistory, fixtureModeEnabled } from './fixtures/live-match';
+import { createFixtureAramLiveMatch, createFixtureLiveMatch, createFixturePersonalHistory, fixtureModeEnabled } from './fixtures/live-match';
 import { z } from 'zod';
 import { GameflowCoordinator } from './match/gameflow-coordinator';
 import { PersonalHistoryService } from './history/personal-history-service';
@@ -41,6 +41,7 @@ function createWindow(): void {
 
 void app.whenReady().then(() => {
   const fixtureMode = fixtureModeEnabled(process.argv, app.isPackaged, process.env);
+  const aramFixtureMode = fixtureMode && process.argv.includes('--fixture-aram');
   database = new Database(join(app.getPath('userData'), 'lol-viewer.sqlite3'));
   migrateDatabase(database);
   const cache = new MatchCache(database);
@@ -67,11 +68,13 @@ void app.whenReady().then(() => {
       return new PersonalHistoryService(createLcuClient(connection), personalHistoryCache).load();
     }
   });
-  coordinator = new GameflowCoordinator(async (scope, onPlayer) => {
+  coordinator = new GameflowCoordinator(async (scope, onPlayer, signal) => {
+      if (aramFixtureMode) return createFixtureAramLiveMatch(scope);
       if (fixtureMode) return createFixtureLiveMatch(scope);
       const connection = await discoverLcuConnection();
+      if (signal.aborted) throw Object.assign(new Error('Live match request cancelled'), { code: 'MATCH_CANCELLED' as const });
       if (!connection) throw new Error('League client is unavailable');
-      return new MatchService(createLcuClient(connection), { cache }).loadLiveMatch(scope, onPlayer);
+      return new MatchService(createLcuClient(connection), { cache }).loadLiveMatch(scope, onPlayer, signal);
   });
   registerMatchIpc(coordinator);
   createWindow();

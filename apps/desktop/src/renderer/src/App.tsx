@@ -69,7 +69,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     };
   }, [page, retryNonce]);
 
-  const retry = () => { void window.lolViewer?.retryLiveMatch?.(); setRetryNonce((value) => value + 1); };
+  const retry = () => { setRetryNonce((value) => value + 1); };
   const clearCache = async () => { setMessage('Clearing cache…'); try { await window.lolViewer?.clearCache(); setMessage('Cache cleared'); } catch { setMessage('Cache could not be cleared'); } };
   const updateLaneSetting = async (showLaneDifferences: boolean) => {
     try { const next = await window.lolViewer?.updateSettings({ showLaneDifferences }); if (next) setSettings(next); } catch { setMessage('Settings could not be saved'); }

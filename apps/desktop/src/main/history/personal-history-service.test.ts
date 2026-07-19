@@ -31,6 +31,18 @@ function createService(get: LcuClient['get']) {
 }
 
 describe('PersonalHistoryService', () => {
+  it('returns a fresh snapshot after identity lookup without requesting history, rank, or patch', async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-summoner/v1/current-summoner') return { summonerId: 7, displayName: 'Current', profileIconId: 30 };
+      throw new Error(`unexpected request ${path}`);
+    }) as LcuClient['get'];
+    const cache = { getFresh: vi.fn(() => cachedSnapshot), getLatest: vi.fn(), put: vi.fn() };
+    const service = new PersonalHistoryService({ get } as LcuClient, cache);
+
+    await expect(service.load()).resolves.toEqual(cachedSnapshot);
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(cache.getFresh).toHaveBeenCalledWith('7');
+  });
   it('loads twenty matches and computes aggregate KDA and favorites', async () => {
     const games = Array.from({ length: 25 }, (_, index) => game(index));
     const get = vi.fn(async (path: string) => {

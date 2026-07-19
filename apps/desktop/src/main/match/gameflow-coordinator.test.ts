@@ -9,6 +9,28 @@ function deferred<T>() {
 }
 
 describe('GameflowCoordinator', () => {
+  it('drops late player events from cancelled generations while forwarding the replacement generation', async () => {
+    const attempts: Array<{ onPlayer: (player: any) => void; signal: AbortSignal; result: ReturnType<typeof deferred<any>> }> = [];
+    const coordinator = new GameflowCoordinator((_scope, onPlayer, signal) => {
+      const result = deferred<any>();
+      attempts.push({ onPlayer, signal, result });
+      return result.promise;
+    });
+    const oldEvents: string[] = [];
+    const newEvents: string[] = [];
+    const old = coordinator.loadLiveMatch('all', (player) => oldEvents.push(player.playerId));
+    await Promise.resolve();
+    const replacement = coordinator.loadLiveMatch('all', (player) => newEvents.push(player.playerId));
+    await expect(old).rejects.toMatchObject({ code: 'MATCH_CANCELLED' });
+    attempts[0].onPlayer({ playerId: 'stale' });
+    attempts[1].onPlayer({ playerId: 'current' });
+    expect(attempts[0].signal.aborted).toBe(true);
+    expect(attempts[1].signal.aborted).toBe(false);
+    expect(oldEvents).toEqual([]);
+    expect(newEvents).toEqual(['current']);
+    coordinator.cancel();
+    await expect(replacement).rejects.toMatchObject({ code: 'MATCH_CANCELLED' });
+  });
   it.each(['replace', 'cancel', 'dispose'] as const)('promptly cancels a hung attempt on %s and ignores late settlement', async (action) => {
     const hung = deferred<{ players: []; queueId: 420; modeName: '单双排'; positionOrderReliable: true }>();
     const replacementHung = deferred<{ players: []; queueId: 420; modeName: '单双排'; positionOrderReliable: true }>();

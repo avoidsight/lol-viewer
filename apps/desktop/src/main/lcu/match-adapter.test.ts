@@ -25,13 +25,19 @@ describe('adaptMatchHistory', () => {
   });
 
   it('returns twenty all-mode matches when requested', () => {
+    const queueIds = [420, 430, 440, 450];
     const games = Array.from({ length: 25 }, (_, index) => ({
       ...structuredClone(fixture.games[0]),
       gameId: index,
-      gameCreation: index
+      gameCreation: (index * 7) % 25,
+      queueId: queueIds[index % queueIds.length]
     }));
 
-    expect(adaptMatchHistory({ games }, { scope: 'all', limit: 20 })).toHaveLength(20);
+    const result = adaptMatchHistory({ games }, { scope: 'all', limit: 20 });
+    expect(result).toHaveLength(20);
+    expect(result[0].matchId).toBe('7');
+    expect(result.at(-1)?.matchId).toBe('15');
+    expect(new Set(result.map((match) => match.queueId))).toEqual(new Set(queueIds));
   });
 
   it.each(['championId', 'win', 'kills', 'deaths', 'assists'])('rejects a match missing %s', (field) => {

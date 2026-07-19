@@ -52,17 +52,27 @@ function isTransient(error: unknown): boolean {
   return (error as Partial<LcuError>)?.code === 'LCU_UNAVAILABLE';
 }
 
+interface MatchCancelledError extends Error { code: 'MATCH_CANCELLED' }
+function cancelled(): MatchCancelledError {
+  return Object.assign(new Error('Live match request cancelled'), { code: 'MATCH_CANCELLED' as const });
+}
+
+function checkCancelled(signal?: AbortSignal): void {
+  if (signal?.aborted) throw cancelled();
+}
+
 function hasReliablePositions(team: z.infer<typeof participantSchema>[]): boolean {
   const positions = team.map((participant) => participant.selectedPosition);
   return positions.every((position): position is string => position !== undefined && standardPositions.has(position))
     && new Set(positions).size === standardPositions.size;
 }
 
-async function mapLimit<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
+async function mapLimit<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>, signal?: AbortSignal): Promise<R[]> {
   const results = new Array<R>(items.length);
   let next = 0;
   async function worker(): Promise<void> {
     while (next < items.length) {
+      checkCancelled(signal);
       const index = next++;
       results[index] = await mapper(items[index]);
     }
@@ -80,10 +90,12 @@ export class MatchService {
     this.cache = options.cache;
   }
 
-  async loadLiveMatch(_scope: QueueScope, onPlayer: (player: PlayerSnapshot) => void): Promise<LiveMatch> {
+  async loadLiveMatch(_scope: QueueScope, onPlayer: (player: PlayerSnapshot) => void, signal?: AbortSignal): Promise<LiveMatch> {
+    checkCancelled(signal);
     const session = sessionSchema.parse(
       await this.client.get('/lol-gameflow/v1/session', sessionSchema)
     );
+    checkCancelled(signal);
     const queueId = session.gameData.queue?.id ?? session.gameData.queueId ?? 0;
     const modeName = describeQueue(queueId);
     const positionOrderReliable = queueId !== 0 && queueId !== 450
@@ -95,16 +107,20 @@ export class MatchService {
         await this.client.get('/lol-summoner/v1/current-summoner', currentSummonerSchema)
       );
     } catch {
+      checkCancelled(signal);
       currentSummoner = undefined;
     }
+    checkCancelled(signal);
     let assetVersion: string | undefined;
     try {
       assetVersion = assetVersionSchema.parse(
         await this.client.get('/lol-patch/v1/game-version', assetVersionSchema)
       );
     } catch {
+      checkCancelled(signal);
       assetVersion = undefined;
     }
+    checkCancelled(signal);
     const allParticipants = [...session.gameData.teamOne, ...session.gameData.teamTwo];
     const local = currentSummoner
       ? allParticipants.find((participant) => String(participant.summonerId) === String(currentSummoner.summonerId))
@@ -116,6 +132,7 @@ export class MatchService {
       ...allParticipants.filter((participant) => participant.teamId !== localTeamId)
     ] : allParticipants;
     const players = await mapLimit(participants, 4, async (participant) => {
+      checkCancelled(signal);
       const base = {
         playerId: String(participant.summonerId),
         displayName: participant.summonerName,
@@ -133,6 +150,7 @@ export class MatchService {
       } catch {
         // Cache availability must not affect live LCU history loading.
       }
+      checkCancelled(signal);
       let matches: MatchSummary[] | null = cached?.matches ?? null;
       let rank: string | undefined;
       try {
@@ -142,16 +160,20 @@ export class MatchService {
         const solo = ranked.queues.find((queue) => queue.queueType === 'RANKED_SOLO_5x5');
         if (solo) rank = `${solo.tier} ${solo.division} ${solo.leaguePoints} LP`;
       } catch {
+        checkCancelled(signal);
         rank = undefined;
       }
+      checkCancelled(signal);
       if (!cached) {
         try {
-          const rawHistory = await this.getHistoryWithRetry(base.playerId);
+          const rawHistory = await this.getHistoryWithRetry(base.playerId, signal);
           matches = adaptMatchHistory(rawHistory, { scope: 'all', limit: 10 });
         } catch {
+          checkCancelled(signal);
           matches = null;
         }
       }
+      checkCancelled(signal);
       const recentMatches = matches ?? [];
       const wins = recentMatches.filter((match) => match.win).length;
       const championMatches = recentMatches.filter((match) => match.championId === base.championId);
@@ -171,32 +193,40 @@ export class MatchService {
         ...(matches === null ? { error: 'Player history is unavailable' } : {})
       };
       if (player.status === 'ready' && !cached) {
+        checkCancelled(signal);
         try {
           this.cache?.put(player);
         } catch {
           // Persisting a fresh snapshot is best-effort.
         }
       }
+      checkCancelled(signal);
       try {
         onPlayer(player);
       } catch {
         // A stale or faulty renderer listener must not affect match loading.
       }
       return player;
-    });
+    }, signal);
+    checkCancelled(signal);
     return { players, localTeamId, queueId, modeName, positionOrderReliable };
   }
 
-  private async getHistoryWithRetry(playerId: string): Promise<unknown> {
+  private async getHistoryWithRetry(playerId: string, signal?: AbortSignal): Promise<unknown> {
     for (let attempt = 0; ; attempt += 1) {
+      checkCancelled(signal);
       try {
-        return await this.client.get(
+        const result = await this.client.get(
           `/lol-match-history/v1/products/lol/${encodeURIComponent(playerId)}/matches?begIndex=0&endIndex=20`,
           matchHistorySchema
         );
+        checkCancelled(signal);
+        return result;
       } catch (error) {
+        checkCancelled(signal);
         if (!isTransient(error) || attempt >= retryDelays.length) throw error;
         await this.sleep(retryDelays[attempt]);
+        checkCancelled(signal);
       }
     }
   }
