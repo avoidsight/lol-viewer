@@ -39,6 +39,7 @@ describe('ChampionLibraryPage', () => {
   ])('does not render internal navigation while %s', async (state, getGuide) => {
     render(<ChampionLibraryPage getGuide={getGuide} />);
     await screen.findByRole(state === 'loading' ? 'status' : 'alert');
+    expect(screen.getByRole('heading', { name: '英雄资料库' })).toBeVisible();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });
