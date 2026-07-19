@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { MatchSummary } from '../../../../shared/domain';
+import { describeQueue } from '../../../../shared/queue';
 
 export default function RecentMatch({ match, assetVersion }: { match: MatchSummary; assetVersion?: string }) {
   const [imageUnavailable, setImageUnavailable] = useState(false);
@@ -10,6 +11,7 @@ export default function RecentMatch({ match, assetVersion }: { match: MatchSumma
         <img className="recent-match__champion" src={`https://raw.communitydragon.org/${encodeURIComponent(assetVersion)}/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/${match.championId}.png`} alt={championLabel} loading="lazy" onError={() => setImageUnavailable(true)} />}
       <strong className="recent-match__result">{match.win ? '胜' : '负'}</strong>
       <span className="recent-match__kda" aria-label={`K/D/A ${match.kills}/${match.deaths}/${match.assists}`}>{match.kills}/{match.deaths}/{match.assists}</span>
+      <span className="recent-match__queue">{describeQueue(match.queueId)}</span>
     </li>
   );
 }

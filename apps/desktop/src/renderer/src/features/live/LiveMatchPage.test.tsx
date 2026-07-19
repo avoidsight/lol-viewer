@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Lane, MatchSummary, PlayerSnapshot } from '../../../../shared/domain';
 import type { LiveMatch } from '../../../../shared/ipc';
 import LiveMatchPage, { teamSlots } from './LiveMatchPage';
@@ -115,16 +115,10 @@ describe('LiveMatchPage', () => {
     expect(screen.getByText('仅获取到 3/10 场')).toBeVisible();
   });
 
-  it('calls the scope switch callback from accessible controls', () => {
-    const onScopeChange = vi.fn();
-    const { rerender } = render(<LiveMatchPage match={fixtureLiveMatch} scope="ranked-solo" onScopeChange={onScopeChange} />);
-
-    fireEvent.click(screen.getByRole('button', { name: '全部模式' }));
-    expect(onScopeChange).toHaveBeenCalledWith('all');
-    expect(screen.getByRole('button', { name: '单双排' })).toHaveAttribute('aria-pressed', 'true');
-
-    rerender(<LiveMatchPage match={fixtureLiveMatch} scope="all" onScopeChange={onScopeChange} />);
-    expect(screen.getByRole('button', { name: '全部模式' })).toHaveAttribute('aria-pressed', 'true');
+  it('shows match mode without queue-scope controls', () => {
+    render(<LiveMatchPage match={fixtureLiveMatch} />);
+    expect(document.querySelector('.live-match-page__mode')).toHaveTextContent('单双排');
+    expect(screen.queryByRole('button', { name: '全部模式' })).not.toBeInTheDocument();
   });
 
   it('renders exactly five deterministic slots per team for duplicate and unknown lanes', () => {
