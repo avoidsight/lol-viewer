@@ -1,5 +1,5 @@
-.app-shell__bar { align-items: center; background: #101827; color: #f8fafc; display: flex; gap: 2rem; min-height: 3.5rem; padding: 0 1.25rem; }
+.app-shell__bar { align-items: center; background: #0c1424; border-bottom: 1px solid #253653; color: #f4f7fb; display: flex; gap: 2rem; min-height: 58px; padding: 0 1.75rem; }
 .app-shell__brand { white-space: nowrap; }.app-shell__tabs { align-self: stretch; display: flex; gap: .25rem; }
-.app-shell__tabs button { background: transparent; border: 0; border-bottom: 3px solid transparent; color: #cbd5e1; cursor: pointer; padding: 0 1rem; }
-.app-shell__tabs button[aria-selected="true"] { border-bottom-color: #38bdf8; color: #fff; }.app-shell__tabs button:focus-visible { outline: 2px solid #fbbf24; outline-offset: -4px; }
+.app-shell__tabs button { background: transparent; border: 0; border-bottom: 3px solid transparent; color: #9aaac1; cursor: pointer; padding: 0 1rem; }
+.app-shell__tabs button[aria-selected="true"] { border-bottom-color: #39c6f4; color: #f4f7fb; }.app-shell__tabs button:focus-visible { outline: 2px solid #d7b45a; outline-offset: -4px; }
 @media (max-width: 36rem) { .app-shell__bar { align-items: stretch; flex-direction: column; gap: 0; padding-top: .75rem; } .app-shell__tabs { overflow-x: auto; } .app-shell__tabs button { min-height: 3rem; white-space: nowrap; } }

@@ -22,14 +22,30 @@ describe('PersonalHistoryPage', () => {
     expect(screen.getAllByTestId('favorite-champion')).toHaveLength(5);
     expect(screen.getAllByTestId('personal-match')).toHaveLength(20);
     expect(screen.getAllByText('极地大乱斗')).toHaveLength(10);
-    expect(screen.getAllByText('8 / 2 / 6')).toHaveLength(20);
+    const kdaValues = screen.getAllByLabelText('KDA');
+    expect(kdaValues).toHaveLength(20);
+    expect(kdaValues.every((element) => element.textContent === '8/2/6')).toBe(true);
   });
 
-  it('uses readable dark text inside light history cards', () => {
+  it('organizes the dashboard into a hero, KPI strip, and 34/66 content split', () => {
+    const { container } = render(<PersonalHistoryPage snapshot={snapshot} state="ready" />);
+    expect(container.querySelector('.personal-history__hero')).toBeInTheDocument();
+    expect(container.querySelector('.personal-history__hero-avatar')).toHaveAttribute('src');
+    expect(container.querySelectorAll('.personal-history__kpi')).toHaveLength(4);
+    expect(container.querySelector('.personal-history__content')).toBeInTheDocument();
+    expect(container.querySelector('.personal-history__favorites-panel')).toBeInTheDocument();
+    expect(container.querySelector('.personal-history__matches-panel')).toBeInTheDocument();
+  });
+
+  it('uses the deep-sea palette, compact rows, and required responsive tiers', () => {
     const css = readFileSync(resolve('src/renderer/src/features/history/personal-history.css'), 'utf8');
-    expect(css).toMatch(/\.personal-history__summary div[^}]*color:\s*#0f172a/s);
-    expect(css).toMatch(/\.personal-history__favorites article[^}]*color:\s*#0f172a/s);
-    expect(css).toMatch(/\.personal-history__matches article[^}]*color:\s*#0f172a/s);
+    expect(css).toMatch(/\.personal-history\s*{[^}]*background:\s*#070b16/i);
+    expect(css).toMatch(/\.personal-history__content\s*{[^}]*grid-template-columns:\s*minmax\(0,\s*34fr\)\s+minmax\(0,\s*66fr\)/i);
+    expect(css).toMatch(/\.personal-history__matches article\s*{[^}]*min-height:\s*58px/i);
+    expect(css).toMatch(/@media\s*\(min-width:\s*1024px\)/i);
+    expect(css).toMatch(/@media\s*\(min-width:\s*720px\)\s+and\s+\(max-width:\s*1023px\)/i);
+    expect(css).toMatch(/@media\s*\(max-width:\s*719px\)/i);
+    expect(css).toMatch(/@media\s*\(max-width:\s*419px\)/i);
   });
 
   it('renders loading and unavailable states explicitly', () => {
