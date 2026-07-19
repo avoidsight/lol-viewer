@@ -36,3 +36,11 @@ Implemented and verified the renderer integration for the fixed three-tab shell,
 ## Concerns
 
 - Test setup emits upstream `prebuild-install --force`, Node `fs.R_OK` deprecation, and Git line-ending warnings; none caused failures.
+
+## Review follow-up
+
+- Added complete roving tab keyboard behavior: `ArrowRight` / `ArrowLeft` wrap, while `Home` / `End` select the first / last tab; selection callback, focus, `aria-selected`, and `tabIndex` update together.
+- Added a regression test proving an unrelated `App` state update does not reload an already loaded champion guide. `App` now passes a stable `useCallback` to `ChampionLibraryPage`.
+- Reformatted `AppShell` and `PersonalHistoryPage` JSX by semantic section and extracted the pure `MatchRow` component.
+- RED evidence: the new keyboard cases produced four missing-callback failures, and the stable-guide test observed four calls instead of one.
+- GREEN evidence: focused renderer suite completed with 149/149 tests, then fresh full desktop verification completed with 24/24 files and 149/149 tests. `tsc --noEmit` and `git diff --check` both exited 0.

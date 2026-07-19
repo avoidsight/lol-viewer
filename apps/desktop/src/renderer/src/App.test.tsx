@@ -48,6 +48,23 @@ describe('App', () => {
     expect(screen.getByRole('tab', { name: '战绩' })).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByText('召唤师')).toBeVisible();
   });
+  it('does not reload a champion guide after an unrelated parent update', async () => {
+    const history = deferred<Awaited<ReturnType<LolViewerApi['getPersonalHistory']>>>();
+    installApi(vi.fn().mockResolvedValue(liveMatch));
+    const getChampionGuide = vi.fn().mockResolvedValue({
+      championId: 114, lane: 'TOP', patch: '16.14', source: 'CN_OFFICIAL', region: 'CN', tier: '翡翠+',
+      fetchedAt: '2026-07-16T00:00:00.000Z', stale: false, builds: [], favorable: [], unfavorable: [], notes: []
+    });
+    window.lolViewer!.getChampionGuide = getChampionGuide;
+    window.lolViewer!.getPersonalHistory = vi.fn(() => history.promise);
+    render(<App initialTab="champions" />);
+    expect(await screen.findByRole('heading', { name: '英雄资料库' })).toBeVisible();
+    await act(async () => history.resolve({
+      playerId: 'me', displayName: '召唤师', profileIconId: 1, matches: [], sampleSize: 0,
+      wins: 0, losses: 0, winRate: 0, averageKda: 0, favoriteChampions: [], cached: false, updatedAt: 1
+    }));
+    expect(getChampionGuide).toHaveBeenCalledOnce();
+  });
   it('cancels the active coordinator when auto-open is turned off', async () => {
     installApi(() => new Promise(() => undefined));
     const cancelLiveMatch = vi.fn().mockResolvedValue(undefined);
