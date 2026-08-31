@@ -40,6 +40,17 @@ describe('discoverLcuConnection', () => {
     expect(result).toEqual({ port: 50846, password: 'tencent-secret', protocol: 'https' });
   });
 
+  it('captures the Tencent region and RSO platform needed for SGP routing', async () => {
+    const result = await discoverLcuConnection([{
+      name: 'LeagueClientUx.exe',
+      commandLine: 'LeagueClientUx.exe "--region=TENCENT" "--rso-platform-id=HN1" "--remoting-auth-token=secret" "--app-port=50846"'
+    }]);
+
+    expect(result).toEqual({
+      port: 50846, password: 'secret', protocol: 'https', region: 'TENCENT', rsoPlatformId: 'HN1'
+    });
+  });
+
   it('prefers a LeagueClientUx command line over the lockfile', async () => {
     const lockfile = join(tmpdir(), `lcu-lockfile-${process.pid}-${Date.now()}`);
     temporaryLockfiles.add(lockfile);

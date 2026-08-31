@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 const { handle, getAllWindows } = vi.hoisted(() => ({ handle: vi.fn(), getAllWindows: vi.fn() }));
 vi.mock('electron', () => ({ ipcMain: { handle }, BrowserWindow: { getAllWindows } }));
 
-import { MATCH_GET_CHANNEL, PLAYER_UPDATED_CHANNEL } from '../../shared/ipc';
+import { GAMEFLOW_PHASE_GET_CHANNEL, GAMEFLOW_SESSION_GET_CHANNEL, MATCH_GET_CHANNEL, PLAYER_UPDATED_CHANNEL } from '../../shared/ipc';
 import { registerMatchIpc } from './register-match-ipc';
 import { createFixtureLiveMatch } from '../fixtures/live-match';
 
@@ -16,8 +16,15 @@ describe('registerMatchIpc', () => {
     const send = vi.fn();
     const sender = { send };
     getAllWindows.mockReturnValue([{ webContents: sender, isDestroyed: () => false }]);
-    registerMatchIpc({ loadLiveMatch });
+    const getGameflowPhase = vi.fn().mockResolvedValue('InProgress');
+    const getGameflowSessionIdentity = vi.fn().mockResolvedValue({ phase: 'InProgress', gameId: '12345' });
+    registerMatchIpc({ loadLiveMatch, getGameflowPhase, getGameflowSessionIdentity });
     const handler = handle.mock.calls.find(([channel]) => channel === MATCH_GET_CHANNEL)?.[1];
+    const phaseHandler = handle.mock.calls.find(([channel]) => channel === GAMEFLOW_PHASE_GET_CHANNEL)?.[1];
+    const identityHandler = handle.mock.calls.find(([channel]) => channel === GAMEFLOW_SESSION_GET_CHANNEL)?.[1];
+    await expect(phaseHandler({ sender })).resolves.toBe('InProgress');
+    await expect(identityHandler({ sender })).resolves.toEqual({ phase: 'InProgress', gameId: '12345' });
+    expect(getGameflowPhase).toHaveBeenCalledOnce();
 
     await expect(handler({ sender }, { scope: 'invalid', generation: 1 })).rejects.toThrow();
     await expect(handler({ sender }, { scope: 'all', generation: 7 })).resolves.toEqual(createFixtureLiveMatch('all'));

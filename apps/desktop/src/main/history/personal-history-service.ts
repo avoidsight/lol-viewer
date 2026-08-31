@@ -1,9 +1,14 @@
 import { z } from 'zod';
 import type { FavoriteChampion, PersonalHistorySnapshot } from '../../shared/domain';
+import { formatRank } from '../../shared/rank';
 import { personalHistorySchema } from '../../shared/ipc';
 import type { PersonalHistoryCache } from '../cache/database';
 import type { LcuClient } from '../lcu/http-client';
-import { adaptMatchHistory, matchHistoryResponseSchema } from '../lcu/match-adapter';
+import {
+  adaptMatchHistory,
+  matchHistoryGameSchema,
+  matchHistoryResponseSchema
+} from '../lcu/match-adapter';
 
 const currentSummonerSchema = z.object({
   summonerId: z.union([z.string(), z.number()]),
@@ -16,25 +21,45 @@ const rankedStatsSchema = z.object({
   }))
 });
 const assetVersionSchema = z.string().regex(/^\d+\.\d+(?:\.\d+){0,2}$/);
+const itemMetadataSchema = z.array(z.object({
+  id: z.number().int().positive(),
+  iconPath: z.string().min(1)
+}).passthrough());
 
 function unavailable(): Error & { code: 'HISTORY_UNAVAILABLE' } {
   return Object.assign(new Error('Personal history is unavailable'), { code: 'HISTORY_UNAVAILABLE' as const });
 }
 
 function favoriteChampions(matches: PersonalHistorySnapshot['matches']): FavoriteChampion[] {
-  const groups = new Map<number, { games: number; wins: number }>();
+  const groups = new Map<number, {
+    games: number;
+    wins: number;
+    kills: number;
+    deaths: number;
+    assists: number;
+  }>();
   for (const match of matches) {
-    const group = groups.get(match.championId) ?? { games: 0, wins: 0 };
+    const group = groups.get(match.championId) ?? {
+      games: 0, wins: 0, kills: 0, deaths: 0, assists: 0
+    };
     group.games += 1;
     if (match.win) group.wins += 1;
+    group.kills += match.kills;
+    group.deaths += match.deaths;
+    group.assists += match.assists;
     groups.set(match.championId, group);
   }
   return [...groups.entries()]
     .map(([championId, group]) => ({
-      championId, games: group.games, wins: group.wins, winRate: group.wins / group.games
+      championId,
+      games: group.games,
+      wins: group.wins,
+      winRate: group.wins / group.games,
+      averageKills: group.kills / group.games,
+      averageDeaths: group.deaths / group.games,
+      averageAssists: group.assists / group.games
     }))
-    .sort((left, right) => right.games - left.games || left.championId - right.championId)
-    .slice(0, 5);
+    .sort((left, right) => right.games - left.games || left.championId - right.championId);
 }
 
 export class PersonalHistoryService {
@@ -51,32 +76,82 @@ export class PersonalHistoryService {
       );
       playerId = String(summoner.summonerId);
       try {
-        const fresh = this.cache.getFresh(playerId);
-        if (fresh) return fresh;
+    const fresh = this.cache.getFresh(playerId);
+    const supportsRichMatchRows = fresh?.matches.every(
+      (match) =>
+        match.summonerSpellIds !== undefined &&
+        match.allyChampionIds !== undefined &&
+        match.enemyChampionIds !== undefined &&
+        match.allyChampionIds.length + match.enemyChampionIds.length > 1,
+    );
+    if (
+      fresh?.historyDataVersion === 4 &&
+      fresh.itemIconPaths !== undefined &&
+      supportsRichMatchRows
+    ) return fresh;
       } catch {
         // A cache read failure must not prevent an online refresh.
       }
-      const history = adaptMatchHistory(await this.client.get(
+      const listedHistory = matchHistoryResponseSchema.parse(await this.client.get(
         '/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=40',
         matchHistoryResponseSchema
-      ), { scope: 'all', limit: 20 });
-      const [rankResult, patchResult] = await Promise.allSettled([
+      ));
+      const listedGames = [...listedHistory.games]
+        .sort((left, right) => right.gameCreation - left.gameCreation)
+        .slice(0, 20);
+      const enrichedGames = await Promise.all(listedGames.map(async (game) => {
+        if (game.participants.length > 1) return game;
+        try {
+          const detailedGame = await this.client.get(
+            `/lol-match-history/v1/games/${encodeURIComponent(String(game.gameId))}`,
+            matchHistoryGameSchema
+          );
+          const localParticipantId = game.participants[0]?.participantId;
+          const localIndex = localParticipantId === undefined
+            ? -1
+            : detailedGame.participants.findIndex(
+              (participant) => participant.participantId === localParticipantId
+            );
+          if (localIndex <= 0) return detailedGame;
+          return {
+            ...detailedGame,
+            participants: [
+              detailedGame.participants[localIndex],
+              ...detailedGame.participants.filter((_, index) => index !== localIndex)
+            ]
+          };
+        } catch {
+          return game;
+        }
+      }));
+      const history = adaptMatchHistory({ games: enrichedGames }, { scope: 'all', limit: 20 });
+      const [rankResult, patchResult, itemsResult] = await Promise.allSettled([
         this.client.get(`/lol-ranked/v1/ranked-stats/${encodeURIComponent(playerId)}`, rankedStatsSchema),
-        this.client.get('/lol-patch/v1/game-version', assetVersionSchema)
+        this.client.get('/lol-patch/v1/game-version', assetVersionSchema),
+        this.client.get('/lol-game-data/assets/v1/items.json', itemMetadataSchema)
       ]);
       let rank: string | undefined;
       if (rankResult.status === 'fulfilled') {
         const solo = rankResult.value.queues.find((queue) => queue.queueType === 'RANKED_SOLO_5x5');
         if (solo && solo.tier.trim() && solo.tier.trim().toUpperCase() !== 'NA') {
-          rank = [solo.tier.trim(), solo.division.trim(), `${solo.leaguePoints} LP`]
-            .filter(Boolean)
-            .join(' ');
+          rank = formatRank(solo.tier, solo.division, solo.leaguePoints);
         }
       }
       const wins = history.filter((match) => match.win).length;
       const kills = history.reduce((total, match) => total + match.kills, 0);
       const deaths = history.reduce((total, match) => total + match.deaths, 0);
       const assists = history.reduce((total, match) => total + match.assists, 0);
+      const usedItemIds = new Set(history.flatMap((match) => match.itemIds ?? []));
+      const itemIconPaths = Object.fromEntries(
+        itemsResult.status === 'fulfilled'
+          ? itemsResult.value
+            .filter((item) =>
+              usedItemIds.has(item.id)
+              && item.iconPath.startsWith('/lol-game-data/assets/')
+              && !item.iconPath.includes('..'))
+            .map((item) => [String(item.id), item.iconPath])
+          : []
+      );
       const snapshot = personalHistorySchema.parse({
         playerId,
         displayName: summoner.displayName,
@@ -90,6 +165,8 @@ export class PersonalHistoryService {
         averageKda: (kills + assists) / Math.max(1, deaths),
         favoriteChampions: favoriteChampions(history),
         ...(patchResult.status === 'fulfilled' ? { assetVersion: patchResult.value } : {}),
+        itemIconPaths,
+        historyDataVersion: 4,
         cached: false,
         updatedAt: Date.now()
       });

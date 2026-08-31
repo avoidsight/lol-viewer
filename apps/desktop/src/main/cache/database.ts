@@ -60,6 +60,11 @@ export function migrateDatabase(database: Database.Database): void {
       );`);
       database.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)').run(3, Date.now());
     }
+    const autoAcceptMigration = database.prepare('SELECT 1 FROM schema_migrations WHERE version = ?').get(4);
+    if (!autoAcceptMigration) {
+      database.exec('ALTER TABLE app_settings ADD COLUMN auto_accept_ready_check INTEGER NOT NULL DEFAULT 0;');
+      database.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)').run(4, Date.now());
+    }
   })();
 }
 

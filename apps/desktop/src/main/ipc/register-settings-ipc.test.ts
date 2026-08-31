@@ -18,8 +18,8 @@ describe('registerSettingsIpc', () => {
     const sender = {};
     electron.getAllWindows.mockReturnValue([{ webContents: sender, isDestroyed: () => false }]);
     const service = {
-      get: vi.fn(() => ({ queueScope: 'ranked-solo' as const, autoOpenLiveMatch: true, showLaneDifferences: true })),
-      update: vi.fn((patch) => ({ queueScope: 'ranked-solo' as const, autoOpenLiveMatch: true, showLaneDifferences: true, ...patch })),
+      get: vi.fn(() => ({ queueScope: 'ranked-solo' as const, autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false })),
+      update: vi.fn((patch) => ({ queueScope: 'ranked-solo' as const, autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false, ...patch })),
       clearCache: vi.fn()
     };
     registerSettingsIpc(service);

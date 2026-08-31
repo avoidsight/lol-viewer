@@ -81,19 +81,30 @@ describe('LiveMatchPage', () => {
 
     expect(screen.getAllByText('胜')).toHaveLength(50);
     expect(screen.getAllByText('负')).toHaveLength(50);
-    expect(screen.getAllByRole('img', { name: /英雄 \d+/ })).toHaveLength(100);
-    expect(screen.getAllByRole('img')[0]).toHaveAttribute('src', expect.stringContaining('/15.14.1/'));
-    expect(screen.getAllByRole('img')[0]).not.toHaveAttribute('src', expect.stringContaining('/latest/'));
-    fireEvent.error(screen.getAllByRole('img')[0]);
+    expect(screen.getAllByRole('img', { name: /^英雄 \d+$/ })).toHaveLength(100);
+    const recentChampion = screen.getAllByRole('img', { name: /^英雄 \d+$/ })[0];
+    expect(recentChampion).toHaveAttribute('src', 'lol-asset://champion-icons/1.png');
+    expect(recentChampion).not.toHaveAttribute('src', expect.stringContaining('/latest/'));
+    fireEvent.error(recentChampion);
     expect(screen.getByRole('img', { name: '英雄 1图标不可用' })).toHaveTextContent('1');
   });
 
-  it('renders a numeric fallback without making an unversioned image request', () => {
+  it('shows champion selection instead of a broken image for championId zero', () => {
+    const selecting: LiveMatch = {
+      ...fixtureLiveMatch,
+      players: fixtureLiveMatch.players.map((entry, index) => index === 0 ? { ...entry, championId: 0 } : entry)
+    };
+    render(<LiveMatchPage match={selecting} />);
+    expect(screen.getByText('英雄选择中')).toBeVisible();
+    expect(screen.queryByRole('img', { name: '当前英雄 0' })).not.toBeInTheDocument();
+  });
+  it('loads local client champion images even without an external asset version', () => {
     const withoutVersion: LiveMatch = { ...fixtureLiveMatch, players: fixtureLiveMatch.players.map((entry) => ({ ...entry, assetVersion: undefined })) };
     render(<LiveMatchPage match={withoutVersion} />);
-    expect(screen.queryAllByRole('img', { name: /^英雄 \d+$/ })).toHaveLength(0);
-    expect(screen.getAllByRole('img', { name: /图标不可用/ })).toHaveLength(100);
-    expect(screen.getAllByRole('img', { name: /图标不可用/ })[0]).toHaveTextContent('1');
+    expect(screen.getAllByRole('img', { name: /^英雄 \d+$/ })).toHaveLength(100);
+    expect(screen.getAllByRole('img', { name: /^英雄 \d+$/ })[0]).toHaveAttribute(
+      'src', 'lol-asset://champion-icons/1.png'
+    );
   });
 
   it('shows loading, unavailable, and fewer-than-ten states explicitly', () => {
@@ -111,7 +122,7 @@ describe('LiveMatchPage', () => {
     render(<LiveMatchPage match={stateMatch} />);
 
     expect(screen.getByText('正在加载战绩…')).toBeVisible();
-    expect(screen.getByText('战绩暂不可用：暂时无法读取')).toBeVisible();
+    expect(screen.getByText('战绩受国服隐私保护')).toBeVisible();
     expect(screen.getByText('仅获取到 3/10 场')).toBeVisible();
   });
 
@@ -182,5 +193,17 @@ describe('LiveMatchPage', () => {
     render(<LiveMatchPage match={fixtureLiveMatch} />);
     expect(getComputedStyle(screen.getByLabelText('双方对局比较')).overflowX).toBe('auto');
     expect(getComputedStyle(document.querySelector('.live-match-grid')!)).toHaveProperty('minWidth', '1050px');
+  });
+
+  it('keeps both five-player rosters useful when every history is private', () => {
+    render(<LiveMatchPage match={{
+      ...fixtureLiveMatch,
+      players: fixtureLiveMatch.players.map((entry) => ({ ...entry, status: 'unavailable', matches: [], sampleSize: 0 }))
+    }} />);
+
+    expect(screen.getAllByTestId('team-roster')).toHaveLength(2);
+    expect(screen.getAllByTestId('player-card')).toHaveLength(10);
+    expect(screen.getAllByText('战绩受国服隐私保护')).toHaveLength(10);
+    expect(screen.getAllByRole('img', { name: /当前英雄 \d+/ })).toHaveLength(10);
   });
 });

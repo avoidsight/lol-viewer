@@ -1,19 +1,34 @@
 import type { PlayerSnapshot } from '../../../../shared/domain';
+import { localizeRank } from '../../../../shared/rank';
 import RecentMatch from './RecentMatch';
 
 const laneNames = { TOP: '上路', JUNGLE: '打野', MIDDLE: '中路', BOTTOM: '下路', UTILITY: '辅助', UNKNOWN: '未知位置' } as const;
 const percent = (value: number): string => `${Math.round(value * 100)}%`;
+const championIconUrl = (_version: string | undefined, championId: number) =>
+  `lol-asset://champion-icons/${championId}.png`;
 
 export default function PlayerCard({ player, displayLane = player.lane, displayLabel, uncertain = false }: { player: PlayerSnapshot; displayLane?: keyof typeof laneNames; displayLabel?: string; uncertain?: boolean }) {
-  return (
-    <article className="player-card" data-testid="player-card" data-lane={displayLane} aria-labelledby={`player-${player.playerId}`}>
-      <header className="player-card__header"><span className="player-card__lane">{displayLabel ?? laneNames[displayLane]}</span><h3 id={`player-${player.playerId}`}>{player.displayName}</h3><span>{player.rank ?? '段位未知'}</span>{uncertain && <span className="player-card__uncertain">位置待确认</span>}</header>
-      {player.status === 'loading' ? <p className="player-card__state" role="status">正在加载战绩…</p> : player.status === 'unavailable' ?
-        <p className="player-card__state" role="status">战绩暂不可用{player.error ? `：${player.error}` : ''}</p> : <>
+  const championIcon = player.championId > 0 ? championIconUrl(player.assetVersion, player.championId) : undefined;
+  return <article className="player-card" data-testid="player-card" data-history-state={player.status} data-lane={displayLane} aria-labelledby={`player-${player.playerId}`}>
+    <header className="player-card__header">
+      {championIcon
+        ? <img className="player-card__champion" src={championIcon} alt={`当前英雄 ${player.championId}`} />
+        : <span className="player-card__champion player-card__champion--fallback" role="img" aria-label="英雄选择中">英雄选择中</span>}
+      <div className="player-card__identity">
+        <span className="player-card__lane">{displayLabel ?? laneNames[displayLane]}</span>
+        <h3 id={`player-${player.playerId}`}>{player.displayName}</h3>
+        <span className="player-card__rank">{localizeRank(player.rank) ?? '段位未知'}</span>
+        {uncertain && <span className="player-card__uncertain">位置待确认</span>}
+      </div>
+    </header>
+    {player.status === 'loading'
+      ? <p className="player-card__state" role="status">正在加载战绩…</p>
+      : player.status === 'unavailable'
+        ? <p className="player-card__state player-card__state--private" role="status">战绩受国服隐私保护</p>
+        : <>
           <dl className="player-card__summary"><div><dt>样本</dt><dd>{player.sampleSize} 场</dd></div><div><dt>胜率</dt><dd>{percent(player.winRate)}</dd></div><div><dt>当前英雄</dt><dd>{player.currentChampionGames} 场 / {percent(player.currentChampionWinRate)}</dd></div></dl>
           {player.matches.length < 10 && <p className="player-card__notice">仅获取到 {player.matches.length}/10 场</p>}
           <ol className="player-card__matches" aria-label={`${player.displayName}最近对局`}>{player.matches.slice(0, 10).map((match) => <RecentMatch key={match.matchId} match={match} assetVersion={player.assetVersion} />)}</ol>
         </>}
-    </article>
-  );
+  </article>;
 }

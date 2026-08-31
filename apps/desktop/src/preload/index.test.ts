@@ -39,7 +39,20 @@ describe('preload match API validation', () => {
     await expect(api.getLiveMatch('all')).rejects.toThrow();
   });
 
-  it('does not deliver an invalid player update to the listener', async () => {
+  it('validates the lightweight gameflow phase response', async () => {
+    const api = await loadApi();
+    electron.invoke.mockResolvedValue('ChampSelect');
+    await expect(api.getGameflowPhase()).resolves.toBe('ChampSelect');
+    electron.invoke.mockResolvedValue('');
+    await expect(api.getGameflowPhase()).rejects.toThrow();
+  });
+  it('validates the gameflow session identity response', async () => {
+    const api = await loadApi();
+    electron.invoke.mockResolvedValue({ phase: 'InProgress', gameId: '12345' });
+    await expect(api.getGameflowSessionIdentity()).resolves.toEqual({ phase: 'InProgress', gameId: '12345' });
+    electron.invoke.mockResolvedValue({ phase: 'InProgress', gameId: '' });
+    await expect(api.getGameflowSessionIdentity()).rejects.toThrow();
+  });  it('does not deliver an invalid player update to the listener', async () => {
     const api = await loadApi();
     const listener = vi.fn();
     api.onPlayerUpdated(listener);
@@ -93,6 +106,14 @@ describe('preload match API validation', () => {
     await expect(api.getChampionGuide(114, 'TOP')).rejects.toThrow();
   });
 
+  it('validates champion catalog and detail responses', async () => {
+    const api = await loadApi();
+    electron.invoke.mockResolvedValue([{ id: 145, name: '虚空之女', title: '卡莎', alias: 'Kaisa', roles: ['marksman'] }]);
+    await expect(api.getChampionCatalog()).resolves.toHaveLength(1);
+    electron.invoke.mockResolvedValue({ id: 145, name: '虚空之女' });
+    await expect(api.getChampionDetails(145)).rejects.toThrow();
+    await expect(api.getChampionDetails(0)).rejects.toThrow();
+  });
   it('invokes personal history without input and validates its response strictly', async () => {
     const snapshot = createFixturePersonalHistory();
     electron.invoke.mockResolvedValue(snapshot);

@@ -20,8 +20,8 @@ test('three tabs load personal history first and live comparison on demand', asy
     const modeHeading = page.locator('.live-match-page__mode');
     await expect(modeHeading).toBeVisible();
     await expect(modeHeading).toHaveText('单双排');
-    await page.getByRole('tab', { name: '英雄资料库' }).click();
-    await expect(page.getByRole('heading', { name: '英雄资料库' })).toBeVisible();
+    await page.getByRole('tab', { name: '设置' }).click();
+    await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
     expect(Date.now() - startedAt).toBeLessThan(15_000);
   } finally {
     await app.close();

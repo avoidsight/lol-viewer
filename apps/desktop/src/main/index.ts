@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, protocol } from 'electron';
 import { is } from '@electron-toolkit/utils';
 import { discoverLcuConnection } from './lcu/discovery';
 import { createLcuClient } from './lcu/http-client';
@@ -10,6 +10,7 @@ import { registerHistoryIpc } from './ipc/register-history-ipc';
 import { MatchService } from './match/match-service';
 import { ChampionGuideCache, MatchCache, migrateDatabase, PersonalHistoryCache } from './cache/database';
 import { ChampionGuideClient } from './champions/champion-guide-client';
+import { ChampionCatalogService } from './champions/champion-catalog-service';
 import { getBundledGuide } from './champions/bundled-guide';
 import { registerChampionIpc } from './ipc/register-champion-ipc';
 import { SettingsService } from './settings/settings-service';
@@ -17,9 +18,18 @@ import { createFixtureAramLiveMatch, createFixtureLiveMatch, createFixturePerson
 import { z } from 'zod';
 import { GameflowCoordinator } from './match/gameflow-coordinator';
 import { PersonalHistoryService } from './history/personal-history-service';
+import { ReadyCheckAutoAcceptor } from './match/ready-check-auto-acceptor';
+import { createSgpClient } from './sgp/sgp-client';
+import { registerLcuAssetProtocol } from './lcu/asset-protocol';
+
+protocol.registerSchemesAsPrivileged([{
+  scheme: 'lol-asset',
+  privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true }
+}]);
 
 let database: Database.Database | undefined;
 let coordinator: GameflowCoordinator | undefined;
+let readyCheckAutoAcceptor: ReadyCheckAutoAcceptor | undefined;
 
 function createWindow(): void {
   const window = new BrowserWindow({
@@ -41,6 +51,7 @@ function createWindow(): void {
 }
 
 void app.whenReady().then(() => {
+  registerLcuAssetProtocol(join(app.getPath('userData'), 'asset-cache'));
   const fixtureMode = fixtureModeEnabled(process.argv, app.isPackaged, process.env);
   const aramFixtureMode = fixtureMode && process.argv.includes('--fixture-aram');
   database = new Database(join(app.getPath('userData'), 'lol-viewer.sqlite3'));
@@ -49,7 +60,7 @@ void app.whenReady().then(() => {
   const guideCache = new ChampionGuideCache(database);
   const personalHistoryCache = new PersonalHistoryCache(database);
   const patchSchema = z.string().regex(/^\d+\.\d+(?:\.\d+){0,2}$/);
-  registerChampionIpc(new ChampionGuideClient({
+  const guideClient = new ChampionGuideClient({
     baseUrl: process.env.CHAMPION_GUIDE_SERVICE_URL ?? 'http://127.0.0.1:8787',
     ...(process.env.CHAMPION_GUIDE_PATCH ? { patch: process.env.CHAMPION_GUIDE_PATCH } : {
       getPatch: async () => {
@@ -59,8 +70,39 @@ void app.whenReady().then(() => {
         return version.split('.').slice(0, 2).join('.');
       }
     }), cache: guideCache, bundledGuide: getBundledGuide
-  }));
-  registerSettingsIpc(new SettingsService(database, cache, guideCache, personalHistoryCache));
+  });
+  let catalogService: ChampionCatalogService | undefined;
+  const getCatalogService = async (): Promise<ChampionCatalogService> => {
+    if (catalogService) return catalogService;
+    const connection = await discoverLcuConnection();
+    if (!connection) throw new Error('League client is unavailable');
+    catalogService = new ChampionCatalogService(createLcuClient(connection));
+    return catalogService;
+  };
+  registerChampionIpc({
+    getChampionGuide: async (championId, lane) => {
+      const guide = await guideClient.getChampionGuide(championId, lane);
+      const itemIds = [...(guide.starterItemIds ?? []), ...(guide.bootsItemIds ?? []), ...guide.builds.flatMap((build) => build.itemIds)];
+      try {
+        const itemIconPaths = await (await getCatalogService()).getItemIconPaths(itemIds);
+        return { ...guide, itemIconPaths };
+      } catch {
+        return guide;
+      }
+    },
+    getCatalog: async () => (await getCatalogService()).getCatalog(),
+    getDetails: async (championId) => (await getCatalogService()).getDetails(championId)
+  });
+  const settingsService = new SettingsService(database, cache, guideCache, personalHistoryCache);
+  registerSettingsIpc(settingsService);
+  if (!fixtureMode) {
+    readyCheckAutoAcceptor = new ReadyCheckAutoAcceptor({
+      getSettings: () => settingsService.get(),
+      discover: discoverLcuConnection,
+      createClient: createLcuClient
+    });
+    readyCheckAutoAcceptor.start();
+  }
   registerHistoryIpc({
     load: async () => {
       if (fixtureMode) return createFixturePersonalHistory();
@@ -75,9 +117,34 @@ void app.whenReady().then(() => {
       const connection = await discoverLcuConnection();
       if (signal.aborted) throw Object.assign(new Error('Live match request cancelled'), { code: 'MATCH_CANCELLED' as const });
       if (!connection) throw new Error('League client is unavailable');
-      return new MatchService(createLcuClient(connection), { cache }).loadLiveMatch(scope, onPlayer, signal);
+      const lcu = createLcuClient(connection);
+      const sgp = connection.region?.toUpperCase() === 'TENCENT' && connection.rsoPlatformId
+        ? createSgpClient(lcu, connection.rsoPlatformId)
+        : undefined;
+      return new MatchService(lcu, { cache, ...(sgp ? { sgp } : {}) }).loadLiveMatch(scope, onPlayer, signal);
   });
-  registerMatchIpc(coordinator);
+  registerMatchIpc({
+    loadLiveMatch: (scope, onPlayer) => coordinator!.loadLiveMatch(scope, onPlayer),
+    retry: () => coordinator?.retry(),
+    cancel: () => coordinator?.cancel(),
+    getGameflowPhase: async () => {
+      if (fixtureMode || aramFixtureMode) return 'InProgress';
+      const connection = await discoverLcuConnection();
+      if (!connection) throw new Error('League client is unavailable');
+      return createLcuClient(connection).get('/lol-gameflow/v1/gameflow-phase', z.string().min(1));
+    },
+    getGameflowSessionIdentity: async () => {
+      if (fixtureMode || aramFixtureMode) return { phase: 'InProgress', gameId: 'fixture-game' };
+      const connection = await discoverLcuConnection();
+      if (!connection) throw new Error('League client is unavailable');
+      const schema = z.object({
+        phase: z.string().min(1),
+        gameData: z.object({ gameId: z.union([z.string(), z.number()]).optional() })
+      });
+      const session = await createLcuClient(connection).get('/lol-gameflow/v1/session', schema);
+      return { phase: session.phase, ...(session.gameData.gameId !== undefined ? { gameId: String(session.gameData.gameId) } : {}) };
+    }
+  });
   createWindow();
 
   app.on('activate', () => {
@@ -86,6 +153,8 @@ void app.whenReady().then(() => {
 });
 
 app.on('before-quit', () => {
+  readyCheckAutoAcceptor?.dispose();
+  readyCheckAutoAcceptor = undefined;
   coordinator?.dispose();
   coordinator = undefined;
   database?.close();

@@ -56,6 +56,21 @@ describe('createLcuClient', () => {
     });
   });
 
+  it('posts to an LCU endpoint and accepts an empty successful response', async () => {
+    const transport = requestDouble({ statusCode: 204 });
+    const client = createLcuClient(
+      { port: 53122, password: 'secret', protocol: 'https' },
+      transport.request
+    );
+
+    await expect(client.post('/lol-matchmaking/v1/ready-check/accept')).resolves.toBeUndefined();
+    expect(transport.options()).toMatchObject({
+      hostname: '127.0.0.1',
+      method: 'POST',
+      path: '/lol-matchmaking/v1/ready-check/accept'
+    });
+  });
+
   it('returns a typed unavailable error on ECONNREFUSED without exposing the token', async () => {
     const refused = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1'), {
       code: 'ECONNREFUSED'

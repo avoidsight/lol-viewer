@@ -12,10 +12,21 @@ describe('SettingsService', () => {
     expect(service.update({ autoOpenLiveMatch: false })).toEqual({
       queueScope: 'ranked-solo',
       autoOpenLiveMatch: false,
-      showLaneDifferences: true
+      showLaneDifferences: true,
+      autoAcceptReadyCheck: false
     });
     expect(new SettingsService(database, new MatchCache(database)).get().autoOpenLiveMatch).toBe(false);
     expect(() => service.update({ queueScope: 'invalid' } as never)).toThrow();
+  });
+
+  it('persists auto accept ready check as an opt-in setting', () => {
+    const database = new Database(':memory:');
+    migrateDatabase(database);
+    const service = new SettingsService(database, new MatchCache(database));
+
+    expect(service.get().autoAcceptReadyCheck).toBe(false);
+    expect(service.update({ autoAcceptReadyCheck: true }).autoAcceptReadyCheck).toBe(true);
+    expect(new SettingsService(database, new MatchCache(database)).get().autoAcceptReadyCheck).toBe(true);
   });
 
   it('does not expose mutable default settings state', () => {
@@ -69,8 +80,10 @@ describe('SettingsService', () => {
   it('rejects corrupt persisted boolean values instead of coercing them', () => {
     const database = new Database(':memory:');
     migrateDatabase(database);
-    database.prepare('INSERT INTO app_settings VALUES (?, ?, ?, ?)')
-      .run(1, 'ranked-solo', 2, 1);
+    database.prepare(`INSERT INTO app_settings
+      (id, queue_scope, auto_open_live_match, show_lane_differences, auto_accept_ready_check)
+      VALUES (?, ?, ?, ?, ?)`)
+      .run(1, 'ranked-solo', 2, 1, 0);
 
     expect(() => new SettingsService(database, new MatchCache(database)).get()).toThrow();
   });

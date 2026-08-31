@@ -12,6 +12,8 @@ export interface LcuConnection {
   port: number;
   password: string;
   protocol: 'https';
+  region?: string;
+  rsoPlatformId?: string;
 }
 
 const execFileAsync = promisify(execFile);
@@ -29,7 +31,17 @@ function commandLineConnection(process: ProcessInfo): LcuConnection | null {
   const password = token?.[1] ?? token?.[2];
 
   if (!Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65_535 || !password) return null;
-  return { port: portNumber, password, protocol: 'https' };
+  const region = /--region=(?:"([\w-]+)"|([\w-]+))/i.exec(process.commandLine);
+  const platform = /--rso[_-]platform[_-]id=(?:"([\w-]+)"|([\w-]+))/i.exec(process.commandLine);
+  const regionValue = region?.[1] ?? region?.[2];
+  const platformValue = platform?.[1] ?? platform?.[2];
+  return {
+    port: portNumber,
+    password,
+    protocol: 'https',
+    ...(regionValue ? { region: regionValue } : {}),
+    ...(platformValue ? { rsoPlatformId: platformValue } : {})
+  };
 }
 
 function lockfileConnection(contents: string): LcuConnection | null {

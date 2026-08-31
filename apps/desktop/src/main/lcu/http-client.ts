@@ -15,6 +15,11 @@ export type HttpsRequest = (
 
 export interface LcuClient {
   get<T>(path: string, schema: z.ZodType<T>): Promise<T>;
+  post?(path: string): Promise<void>;
+}
+
+export interface LcuWritableClient extends LcuClient {
+  post(path: string): Promise<void>;
 }
 
 function lcuError(code: LcuError['code'], message: string): LcuError {
@@ -29,14 +34,13 @@ export function createLcuClient(
   connection: LcuConnection,
   request: HttpsRequest = httpsRequest,
   maxResponseBytes = 2 * 1024 * 1024
-): LcuClient {
-  return {
-    get<T>(path: string, schema: z.ZodType<T>): Promise<T> {
-      if (!validPath(path)) {
-        return Promise.reject(lcuError('LCU_INVALID_RESPONSE', 'LCU request path is invalid'));
-      }
+): LcuWritableClient {
+  function send<T>(method: 'GET' | 'POST', path: string, schema?: z.ZodType<T>): Promise<T | void> {
+    if (!validPath(path)) {
+      return Promise.reject(lcuError('LCU_INVALID_RESPONSE', 'LCU request path is invalid'));
+    }
 
-      return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
         let settled = false;
         const finish = (action: () => void): void => {
           if (settled) return;
@@ -49,7 +53,7 @@ export function createLcuClient(
             protocol: 'https:',
             hostname: '127.0.0.1',
             port: connection.port,
-            method: 'GET',
+            method,
             path,
             timeout: 5_000,
             rejectUnauthorized: false,
@@ -83,6 +87,10 @@ export function createLcuClient(
                 finish(() => reject(lcuError('LCU_INVALID_RESPONSE', 'LCU returned an unexpected status')));
                 return;
               }
+              if (!schema) {
+                finish(() => resolve());
+                return;
+              }
               try {
                 const body = Buffer.concat(chunks).toString('utf8');
                 const value: unknown = body ? JSON.parse(body) : null;
@@ -110,6 +118,14 @@ export function createLcuClient(
         );
         req.end();
       });
+  }
+
+  return {
+    get<T>(path: string, schema: z.ZodType<T>): Promise<T> {
+      return send('GET', path, schema) as Promise<T>;
+    },
+    post(path: string): Promise<void> {
+      return send('POST', path) as Promise<void>;
     }
   };
 }

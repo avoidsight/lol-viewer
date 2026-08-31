@@ -4,19 +4,28 @@ import type { PersonalHistorySnapshot, PlayerSnapshot, QueueScope } from './doma
 export const MATCH_GET_CHANNEL = 'match:get-live' as const;
 export const MATCH_RETRY_CHANNEL = 'match:retry' as const;
 export const MATCH_CANCEL_CHANNEL = 'match:cancel' as const;
+export const GAMEFLOW_PHASE_GET_CHANNEL = 'gameflow:get-phase' as const;
+export const GAMEFLOW_SESSION_GET_CHANNEL = 'gameflow:get-session-identity' as const;
 export const PLAYER_UPDATED_CHANNEL = 'match:player-updated' as const;
 export const SETTINGS_GET_CHANNEL = 'settings:get' as const;
 export const SETTINGS_UPDATE_CHANNEL = 'settings:update' as const;
 export const SETTINGS_CLEAR_CACHE_CHANNEL = 'settings:clear-cache' as const;
 export const CHAMPION_GUIDE_GET_CHANNEL = 'champions:get-guide' as const;
+export const CHAMPION_CATALOG_GET_CHANNEL = 'champions:get-catalog' as const;
+export const CHAMPION_DETAILS_GET_CHANNEL = 'champions:get-details' as const;
 export const PERSONAL_HISTORY_GET_CHANNEL = 'history:get-personal' as const;
 
 const laneSchema = z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'UNKNOWN']);
+const matchAchievementSchema = z.object({
+  type: z.enum(['MOST_KILLS', 'MOST_ASSISTS', 'MOST_DAMAGE', 'MOST_DAMAGE_TAKEN']),
+  value: z.number().nonnegative()
+}).strict();
 export const queueScopeSchema = z.enum(['ranked-solo', 'all']);
 export const appSettingsSchema = z.object({
   queueScope: queueScopeSchema,
   autoOpenLiveMatch: z.boolean(),
-  showLaneDifferences: z.boolean()
+  showLaneDifferences: z.boolean(),
+  autoAcceptReadyCheck: z.boolean()
 }).strict();
 export const appSettingsPatchSchema = appSettingsSchema.partial().strict();
 export type AppSettings = z.infer<typeof appSettingsSchema>;
@@ -31,14 +40,31 @@ export const matchSummarySchema = z.object({
   deaths: z.number().int().nonnegative(),
   assists: z.number().int().nonnegative(),
   cs: z.number().optional(),
-  lane: laneSchema.optional()
+  lane: laneSchema.optional(),
+  itemIds: z.array(z.number().int().positive()).max(7).optional(),
+  summonerSpellIds: z.tuple([
+    z.number().int().positive(),
+    z.number().int().positive()
+  ]).optional(),
+  allyChampionIds: z.array(z.number().int().nonnegative()).max(5).optional(),
+  enemyChampionIds: z.array(z.number().int().nonnegative()).max(5).optional(),
+  goldEarned: z.number().int().nonnegative().optional(),
+  totalDamageDealtToChampions: z.number().int().nonnegative().optional(),
+  totalDamageTaken: z.number().int().nonnegative().optional(),
+  teamDamageShare: z.number().min(0).max(1).optional(),
+  teamDamageTakenShare: z.number().min(0).max(1).optional(),
+  teamGoldShare: z.number().min(0).max(1).optional(),
+  achievements: z.array(matchAchievementSchema).max(4).optional()
 }).strict();
 
 const favoriteChampionSchema = z.object({
   championId: z.number().int().nonnegative(),
   games: z.number().int().nonnegative(),
   wins: z.number().int().nonnegative(),
-  winRate: z.number().min(0).max(1)
+  winRate: z.number().min(0).max(1),
+  averageKills: z.number().nonnegative().optional(),
+  averageDeaths: z.number().nonnegative().optional(),
+  averageAssists: z.number().nonnegative().optional()
 }).strict();
 
 export const personalHistorySchema: z.ZodType<PersonalHistorySnapshot> = z.object({
@@ -52,8 +78,10 @@ export const personalHistorySchema: z.ZodType<PersonalHistorySnapshot> = z.objec
   losses: z.number().int().nonnegative(),
   winRate: z.number().min(0).max(1),
   averageKda: z.number().nonnegative(),
-  favoriteChampions: z.array(favoriteChampionSchema).max(5),
+  favoriteChampions: z.array(favoriteChampionSchema).max(20),
   assetVersion: z.string().min(1).optional(),
+  itemIconPaths: z.record(z.string(), z.string().min(1)).optional(),
+  historyDataVersion: z.number().int().positive().optional(),
   cached: z.boolean(),
   updatedAt: z.number()
 }).strict();
@@ -90,13 +118,36 @@ export const liveMatchSchema = z.object({
 }).strict();
 export const liveMatchRequestSchema = z.object({ scope: queueScopeSchema, generation: z.number().int().nonnegative() }).strict();
 export const playerUpdateSchema = z.object({ generation: z.number().int().nonnegative(), player: playerSnapshotSchema }).strict();
+export const gameflowPhaseSchema = z.string().min(1);
+export const gameflowSessionIdentitySchema = z.object({ phase: gameflowPhaseSchema, gameId: z.string().min(1).optional() }).strict();
+export type GameflowSessionIdentity = z.infer<typeof gameflowSessionIdentitySchema>;
 
 export const championLaneSchema = z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']);
+export const championCatalogEntrySchema = z.object({
+  id: z.number().int().positive(), name: z.string().min(1), title: z.string().min(1),
+  alias: z.string().min(1), roles: z.array(z.string().min(1)).max(4)
+}).strict();
+export const championCatalogSchema = z.array(championCatalogEntrySchema);
+export const championAbilitySchema = z.object({
+  key: z.enum(['P', 'Q', 'W', 'E', 'R']), name: z.string().min(1),
+  description: z.string(), iconPath: z.string().min(1)
+}).strict();
+export const championDetailsSchema = z.object({
+  id: z.number().int().positive(), name: z.string().min(1), title: z.string().min(1),
+  alias: z.string().min(1), shortBio: z.string(), roles: z.array(z.string().min(1)).max(4),
+  abilities: z.array(championAbilitySchema).min(4).max(5)
+}).strict();
+export const championDetailsRequestSchema = z.object({ championId: z.number().int().positive() }).strict();
 export const championGuideSnapshotSchema = z.object({
   championId: z.number().int().positive(), lane: championLaneSchema,
   patch: z.string().regex(/^\d+\.\d+$/), source: z.enum(['CN_OFFICIAL', 'OPGG', 'MANUAL']),
   region: z.string().min(2), tier: z.string().min(1), fetchedAt: z.string().datetime(),
   builds: z.array(z.object({ itemIds: z.array(z.number().int().positive()).min(2), pickRate: z.number().min(0).max(1).optional() }).strict()),
+  itemIconPaths: z.record(z.string(), z.string().min(1)).optional(),
+  skillOrders: z.array(z.object({ keys: z.array(z.enum(['Q', 'W', 'E', 'R'])).length(18), pickRate: z.number().min(0).max(1).optional() }).strict()).max(3).optional(),
+  starterItemIds: z.array(z.number().int().positive()).max(4).optional(),
+  bootsItemIds: z.array(z.number().int().positive()).max(3).optional(),
+  summonerSpellIds: z.tuple([z.number().int().positive(), z.number().int().positive()]).optional(),
   favorable: z.array(z.object({ opponentChampionId: z.number().int().positive(), winRate: z.number().min(0).max(1), games: z.number().int().nonnegative().optional() }).strict()),
   unfavorable: z.array(z.object({ opponentChampionId: z.number().int().positive(), winRate: z.number().min(0).max(1), games: z.number().int().nonnegative().optional() }).strict()),
   notes: z.array(z.string().max(240)).max(5)
@@ -106,6 +157,8 @@ export const championGuideRequestSchema = z.object({ championId: z.number().int(
 export type ChampionLane = z.infer<typeof championLaneSchema>;
 export type ChampionGuideSnapshot = z.infer<typeof championGuideSnapshotSchema>;
 export type ChampionGuide = z.infer<typeof championGuideSchema>;
+export type ChampionCatalogEntry = z.infer<typeof championCatalogEntrySchema>;
+export type ChampionDetails = z.infer<typeof championDetailsSchema>;
 
 export interface LiveMatch {
   players: PlayerSnapshot[];
@@ -118,6 +171,8 @@ export interface LiveMatch {
 export interface LolViewerApi {
   getPersonalHistory(): Promise<PersonalHistorySnapshot>;
   getLiveMatch(scope: QueueScope, generation?: number): Promise<LiveMatch>;
+  getGameflowPhase(): Promise<string>;
+  getGameflowSessionIdentity(): Promise<GameflowSessionIdentity>;
   retryLiveMatch?(): Promise<void>;
   cancelLiveMatch?(): Promise<void>;
   onPlayerUpdated(listener: (player: PlayerSnapshot, generation?: number) => void): () => void;
@@ -125,4 +180,6 @@ export interface LolViewerApi {
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
   clearCache(): Promise<void>;
   getChampionGuide(championId: number, lane: ChampionLane): Promise<ChampionGuide>;
+  getChampionCatalog(): Promise<ChampionCatalogEntry[]>;
+  getChampionDetails(championId: number): Promise<ChampionDetails>;
 }

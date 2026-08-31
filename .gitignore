@@ -7,3 +7,12 @@ work/
 .cache/
 .pnpm-store/
 .superpowers/
+
+# Codex 工具内部目录与临时产物
+.agents/
+.codex/
+outputs/
+dist-v*/
+*.log
+Thumbs.db
+.DS_Store

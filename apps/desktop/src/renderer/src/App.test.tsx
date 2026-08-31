@@ -16,10 +16,19 @@ function install(getLiveMatch: LolViewerApi['getLiveMatch'] = vi.fn().mockResolv
   const unsubscribe = vi.fn();
   const api = {
     getPersonalHistory: vi.fn().mockResolvedValue(history), getLiveMatch,
+    getGameflowPhase: vi.fn().mockResolvedValue('InProgress'),
+    getGameflowSessionIdentity: vi.fn().mockResolvedValue({ phase: 'InProgress', gameId: 'game-1' }),
     onPlayerUpdated: vi.fn((next) => { order?.push('subscribe'); listener = next; return unsubscribe; }),
-    cancelLiveMatch: vi.fn().mockResolvedValue(undefined), retryLiveMatch: vi.fn().mockResolvedValue(undefined), getChampionGuide: vi.fn().mockRejectedValue(new Error('offline')),
-    getSettings: vi.fn().mockResolvedValue({ queueScope: 'ranked-solo', autoOpenLiveMatch: true, showLaneDifferences: true }),
-    updateSettings: vi.fn(), clearCache: vi.fn()
+    cancelLiveMatch: vi.fn().mockResolvedValue(undefined), retryLiveMatch: vi.fn().mockResolvedValue(undefined),
+    getChampionGuide: vi.fn().mockRejectedValue(new Error('offline')),
+    getChampionCatalog: vi.fn().mockResolvedValue([{ id: 114, name: '无双剑姬', title: '菲奥娜', alias: 'Fiora', roles: ['fighter'] }]),
+    getChampionDetails: vi.fn().mockResolvedValue({ id: 114, name: '无双剑姬', title: '菲奥娜', alias: 'Fiora', shortBio: '', roles: ['fighter'], abilities: [
+      { key: 'P', name: '决斗之舞', description: '', iconPath: '/p.png' }, { key: 'Q', name: '破空斩', description: '', iconPath: '/q.png' },
+      { key: 'W', name: '劳伦特心眼刀', description: '', iconPath: '/w.png' }, { key: 'E', name: '夺命连刺', description: '', iconPath: '/e.png' },
+      { key: 'R', name: '无双挑战', description: '', iconPath: '/r.png' }
+    ] }),
+    getSettings: vi.fn().mockResolvedValue({ queueScope: 'ranked-solo', autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false }),
+    updateSettings: vi.fn().mockImplementation(async (patch) => ({ queueScope: 'ranked-solo', autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false, ...patch })), clearCache: vi.fn()
   } as unknown as LolViewerApi;
   window.lolViewer = api;
   return { api, unsubscribe, emit: (value: PlayerSnapshot, generation?: number) => listener?.(value, generation) };
@@ -45,13 +54,77 @@ describe('App tab lifecycle', () => {
     expect(api.getLiveMatch).not.toHaveBeenCalled();
   });
 
+  it('keeps cached personal history visible while refreshing after tab re-entry', async () => {
+    const refresh = deferred<PersonalHistorySnapshot>();
+    const { api } = install();
+    vi.mocked(api.getPersonalHistory)
+      .mockResolvedValueOnce(history)
+      .mockImplementationOnce(() => refresh.promise);
+    render(<App />);
+    expect(await screen.findByText(history.displayName)).toBeVisible();
+
+    const tabs = screen.getAllByRole('tab');
+    fireEvent.click(tabs[1]);
+    fireEvent.click(tabs[0]);
+
+    await waitFor(() => expect(api.getPersonalHistory).toHaveBeenCalledTimes(2));
+    expect(screen.getByText(history.displayName)).toBeVisible();
+  });
+  it('keeps the same history image elements mounted across tab switches', async () => {
+    install();
+    render(<App />);
+    await screen.findByText(history.displayName);
+    const avatar = document.querySelector('.personal-history__hero-avatar');
+    expect(avatar).toBeInstanceOf(HTMLImageElement);
+
+    const tabs = screen.getAllByRole('tab');
+    fireEvent.click(tabs[1]);
+    fireEvent.click(tabs[0]);
+
+    expect(document.querySelector('.personal-history__hero-avatar')).toBe(avatar);
+  });
+  it('refreshes personal history once and shows the replacement snapshot', async () => {
+    const refresh = deferred<PersonalHistorySnapshot>();
+    const { api } = install();
+    vi.mocked(api.getPersonalHistory)
+      .mockResolvedValueOnce(history)
+      .mockImplementationOnce(() => refresh.promise);
+    render(<App />);
+    expect(await screen.findByText('召唤师')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }));
+    expect(screen.getByRole('button', { name: '刷新中' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '刷新中' }));
+    expect(api.getPersonalHistory).toHaveBeenCalledTimes(2);
+
+    await act(async () => refresh.resolve({ ...history, displayName: '更新后的召唤师', wins: 9 }));
+    expect(await screen.findByText('更新后的召唤师')).toBeVisible();
+    expect(screen.getByRole('button', { name: '刷新' })).toBeEnabled();
+  });
+
+  it('keeps the current personal history visible when a manual refresh fails', async () => {
+    const refresh = deferred<PersonalHistorySnapshot>();
+    const { api } = install();
+    vi.mocked(api.getPersonalHistory)
+      .mockResolvedValueOnce(history)
+      .mockImplementationOnce(() => refresh.promise);
+    render(<App />);
+    expect(await screen.findByText('召唤师')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }));
+    await act(async () => refresh.reject(new Error('offline')));
+
+    expect(screen.getByText('召唤师')).toBeVisible();
+    expect(screen.getByText('刷新失败，请重试')).toBeVisible();
+  });
+
   it('subscribes before requesting all modes, then cancels on exit', async () => {
     const order: string[] = []; const request = deferred<LiveMatch>();
     const { api, unsubscribe } = install(vi.fn((scope, generation) => { order.push(`request:${scope}:${generation}`); return request.promise; }), order);
     render(<App />); fireEvent.click(screen.getByRole('tab', { name: '对战信息' }));
     await waitFor(() => expect(order[0]).toBe('subscribe'));
     expect(api.getLiveMatch).toHaveBeenCalledWith('all', expect.any(Number));
-    fireEvent.click(screen.getByRole('tab', { name: '英雄资料库' }));
+    fireEvent.click(screen.getByRole('tab', { name: '设置' }));
     await waitFor(() => expect(api.cancelLiveMatch).toHaveBeenCalledOnce());
     expect(unsubscribe).toHaveBeenCalledOnce();
   });
@@ -99,6 +172,19 @@ describe('App tab lifecycle', () => {
     expect(screen.getByText('Player One')).toBeVisible();
   });
 
+  it('clears the previous match immediately while a tab re-entry refresh is pending', async () => {
+    const refresh = deferred<LiveMatch>();
+    const { api } = install(vi.fn().mockResolvedValueOnce(match).mockImplementationOnce(() => refresh.promise));
+    render(<App initialTab="live" />);
+    expect(await screen.findByText('Player One')).toBeVisible();
+
+    const tabs = screen.getAllByRole('tab');
+    fireEvent.click(tabs[0]);
+    fireEvent.click(tabs[1]);
+
+    await waitFor(() => expect(api.getLiveMatch).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText('Player One')).not.toBeInTheDocument();
+  });
   it('shows retryable error only when the request rejects', async () => {
     const request = deferred<LiveMatch>(); install(() => request.promise); render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: '对战信息' }));
@@ -106,17 +192,120 @@ describe('App tab lifecycle', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('对战信息暂时无法读取，请重试');
   });
 
-  it('starts exactly one new request lifecycle for one retry click', async () => {
+  it('shows an error without exposing manual live controls', async () => {
     const getLiveMatch = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(match);
     const { api } = install(getLiveMatch);
     render(<App initialTab="live" />);
     expect(await screen.findByRole('alert')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Retry live match' }));
-    await waitFor(() => expect(api.getLiveMatch).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole('button', { name: 'Retry live match' })).not.toBeInTheDocument();
+    expect(api.getLiveMatch).toHaveBeenCalledOnce();
     expect(api.retryLiveMatch).not.toHaveBeenCalled();
-    expect(api.cancelLiveMatch).toHaveBeenCalledTimes(1);
+    expect(api.cancelLiveMatch).not.toHaveBeenCalled();
   });
 
+  it('keeps live controls out of the match page and persists auto accept from settings', async () => {
+    const { api } = install();
+    render(<App initialTab="live" />);
+    expect(screen.queryByRole('switch', { name: /自动接受匹配/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry live match' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '设置' }));
+    const toggle = await screen.findByRole('switch', { name: /自动接受匹配/ });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    await waitFor(() => expect(api.updateSettings).toHaveBeenCalledWith({ autoAcceptReadyCheck: true }));
+    expect(toggle).toBeChecked();
+  });
+
+  it('does not cancel a slow live request and retries three seconds after it fails', async () => {
+    vi.useFakeTimers();
+    try {
+      const first = deferred<LiveMatch>();
+      const { api } = install(vi.fn().mockImplementationOnce(() => first.promise).mockResolvedValueOnce(match));
+      render(<App initialTab="live" />);
+      await act(async () => { await Promise.resolve(); });
+      expect(api.getLiveMatch).toHaveBeenCalledOnce();
+
+      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); });
+      expect(api.getLiveMatch).toHaveBeenCalledOnce();
+      expect(api.cancelLiveMatch).not.toHaveBeenCalled();
+
+      await act(async () => first.reject(new Error('not in game')));
+      await act(async () => { vi.advanceTimersByTime(2_999); await Promise.resolve(); });
+      expect(api.getLiveMatch).toHaveBeenCalledOnce();
+      await act(async () => { vi.advanceTimersByTime(1); await Promise.resolve(); });
+      expect(api.getLiveMatch).toHaveBeenCalledTimes(2);
+      expect(api.cancelLiveMatch).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reloads when the phase moves directly from the previous game into a new champion select', async () => {
+    vi.useFakeTimers();
+    try {
+      const nextPlayer = { ...player, playerId: 'two', displayName: 'Player Two', championId: 2 };
+      const getLiveMatch = vi.fn().mockResolvedValueOnce(match).mockResolvedValueOnce({ ...match, players: [nextPlayer] });
+      const { api } = install(getLiveMatch);
+      const phaseApi = api as unknown as { getGameflowSessionIdentity: ReturnType<typeof vi.fn> };
+      phaseApi.getGameflowSessionIdentity.mockResolvedValueOnce({ phase: 'InProgress', gameId: 'game-1' }).mockResolvedValueOnce({ phase: 'ChampSelect', gameId: 'game-2' });
+      render(<App initialTab="live" />);
+      await act(async () => { await Promise.resolve(); });
+      expect(screen.getByText('Player One')).toBeVisible();
+
+      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); });
+      expect(getLiveMatch).toHaveBeenCalledOnce();
+      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
+      expect(getLiveMatch).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Player Two')).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('reloads when gameId changes while the gameflow phase stays InProgress', async () => {
+    vi.useFakeTimers();
+    try {
+      const nextPlayer = { ...player, playerId: 'two', displayName: 'Player Two', championId: 2 };
+      const getLiveMatch = vi.fn().mockResolvedValueOnce(match).mockResolvedValueOnce({ ...match, players: [nextPlayer] });
+      const { api } = install(getLiveMatch);
+      const identityApi = api as unknown as { getGameflowSessionIdentity: ReturnType<typeof vi.fn> };
+      identityApi.getGameflowSessionIdentity
+        .mockResolvedValueOnce({ phase: 'InProgress', gameId: 'game-1' })
+        .mockResolvedValueOnce({ phase: 'InProgress', gameId: 'game-2' });
+      render(<App initialTab="live" />);
+      await act(async () => { await Promise.resolve(); });
+      expect(screen.getByText('Player One')).toBeVisible();
+
+      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); });
+      expect(getLiveMatch).toHaveBeenCalledOnce();
+      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
+      expect(getLiveMatch).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Player Two')).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+    }
+  });  it('clears the previous roster after game end and loads the next match on the next active phase', async () => {
+    vi.useFakeTimers();
+    try {
+      const nextPlayer = { ...player, playerId: 'two', displayName: 'Player Two', championId: 2 };
+      const nextMatch = { ...match, players: [nextPlayer] };
+      const getLiveMatch = vi.fn().mockResolvedValueOnce(match).mockResolvedValueOnce(nextMatch);
+      const { api } = install(getLiveMatch);
+      const phaseApi = api as unknown as { getGameflowSessionIdentity: ReturnType<typeof vi.fn> };
+      phaseApi.getGameflowSessionIdentity.mockResolvedValueOnce({ phase: 'EndOfGame', gameId: 'game-1' }).mockResolvedValueOnce({ phase: 'ChampSelect', gameId: 'game-2' });
+      render(<App initialTab="live" />);
+      await act(async () => { await Promise.resolve(); });
+      expect(screen.getByText('Player One')).toBeVisible();
+
+      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); });
+      expect(screen.queryByText('Player One')).not.toBeInTheDocument();
+
+      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
+      expect(getLiveMatch).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Player Two')).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('shows the resolved match mode and has no scope controls', async () => {
     install(); render(<App />); fireEvent.click(screen.getByRole('tab', { name: '对战信息' }));
     expect(await screen.findByText('极地大乱斗')).toBeVisible();
@@ -129,5 +318,45 @@ describe('App tab lifecycle', () => {
     await waitFor(() => expect(api.getChampionGuide).toHaveBeenCalledOnce());
     await act(async () => guide.reject(new Error('offline')));
     expect(api.getChampionGuide).toHaveBeenCalledOnce();
+  });
+
+  it('automatically loads personal history once the League client becomes available', async () => {
+    vi.useFakeTimers();
+    try {
+      const { api } = install();
+      vi.mocked(api.getPersonalHistory)
+        .mockRejectedValueOnce(new Error('League client is unavailable'))
+        .mockResolvedValueOnce(history);
+      render(<App />);
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+      expect(screen.getByText('请先启动英雄联盟客户端')).toBeVisible();
+      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+      expect(screen.getByText('召唤师')).toBeVisible();
+      expect(api.getPersonalHistory).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('highlights the live tab when champion select starts while on the history page', async () => {
+    vi.useFakeTimers();
+    try {
+      const { api } = install();
+      const identityApi = api as unknown as { getGameflowSessionIdentity: ReturnType<typeof vi.fn> };
+      identityApi.getGameflowSessionIdentity
+        .mockResolvedValueOnce({ phase: 'None' })
+        .mockResolvedValueOnce({ phase: 'ChampSelect', gameId: 'game-1' });
+      render(<App />);
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+      expect(screen.getByRole('tab', { name: '对战信息' })).not.toHaveClass('app-shell__tab--attention');
+      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
+      expect(screen.getByRole('tab', { name: '对战信息' })).not.toHaveClass('app-shell__tab--attention');
+      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
+      expect(screen.getByRole('tab', { name: '对战信息' })).toHaveClass('app-shell__tab--attention');
+      fireEvent.click(screen.getByRole('tab', { name: '对战信息' }));
+      expect(screen.getByRole('tab', { name: '对战信息' })).not.toHaveClass('app-shell__tab--attention');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

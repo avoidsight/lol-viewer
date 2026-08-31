@@ -6,6 +6,17 @@ export type QueueMode = 'RANKED' | 'NORMAL' | 'ARAM' | 'OTHER';
 
 export type DataStatus = 'loading' | 'ready' | 'unavailable';
 
+export type MatchAchievementType =
+  | 'MOST_KILLS'
+  | 'MOST_ASSISTS'
+  | 'MOST_DAMAGE'
+  | 'MOST_DAMAGE_TAKEN';
+
+export interface MatchAchievement {
+  type: MatchAchievementType;
+  value: number;
+}
+
 export interface MatchSummary {
   matchId: string;
   queueId: number;
@@ -18,6 +29,17 @@ export interface MatchSummary {
   assists: number;
   cs?: number;
   lane?: Lane;
+  itemIds?: number[];
+  summonerSpellIds?: [number, number];
+  allyChampionIds?: number[];
+  enemyChampionIds?: number[];
+  goldEarned?: number;
+  totalDamageDealtToChampions?: number;
+  totalDamageTaken?: number;
+  teamDamageShare?: number;
+  teamDamageTakenShare?: number;
+  teamGoldShare?: number;
+  achievements?: MatchAchievement[];
 }
 
 export interface FavoriteChampion {
@@ -25,6 +47,9 @@ export interface FavoriteChampion {
   games: number;
   wins: number;
   winRate: number;
+  averageKills?: number;
+  averageDeaths?: number;
+  averageAssists?: number;
 }
 
 export interface PersonalHistorySnapshot {
@@ -40,6 +65,8 @@ export interface PersonalHistorySnapshot {
   averageKda: number;
   favoriteChampions: FavoriteChampion[];
   assetVersion?: string;
+  itemIconPaths?: Record<string, string>;
+  historyDataVersion?: number;
   cached: boolean;
   updatedAt: number;
 }

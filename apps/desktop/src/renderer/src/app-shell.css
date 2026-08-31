@@ -3,3 +3,22 @@
 .app-shell__tabs button { background: transparent; border: 0; border-bottom: 3px solid transparent; color: #9aaac1; cursor: pointer; padding: 0 1rem; }
 .app-shell__tabs button[aria-selected="true"] { border-bottom-color: #39c6f4; color: #f4f7fb; }.app-shell__tabs button:focus-visible { outline: 2px solid #d7b45a; outline-offset: -4px; }
 @media (max-width: 36rem) { .app-shell__bar { align-items: stretch; flex-direction: column; gap: 0; padding-top: .75rem; } .app-shell__tabs { overflow-x: auto; } .app-shell__tabs button { min-height: 3rem; white-space: nowrap; } }
+
+.app-shell__tabs button.app-shell__tab--attention { color: #ffd76a; position: relative; }
+.app-shell__tabs button.app-shell__tab--attention::after {
+  animation: app-shell__tab-pulse 1.2s ease-in-out infinite;
+  background: #ff5d5d;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgb(255 93 93 / 0.8);
+  content: '';
+  height: 8px;
+  position: absolute;
+  right: 6px;
+  top: 10px;
+  width: 8px;
+}
+@keyframes app-shell__tab-pulse {
+  0% { box-shadow: 0 0 0 0 rgb(255 93 93 / 0.8); }
+  70% { box-shadow: 0 0 0 8px rgb(255 93 93 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(255 93 93 / 0); }
+}

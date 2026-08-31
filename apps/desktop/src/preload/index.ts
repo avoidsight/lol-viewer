@@ -5,7 +5,11 @@ import {
   MATCH_GET_CHANNEL,
   MATCH_CANCEL_CHANNEL,
   MATCH_RETRY_CHANNEL,
+  GAMEFLOW_PHASE_GET_CHANNEL,
+  GAMEFLOW_SESSION_GET_CHANNEL,
   CHAMPION_GUIDE_GET_CHANNEL,
+  CHAMPION_CATALOG_GET_CHANNEL,
+  CHAMPION_DETAILS_GET_CHANNEL,
   PERSONAL_HISTORY_GET_CHANNEL,
   PLAYER_UPDATED_CHANNEL,
   SETTINGS_CLEAR_CACHE_CHANNEL,
@@ -15,11 +19,16 @@ import {
   appSettingsSchema,
   liveMatchSchema,
   liveMatchRequestSchema,
+  gameflowPhaseSchema,
+  gameflowSessionIdentitySchema,
   playerUpdateSchema,
   playerSnapshotSchema,
   queueScopeSchema,
   championGuideRequestSchema,
   championGuideSchema,
+  championCatalogSchema,
+  championDetailsRequestSchema,
+  championDetailsSchema,
   personalHistorySchema,
   type AppSettings,
   type ChampionLane,
@@ -34,6 +43,10 @@ const api: LolViewerApi = Object.freeze({
     const input = liveMatchRequestSchema.parse({ scope: queueScopeSchema.parse(scope), generation });
     return liveMatchSchema.parse(await ipcRenderer.invoke(MATCH_GET_CHANNEL, input));
   },
+  getGameflowPhase: async (): Promise<string> =>
+    gameflowPhaseSchema.parse(await ipcRenderer.invoke(GAMEFLOW_PHASE_GET_CHANNEL)),
+  getGameflowSessionIdentity: async () =>
+    gameflowSessionIdentitySchema.parse(await ipcRenderer.invoke(GAMEFLOW_SESSION_GET_CHANNEL)),
   retryLiveMatch: async (): Promise<void> => z.undefined().parse(await ipcRenderer.invoke(MATCH_RETRY_CHANNEL)),
   cancelLiveMatch: async (): Promise<void> => z.undefined().parse(await ipcRenderer.invoke(MATCH_CANCEL_CHANNEL)),
   onPlayerUpdated: (listener: (player: PlayerSnapshot, generation?: number) => void): (() => void) => {
@@ -57,6 +70,12 @@ const api: LolViewerApi = Object.freeze({
   getChampionGuide: async (championId: number, lane: ChampionLane) => {
     const input = championGuideRequestSchema.parse({ championId, lane });
     return championGuideSchema.parse(await ipcRenderer.invoke(CHAMPION_GUIDE_GET_CHANNEL, input));
+  },
+  getChampionCatalog: async () =>
+    championCatalogSchema.parse(await ipcRenderer.invoke(CHAMPION_CATALOG_GET_CHANNEL)),
+  getChampionDetails: async (championId: number) => {
+    const input = championDetailsRequestSchema.parse({ championId });
+    return championDetailsSchema.parse(await ipcRenderer.invoke(CHAMPION_DETAILS_GET_CHANNEL, input));
   }
 });
 

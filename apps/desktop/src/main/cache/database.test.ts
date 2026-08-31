@@ -86,7 +86,9 @@ describe('MatchCache', () => {
     migrateDatabase(database);
     migrateDatabase(database);
 
-    expect(database.prepare('SELECT version FROM schema_migrations ORDER BY version').all()).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
+    expect(database.prepare('SELECT version FROM schema_migrations ORDER BY version').all()).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }]);
+    expect(database.prepare("SELECT name FROM pragma_table_info('app_settings') WHERE name = ?").get('auto_accept_ready_check'))
+      .toEqual({ name: 'auto_accept_ready_check' });
   });
 });
 
