@@ -28,10 +28,15 @@ function Write-Step {
 function Refresh-ProcessPath {
     $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-    $officialNodePath = Join-Path $env:ProgramFiles "nodejs"
     $pathParts = @()
-    if (Test-Path $officialNodePath) {
-        $pathParts += $officialNodePath
+
+    foreach ($programFilesPath in @($env:ProgramW6432, $env:ProgramFiles)) {
+        if ($programFilesPath) {
+            $officialNodePath = Join-Path $programFilesPath "nodejs"
+            if ((Test-Path (Join-Path $officialNodePath "node.exe")) -and $pathParts -notcontains $officialNodePath) {
+                $pathParts += $officialNodePath
+            }
+        }
     }
     if ($machinePath) {
         $pathParts += $machinePath
@@ -82,22 +87,46 @@ function Install-Or-UpdateNode {
     Refresh-ProcessPath
 }
 
-function Get-NodeVersion {
-    $node = Get-Command "node.exe" -ErrorAction SilentlyContinue
-    if (-not $node) {
-        return $null
+function Get-BestNodeInstallation {
+    $candidatePaths = @()
+
+    foreach ($programFilesPath in @($env:ProgramW6432, $env:ProgramFiles)) {
+        if ($programFilesPath) {
+            $candidatePaths += Join-Path $programFilesPath "nodejs\node.exe"
+        }
     }
 
-    $versionText = (& $node.Source --version).Trim().TrimStart("v")
-    if ($LASTEXITCODE -ne 0) {
-        return $null
+    $pathCommands = @(Get-Command "node.exe" -All -ErrorAction SilentlyContinue)
+    foreach ($pathCommand in $pathCommands) {
+        $candidatePaths += $pathCommand.Source
     }
 
-    try {
-        return [version]$versionText
-    } catch {
-        return $null
+    $bestInstallation = $null
+    foreach ($candidatePath in @($candidatePaths | Select-Object -Unique)) {
+        if (-not $candidatePath -or -not (Test-Path $candidatePath)) {
+            continue
+        }
+
+        try {
+            $versionOutput = (& $candidatePath --version 2>$null).Trim()
+            if ($LASTEXITCODE -ne 0) {
+                continue
+            }
+            $version = [version]$versionOutput.TrimStart("v")
+        } catch {
+            continue
+        }
+
+        if (-not $bestInstallation -or $version -gt $bestInstallation.Version) {
+            $bestInstallation = [PSCustomObject]@{
+                Path = $candidatePath
+                Directory = Split-Path -Parent $candidatePath
+                Version = $version
+            }
+        }
     }
+
+    return $bestInstallation
 }
 
 function Invoke-Pnpm {
@@ -116,26 +145,33 @@ if ($env:OS -ne "Windows_NT") {
 try {
     Write-Step 1 "检查 Node.js 和 pnpm 环境"
 
-    $nodeVersion = Get-NodeVersion
-    if (-not $nodeVersion) {
+    $nodeInstallation = Get-BestNodeInstallation
+    if (-not $nodeInstallation) {
         Install-Or-UpdateNode -IsUpgrade $false
-        $nodeVersion = Get-NodeVersion
-    } elseif ($nodeVersion.Major -lt $RequiredNodeMajor) {
+    } elseif ($nodeInstallation.Version.Major -lt $RequiredNodeMajor) {
         Install-Or-UpdateNode -IsUpgrade $true
-        $nodeVersion = Get-NodeVersion
     }
 
-    if (-not $nodeVersion -or $nodeVersion.Major -lt $RequiredNodeMajor) {
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
+        Refresh-ProcessPath
+        $nodeInstallation = Get-BestNodeInstallation
+        if ($nodeInstallation -and $nodeInstallation.Version.Major -ge $RequiredNodeMajor) {
+            break
+        }
+        Start-Sleep -Seconds 1
+    }
+
+    if (-not $nodeInstallation -or $nodeInstallation.Version.Major -lt $RequiredNodeMajor) {
         throw "Node.js 安装完成后仍无法找到 $RequiredNodeMajor+ 版本。请重启电脑后再次运行本脚本。"
     }
 
-    $npx = Get-Command "npx.cmd" -ErrorAction SilentlyContinue
-    if (-not $npx) {
+    $npxPath = Join-Path $nodeInstallation.Directory "npx.cmd"
+    if (-not (Test-Path $npxPath)) {
         throw "未找到 npx.cmd。请重新安装 Node.js LTS 后再试。"
     }
 
-    $script:NpxCommand = $npx.Source
-    Write-Host "Node.js $nodeVersion" -ForegroundColor Green
+    $script:NpxCommand = $npxPath
+    Write-Host "Node.js $($nodeInstallation.Version)（$($nodeInstallation.Path)）" -ForegroundColor Green
     Write-Host "pnpm $PnpmVersion（脚本会自动下载并使用固定版本）" -ForegroundColor Green
 
     Push-Location $ProjectRoot
