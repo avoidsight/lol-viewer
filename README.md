@@ -44,17 +44,32 @@ pnpm verify
 
 ## 打包
 
-在 `apps/desktop` 下执行：
+### Windows 一键打包（推荐）
+
+下载或解压完整源码后，直接双击项目根目录的 `package-windows.bat`。脚本会自动：
+
+1. 检查 Node.js 22+；未安装时尝试通过 Windows `winget` 安装 Node.js LTS
+2. 下载并使用项目固定的 pnpm 10.13.1
+3. 安装锁定版本的依赖并构建 Windows x64 NSIS 安装包
+4. 将安装包及 SHA256 校验文件复制到根目录的 `release` 文件夹
+
+首次打包需要联网。若电脑没有 `winget`，请先手动安装 [Node.js LTS](https://nodejs.org/)；其余依赖无需单独配置。
+
+也可以在 PowerShell 中运行 `scripts/package-windows.ps1`，效果相同。
+
+### 命令行打包
+
+在项目根目录执行：
 
 ```bash
 # NSIS 安装包
 pnpm package:win
 
 # 免安装目录（win-unpacked）
-pnpm exec electron-builder --win dir --x64 --publish never
+pnpm --dir apps/desktop exec electron-builder --win dir --x64 --publish never
 ```
 
-产物输出到 `apps/desktop/dist`。
+命令行打包产物输出到 `apps/desktop/dist`；一键脚本还会把最终安装包复制到根目录的 `release`。
 
 ## 开发约定
 

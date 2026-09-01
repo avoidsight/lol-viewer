@@ -4,6 +4,7 @@
   "packageManager": "pnpm@10.13.1",
   "scripts": {
     "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "package:win": "pnpm --dir apps/desktop package:win"
   }
 }
