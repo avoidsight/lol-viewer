@@ -165,6 +165,13 @@ try {
         throw "Node.js 安装完成后仍无法找到 $RequiredNodeMajor+ 版本。请重启电脑后再次运行本脚本。"
     }
 
+
+    # 将选中的 Node 目录放到 PATH 最前面，避免 pnpm 等子进程的启动器从 PATH
+    # 解析到旧版本 node（例如 D:\env\nodejs 下的 v16），导致 pnpm 拒绝运行。
+    if ($env:Path -notlike "$($nodeInstallation.Directory)*") {
+        $env:Path = "$($nodeInstallation.Directory);$env:Path"
+    }
+
     $npxPath = Join-Path $nodeInstallation.Directory "npx.cmd"
     if (-not (Test-Path $npxPath)) {
         throw "未找到 npx.cmd。请重新安装 Node.js LTS 后再试。"
@@ -173,6 +180,15 @@ try {
     $script:NpxCommand = $npxPath
     Write-Host "Node.js $($nodeInstallation.Version)（$($nodeInstallation.Path)）" -ForegroundColor Green
     Write-Host "pnpm $PnpmVersion（脚本会自动下载并使用固定版本）" -ForegroundColor Green
+
+    # 国内网络优化：默认从 npmmirror 下载 Electron 与 electron-builder 工具链，
+    # 避免直连 GitHub 超时；若用户已自行设置镜像，则尊重已有配置。
+    if (-not $env:ELECTRON_MIRROR) {
+        $env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
+    }
+    if (-not $env:ELECTRON_BUILDER_BINARIES_MIRROR) {
+        $env:ELECTRON_BUILDER_BINARIES_MIRROR = "https://npmmirror.com/mirrors/electron-builder-binaries/"
+    }
 
     Push-Location $ProjectRoot
     try {
@@ -216,3 +232,4 @@ try {
 }
 
 exit 0
+

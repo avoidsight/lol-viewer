@@ -23,7 +23,7 @@ docs           设计文档
 - Node.js >= 22（推荐 24）
 - pnpm 10.13.1（仓库通过 packageManager 字段固定版本）
 - 英雄联盟客户端已登录（对战信息依赖本机 LCU 端口；未进入游戏或英雄选择时无实时数据）
-- 首次安装依赖时允许构建原生模块 better-sqlite3（已在 pnpm-workspace.yaml 中配置 allowBuilds）
+- 首次安装依赖时允许构建原生模块 better-sqlite3（已在 pnpm-workspace.yaml 中配置 onlyBuiltDependencies）
 
 ## 安装与运行
 
@@ -55,7 +55,7 @@ pnpm verify
 
 打包成功或失败后控制台都会保留，查看结果后按任意键退出。
 
-首次打包需要联网。若电脑没有 `winget`，请先手动安装 [Node.js LTS](https://nodejs.org/)；其余依赖无需单独配置。
+首次打包需要联网。若电脑没有 `winget`，请先手动安装 [Node.js LTS](https://nodejs.org/)。Electron 与 electron-builder 工具链的二进制下载已通过根目录 .npmrc 配置为 npmmirror 国内镜像，国内网络无需手动配置代理。
 
 也可以在 PowerShell 中运行 `scripts/package-windows.ps1`，效果相同。
 
