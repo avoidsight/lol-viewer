@@ -175,6 +175,33 @@ describe('PersonalHistoryService', () => {
     expect(get).toHaveBeenCalledWith('/lol-match-history/v1/games/1', expect.anything());
   });
 
+  it('limits game detail enrichment to four concurrent requests in newest-first order', async () => {
+    const games = Array.from({ length: 12 }, (_, index) => game(index));
+    let active = 0;
+    let maximum = 0;
+    const started: number[] = [];
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-summoner/v1/current-summoner') return { summonerId: 7, displayName: 'Current', profileIconId: 30 };
+      if (path.includes('/matches?')) return { games };
+      if (path.includes('/lol-match-history/v1/games/')) {
+        const gameId = Number(path.split('/').at(-1));
+        started.push(gameId);
+        active += 1;
+        maximum = Math.max(maximum, active);
+        await new Promise<void>((resolve) => setTimeout(resolve, 5));
+        active -= 1;
+        return games.find((entry) => entry.gameId === gameId)!;
+      }
+      throw new Error('optional endpoint offline');
+    }) as LcuClient['get'];
+
+    await createService(get).service.load();
+
+    expect(maximum).toBe(4);
+    expect(started.slice(0, 4)).toEqual([1, 2, 3, 4]);
+    expect(started).toHaveLength(12);
+  });
+
   it('refreshes a legacy fresh cache that has no local item icon metadata', async () => {
     const legacySnapshot = { ...cachedSnapshot };
     delete legacySnapshot.itemIconPaths;
