@@ -123,6 +123,7 @@ export const playerSnapshotSchema: z.ZodType<PlayerSnapshot> = z.object({
   currentChampionWins: z.number().int().nonnegative(),
   currentChampionWinRate: z.number(),
   status: z.enum(['loading', 'ready', 'unavailable']),
+  errorCode: z.enum(['PRIVACY_RESTRICTED', 'CLIENT_UNAVAILABLE', 'DATA_SERVICE_UNAVAILABLE', 'INVALID_RESPONSE', 'UNKNOWN']).optional(),
   error: z.string().optional(),
   updatedAt: z.number()
 }).strict();

@@ -23,7 +23,7 @@ export function teamSlots(players: PlayerSnapshot[], reliable: boolean): Slot[] 
   return slots;
 }
 
-interface Props { match?: LiveMatch; players?: PlayerSnapshot[]; notice?: ReactNode; showLaneDifferences?: boolean; lifecycleStatus?: LiveMatchStatus; gameflowPhase?: string }
+interface Props { match?: LiveMatch; players?: PlayerSnapshot[]; loadingProgress?: number; notice?: ReactNode; showLaneDifferences?: boolean; lifecycleStatus?: LiveMatchStatus; gameflowPhase?: string }
 export type LiveHistoryScope = 'all' | 'ranked';
 
 function statusLabel(status: LiveMatchStatus, phase: string | undefined): string {
@@ -37,7 +37,7 @@ function statusLabel(status: LiveMatchStatus, phase: string | undefined): string
   return status === 'current' ? '当前对局' : '等待对局';
 }
 
-export default function LiveMatchPage({ match, players = [], notice, showLaneDifferences = true, lifecycleStatus = match ? 'current' : 'waiting', gameflowPhase }: Props) {
+export default function LiveMatchPage({ match, players = [], loadingProgress, notice, showLaneDifferences = true, lifecycleStatus = match ? 'current' : 'waiting', gameflowPhase }: Props) {
   const [historyScope, setHistoryScope] = useState<LiveHistoryScope>(() =>
     match && isRankedQueue(match.queueId) ? 'ranked' : 'all');
   useEffect(() => {
@@ -54,6 +54,7 @@ export default function LiveMatchPage({ match, players = [], notice, showLaneDif
   return <main className="live-match-page">
     <div className="live-match-page__toolbar"><div><h1>对战信息</h1><span>实时 5v5 阵容</span></div><div className="live-match-page__controls"><span className="live-match-page__status" data-status={lifecycleStatus}>{statusLabel(lifecycleStatus, gameflowPhase)}</span><div className="live-match-page__scope" role="group" aria-label="战绩范围"><button type="button" aria-pressed={historyScope === 'all'} onClick={() => setHistoryScope('all')}>全部对局</button><button type="button" aria-pressed={historyScope === 'ranked'} onClick={() => setHistoryScope('ranked')}>排位对局</button></div>{match && <strong className="live-match-page__mode">{match.modeName}</strong>}</div></div>
     {notice}
+    {loadingProgress !== undefined && <div className="live-match-page__progress" role="status" aria-label={`阵容加载进度 ${loadingProgress}/10`}><span>正在读取玩家战绩</span><strong>{loadingProgress}/10</strong><progress max={10} value={loadingProgress} /></div>}
     {!oriented && visiblePlayers.length > 0 && <p role="status">阵营方向无法确认</p>}
     {visiblePlayers.length > 0 && <div className="live-match-page__scroll" style={{ overflowX: 'auto' }} tabIndex={0} aria-label="双方对局比较"><div className="live-match-grid" style={{ minWidth: 1050 }}>
       {teamIds.map((teamId, teamIndex) => {

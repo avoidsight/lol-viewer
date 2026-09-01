@@ -5,7 +5,7 @@ import AppShell, { type AppTab } from './AppShell';
 import ChampionLibraryPage from './features/champions/ChampionLibraryPage';
 import PersonalHistoryPage from './features/history/PersonalHistoryPage';
 import LiveMatchPage from './features/live/LiveMatchPage';
-import { initialLiveMatchState, liveMatchReducer, type LiveMatchAction } from './features/live/live-match-state';
+import { initialLiveMatchState, liveMatchReducer, type LiveMatchAction, type LiveMatchErrorReason } from './features/live/live-match-state';
 import SettingsPage from './features/settings/SettingsPage';
 
 declare global { interface Window { lolViewer?: LolViewerApi } }
@@ -13,6 +13,13 @@ declare global { interface Window { lolViewer?: LolViewerApi } }
 const defaults: AppSettings = { queueScope: 'ranked-solo', autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false };
 const activePhases = new Set(['ChampSelect', 'GameStart', 'InProgress', 'Reconnect']);
 const clientRetryDelayMs = 3_000;
+
+function liveErrorReason(error: unknown): LiveMatchErrorReason {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  if (message.includes('league client') || message.includes('lcu is unavailable') || message.includes('lcu authentication')) return 'client-unavailable';
+  if (message.includes('roster is incomplete') || message.includes('champ-select') || message.includes('not in game') || message.includes('no active')) return 'not-in-match';
+  return 'data-unavailable';
+}
 
 export default function App({ initialTab = 'history' }: { initialTab?: AppTab } = {}) {
   const [page, setPage] = useState<AppTab>(initialTab);
@@ -88,7 +95,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     if (page !== 'live') return;
     let active = true;
     const api = window.lolViewer;
-    if (!api) { dispatchLive({ type: 'request-failed' }); return; }
+    if (!api) { dispatchLive({ type: 'request-failed', reason: 'client-unavailable' }); return; }
     const currentGeneration = ++generation.current;
     dispatchLive({ type: 'request-started' });
     const unsubscribe = api.onPlayerUpdated((player, eventGeneration = currentGeneration) => {
@@ -98,8 +105,8 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     void api.getLiveMatch('all', currentGeneration).then((next) => {
       if (!active || currentGeneration !== generation.current) return;
       dispatchLive({ type: 'request-succeeded', match: next });
-    }).catch(() => {
-      if (active && currentGeneration === generation.current) dispatchLive({ type: 'request-failed' });
+    }).catch((error: unknown) => {
+      if (active && currentGeneration === generation.current) dispatchLive({ type: 'request-failed', reason: liveErrorReason(error) });
     });
     return () => {
       active = false;
@@ -251,15 +258,20 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     window.lolViewer?.getChampionGuide(id, lane) ?? Promise.reject(new Error('unavailable')), []);
   const getChampionCatalog = useCallback(() => window.lolViewer?.getChampionCatalog() ?? Promise.reject(new Error('unavailable')), []);
   const getChampionDetails = useCallback((id: number) => window.lolViewer?.getChampionDetails(id) ?? Promise.reject(new Error('unavailable')), []);
+  const liveErrorMessages: Record<LiveMatchErrorReason, string> = {
+    'client-unavailable': '未连接到英雄联盟客户端，请先启动客户端',
+    'not-in-match': '暂未检测到可读取的对局阵容',
+    'data-unavailable': '对战数据暂时无法读取，正在自动重试'
+  };
   const liveNotice = liveView.status === 'error'
-      ? <p role="alert" className="live-match-page__notice live-match-page__notice--error">对战信息暂时无法读取，请重试</p>
-      : !liveView.match && liveView.progress.length === 0
+      ? <p role="alert" className="live-match-page__notice live-match-page__notice--error">{liveErrorMessages[liveView.errorReason ?? 'data-unavailable']}</p>
+      : !liveView.match && liveView.progress.length === 0 && (liveView.status === 'waiting' || liveView.status === 'new-match-loading')
         ? <p role="status" className="live-match-page__notice">{liveView.status === 'new-match-loading' ? '检测到新对局，正在加载阵容' : '等待进入英雄选择或游戏'}</p>
         : null;
 
   const content = <>
     <div hidden={page !== 'history'}><PersonalHistoryPage snapshot={history} state={historyState} onRefresh={() => void refreshHistory()} onPlayerSelect={(target) => void viewPlayerHistory(target)} onBack={historyTarget ? returnToOwnHistory : undefined} refreshing={historyRefreshing} refreshError={historyRefreshError} /></div>
-    <div hidden={page !== 'live'}><LiveMatchPage match={liveView.match} players={liveView.match ? undefined : liveView.progress} lifecycleStatus={liveView.status} gameflowPhase={liveView.phase} showLaneDifferences={settings.showLaneDifferences} notice={liveNotice} /></div>
+    <div hidden={page !== 'live'}><LiveMatchPage match={liveView.match} players={liveView.match ? undefined : liveView.progress} loadingProgress={liveView.requesting && !liveView.match ? liveView.progress.length : undefined} lifecycleStatus={liveView.status} gameflowPhase={liveView.phase} showLaneDifferences={settings.showLaneDifferences} notice={liveNotice} /></div>
     {page === 'champions' && <ChampionLibraryPage getCatalog={getChampionCatalog} getDetails={getChampionDetails} getGuide={getChampionGuide} />}
     {page === 'settings' && <SettingsPage settings={settings} message={message} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onLaneDifferencesChange={(checked) => void updateLaneSetting(checked)} onClearCache={() => void clearCache()} />}
   </>;

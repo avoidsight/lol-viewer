@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Lane, MatchSummary, PlayerSnapshot, QueueScope } from '../../shared/domain';
+import type { Lane, MatchSummary, PlayerDataErrorCode, PlayerSnapshot, QueueScope } from '../../shared/domain';
 import type { LiveMatch, LiveRoster } from '../../shared/ipc';
 import { formatRank } from '../../shared/rank';
 import type { LcuClient, LcuError } from '../lcu/http-client';
@@ -102,6 +102,16 @@ function laneOf(value: string | undefined): Lane {
 
 function isTransient(error: unknown): boolean {
   return (error as Partial<LcuError>)?.code === 'LCU_UNAVAILABLE';
+}
+
+function classifyHistoryError(error: unknown, source: 'lcu' | 'sgp'): PlayerDataErrorCode {
+  const code = (error as { code?: string })?.code;
+  const message = error instanceof Error ? error.message.toLowerCase() : '';
+  if (message.includes('privacy') || message.includes('forbidden') || /status (403|404)\b/.test(message)) return 'PRIVACY_RESTRICTED';
+  if (code === 'LCU_UNAVAILABLE' || code === 'LCU_AUTH') return 'CLIENT_UNAVAILABLE';
+  if (code === 'LCU_INVALID_RESPONSE' || code === 'LCU_RESPONSE_TOO_LARGE') return 'INVALID_RESPONSE';
+  if (source === 'sgp') return 'DATA_SERVICE_UNAVAILABLE';
+  return 'UNKNOWN';
 }
 
 interface MatchCancelledError extends Error { code: 'MATCH_CANCELLED' }
@@ -232,6 +242,7 @@ export class MatchService {
       }
       checkCancelled(signal);
       let matches: MatchSummary[] | null = cached?.matches ?? null;
+      let historyErrorCode: PlayerDataErrorCode | undefined;
       let rank: string | undefined;
       try {
         const ranked = rankedStatsSchema.parse(playerPuuid && this.sgp
@@ -248,6 +259,7 @@ export class MatchService {
       }
       checkCancelled(signal);
       if (!cached) {
+        let historySource: 'lcu' | 'sgp' = playerPuuid && this.sgp ? 'sgp' : 'lcu';
         try {
           let rawHistory: unknown;
           if (playerPuuid && this.sgp) {
@@ -255,6 +267,7 @@ export class MatchService {
               rawHistory = await this.sgp.getHistory(playerPuuid, 20);
             } catch (error) {
               if (!isLocalPlayer) throw error;
+              historySource = 'lcu';
               rawHistory = await this.getHistoryWithRetry(lookupId, true, signal);
             }
           } else {
@@ -265,9 +278,10 @@ export class MatchService {
             );
           }
           matches = adaptMatchHistory(rawHistory, { scope: 'all', limit: 20 });
-        } catch {
+        } catch (error) {
           checkCancelled(signal);
           matches = null;
+          historyErrorCode = classifyHistoryError(error, historySource);
         }
       }
       checkCancelled(signal);
@@ -287,6 +301,7 @@ export class MatchService {
         currentChampionWins,
         currentChampionWinRate: championMatches.length ? currentChampionWins / championMatches.length : 0,
         status: matches === null ? 'unavailable' : 'ready',
+        ...(historyErrorCode === undefined ? {} : { errorCode: historyErrorCode }),
         ...(matches === null ? { error: 'Player history is unavailable' } : {})
       };
       if (player.status === 'ready' && !cached) {

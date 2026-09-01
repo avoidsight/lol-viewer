@@ -131,7 +131,7 @@ describe('LiveMatchPage', () => {
       ...fixtureLiveMatch,
       players: fixtureLiveMatch.players.map((entry, index) => {
         if (index === 0) return player(index, { status: 'loading', matches: [], sampleSize: 0 });
-        if (index === 1) return player(index, { status: 'unavailable', matches: [], sampleSize: 0, error: '暂时无法读取' });
+        if (index === 1) return player(index, { status: 'unavailable', matches: [], sampleSize: 0, errorCode: 'PRIVACY_RESTRICTED', error: '暂时无法读取' });
         if (index === 2) return player(index, { matches: partial, sampleSize: partial.length, wins: 2, losses: 1 });
         return entry;
       })
@@ -140,9 +140,16 @@ describe('LiveMatchPage', () => {
     render(<LiveMatchPage match={stateMatch} />);
 
     expect(screen.getByText('正在加载战绩…')).toBeVisible();
-    expect(screen.getByText('战绩受国服隐私保护')).toBeVisible();
+    expect(screen.getByText('该玩家战绩受隐私保护')).toBeVisible();
     expect(screen.getByText('仅获取到 3/10 场')).toBeVisible();
     expect(screen.getByRole('list', { name: 'Player 2最近排位对局' })).not.toHaveAttribute('tabindex');
+  });
+
+  it('shows overall loading progress while player histories stream in', () => {
+    render(<LiveMatchPage players={fixtureLiveMatch.players.slice(0, 4)} loadingProgress={4} lifecycleStatus="loading" />);
+
+    expect(screen.getByRole('status', { name: '阵容加载进度 4/10' })).toBeVisible();
+    expect(screen.getByRole('progressbar')).toHaveAttribute('value', '4');
   });
 
   it('defaults to ranked history in solo and flex queues', () => {
@@ -240,12 +247,12 @@ describe('LiveMatchPage', () => {
   it('keeps both five-player rosters useful when every history is private', () => {
     render(<LiveMatchPage match={{
       ...fixtureLiveMatch,
-      players: fixtureLiveMatch.players.map((entry) => ({ ...entry, status: 'unavailable', matches: [], sampleSize: 0 }))
+      players: fixtureLiveMatch.players.map((entry) => ({ ...entry, status: 'unavailable', errorCode: 'PRIVACY_RESTRICTED', matches: [], sampleSize: 0 }))
     }} />);
 
     expect(screen.getAllByTestId('team-roster')).toHaveLength(2);
     expect(screen.getAllByTestId('player-card')).toHaveLength(10);
-    expect(screen.getAllByText('战绩受国服隐私保护')).toHaveLength(10);
+    expect(screen.getAllByText('该玩家战绩受隐私保护')).toHaveLength(10);
     expect(screen.getAllByRole('img', { name: /当前英雄 \d+/ })).toHaveLength(10);
   });
 });

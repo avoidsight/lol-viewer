@@ -8,6 +8,13 @@ const laneNames = { TOP: '上路', JUNGLE: '打野', MIDDLE: '中路', BOTTOM: '
 const percent = (value: number): string => `${Math.round(value * 100)}%`;
 const championIconUrl = (_version: string | undefined, championId: number) =>
   `lol-asset://champion-icons/${championId}.png`;
+const unavailableLabels = {
+  PRIVACY_RESTRICTED: '该玩家战绩受隐私保护',
+  CLIENT_UNAVAILABLE: '客户端连接中断，暂时无法读取',
+  DATA_SERVICE_UNAVAILABLE: '战绩服务暂时不可用',
+  INVALID_RESPONSE: '战绩数据格式异常',
+  UNKNOWN: '战绩暂时无法读取'
+} as const;
 
 export default function PlayerCard({ player, historyScope = 'all', displayLane = player.lane, displayLabel, uncertain = false }: { player: PlayerSnapshot; historyScope?: LiveHistoryScope; displayLane?: keyof typeof laneNames; displayLabel?: string; uncertain?: boolean }) {
   const championIcon = player.championId > 0 ? championIconUrl(player.assetVersion, player.championId) : undefined;
@@ -31,7 +38,7 @@ export default function PlayerCard({ player, historyScope = 'all', displayLane =
     {player.status === 'loading'
       ? <p className="player-card__state" role="status">正在加载战绩…</p>
       : player.status === 'unavailable'
-        ? <p className="player-card__state player-card__state--private" role="status">战绩受国服隐私保护</p>
+        ? <p className="player-card__state player-card__state--private" role="status">{player.errorCode ? unavailableLabels[player.errorCode] : '战绩暂时无法读取'}</p>
         : <>
           <dl className="player-card__summary"><div><dt>样本</dt><dd>{visibleMatches.length} 场</dd></div><div><dt>胜率</dt><dd>{percent(visibleMatches.length ? wins / visibleMatches.length : 0)}</dd></div><div><dt>当前英雄</dt><dd>{championMatches.length} 场 / {percent(championMatches.length ? championWins / championMatches.length : 0)}</dd></div></dl>
           {visibleMatches.length < 10 && <p className="player-card__notice">{historyScope === 'ranked' && visibleMatches.length === 0 ? '最近记录中没有排位对局' : `仅获取到 ${visibleMatches.length}/10 场`}</p>}

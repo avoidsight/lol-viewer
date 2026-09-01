@@ -142,6 +142,7 @@ describe('MatchService', () => {
     expect(local).toMatchObject({ displayName: '我的账号', teamId: 100, status: 'ready', sampleSize: 1 });
     expect(get).toHaveBeenCalledWith('/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=20', expect.anything());
     expect(result.players.filter((entry) => entry.status === 'unavailable')).toHaveLength(9);
+    expect(result.players.filter((entry) => entry.status === 'unavailable').every((entry) => entry.errorCode === 'PRIVACY_RESTRICTED')).toBe(true);
   });
 
   it('falls back to the current-summoner LCU history when local SGP history fails', async () => {
@@ -165,6 +166,21 @@ describe('MatchService', () => {
 
     expect(local).toMatchObject({ displayName: '我的账号', status: 'ready', sampleSize: 1 });
     expect(get).toHaveBeenCalledWith('/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=20', expect.anything());
+  });
+  it('marks SGP outages separately from player privacy restrictions', async () => {
+    const identified = participants.map((entry, index) => ({ ...entry, puuid: `puuid-${index}` }));
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: identified.slice(0, 5), teamTwo: identified.slice(5), queueId: 420 } };
+      throw new Error('optional LCU endpoint unavailable');
+    });
+    const sgp = {
+      getRankedStats: vi.fn().mockResolvedValue({ queues: [] }),
+      getHistory: vi.fn().mockRejectedValue(new Error('SGP unavailable'))
+    };
+
+    const result = await new MatchService({ get } as LcuClient, { sgp }).loadLiveMatch('all', vi.fn());
+
+    expect(result.players.every((entry) => entry.errorCode === 'DATA_SERVICE_UNAVAILABLE')).toBe(true);
   });
   it('stops starting LCU requests, player events, and cache writes after cancellation', async () => {
     const controller = new AbortController();
@@ -455,7 +471,9 @@ describe('MatchService', () => {
 
     expect(result.players).toHaveLength(10);
     expect(result.players.filter((player) => player.status === 'ready')).toHaveLength(9);
-    expect(result.players.filter((player) => player.status === 'unavailable')).toHaveLength(1);
+    expect(result.players.filter((player) => player.status === 'unavailable')).toEqual([
+      expect.objectContaining({ errorCode: 'CLIENT_UNAVAILABLE' })
+    ]);
     expect(updated).toHaveLength(10);
   });
 

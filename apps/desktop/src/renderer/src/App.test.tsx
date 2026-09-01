@@ -183,10 +183,10 @@ describe('App tab lifecycle', () => {
     window.removeEventListener('unhandledrejection', unhandled);
   });
 
-  it('shows lobby waiting without ten placeholder slots', async () => {
+  it('shows initial loading progress without ten placeholder slots', async () => {
     install(() => new Promise(() => undefined)); render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: '对战信息' }));
-    expect(await screen.findByText('等待进入英雄选择或游戏')).toBeVisible();
+    expect(await screen.findByRole('status', { name: '阵容加载进度 0/10' })).toBeVisible();
     expect(screen.queryByTestId('player-slot')).not.toBeInTheDocument();
   });
 
@@ -223,7 +223,13 @@ describe('App tab lifecycle', () => {
     const request = deferred<LiveMatch>(); install(() => request.promise); render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: '对战信息' }));
     await act(async () => request.reject(new Error('offline')));
-    expect(screen.getByRole('alert')).toHaveTextContent('对战信息暂时无法读取，请重试');
+    expect(screen.getByRole('alert')).toHaveTextContent('对战数据暂时无法读取，正在自动重试');
+  });
+
+  it('explains when the League client is not connected', async () => {
+    install(vi.fn().mockRejectedValue(new Error('League client is unavailable')));
+    render(<App initialTab="live" />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('未连接到英雄联盟客户端，请先启动客户端');
   });
 
   it('shows an error without exposing manual live controls', async () => {
