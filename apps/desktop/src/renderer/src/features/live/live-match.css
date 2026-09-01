@@ -4,6 +4,12 @@
 .live-match-page__toolbar { display: flex; align-items: center; justify-content: space-between; max-width: 1400px; margin: 0 auto 16px; }
 .live-match-page__toolbar h1 { margin: 0; font-size: 24px; }
 .live-match-page__toolbar div > span { color: #71849e; font-size: 11px; }
+.live-match-page__controls { display: flex; align-items: center; gap: 12px; }
+.live-match-page__scope { display: flex; gap: 3px; padding: 3px; border: 1px solid #334155; border-radius: 8px; background: #0f172a; }
+.live-match-page__scope button { padding: 6px 11px; border: 0; border-radius: 5px; color: #94a3b8; background: transparent; cursor: pointer; font-size: 11px; }
+.live-match-page__scope button:hover { color: #e2e8f0; background: #1e293b; }
+.live-match-page__scope button[aria-pressed="true"] { color: #082f49; background: #7dd3fc; font-weight: 700; }
+.live-match-page__scope button:focus-visible { outline: 2px solid #fbbf24; outline-offset: 2px; }
 .live-match-page__mode { color: #cbd5e1; }
 .live-match-page__scroll:focus-visible { outline: 3px solid #fbbf24; outline-offset: 2px; }
 .live-match-page__scroll { overflow-x: auto; padding-bottom: 10px; }

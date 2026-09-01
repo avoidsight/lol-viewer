@@ -295,7 +295,7 @@ export class MatchService {
               signal
             );
           }
-          matches = adaptMatchHistory(rawHistory, { scope: 'all', limit: 10 });
+          matches = adaptMatchHistory(rawHistory, { scope: 'all', limit: 20 });
         } catch {
           checkCancelled(signal);
           matches = null;

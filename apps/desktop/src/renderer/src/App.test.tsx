@@ -339,10 +339,11 @@ describe('App tab lifecycle', () => {
       vi.useRealTimers();
     }
   });
-  it('shows the resolved match mode and has no scope controls', async () => {
+  it('shows the resolved match mode and defaults non-ranked matches to all history', async () => {
     install(); render(<App />); fireEvent.click(screen.getByRole('tab', { name: '对战信息' }));
     expect(await screen.findByText('极地大乱斗')).toBeVisible();
-    expect(screen.queryByRole('button', { name: '全部模式' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '全部对局' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '排位对局' })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('keeps the champion guide callback stable across parent updates', async () => {

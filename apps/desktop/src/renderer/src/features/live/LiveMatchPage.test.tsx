@@ -126,10 +126,33 @@ describe('LiveMatchPage', () => {
     expect(screen.getByText('仅获取到 3/10 场')).toBeVisible();
   });
 
-  it('shows match mode without queue-scope controls', () => {
-    render(<LiveMatchPage match={fixtureLiveMatch} />);
+  it('defaults to ranked history in solo and flex queues', () => {
+    const { rerender } = render(<LiveMatchPage match={fixtureLiveMatch} />);
     expect(document.querySelector('.live-match-page__mode')).toHaveTextContent('单双排');
-    expect(screen.queryByRole('button', { name: '全部模式' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '排位对局' })).toHaveAttribute('aria-pressed', 'true');
+
+    rerender(<LiveMatchPage match={{ ...fixtureLiveMatch, queueId: 440, modeName: '灵活排位' }} />);
+    expect(screen.getByRole('button', { name: '排位对局' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('defaults to all history outside ranked queues and filters both ranked queue types', () => {
+    const mixedPlayers = fixtureLiveMatch.players.map((entry) => ({
+      ...entry,
+      matches: entry.matches.map((recent, index) => ({
+        ...recent,
+        queueId: [420, 440, 430, 450][index % 4]
+      }))
+    }));
+    render(<LiveMatchPage match={{ ...fixtureLiveMatch, players: mixedPlayers, queueId: 450, modeName: '极地大乱斗' }} />);
+
+    expect(screen.getByRole('button', { name: '全部对局' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByTestId('recent-match')).toHaveLength(100);
+    fireEvent.click(screen.getByRole('button', { name: '排位对局' }));
+    expect(screen.getByRole('button', { name: '排位对局' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByTestId('recent-match')).toHaveLength(60);
+    expect(screen.getAllByText('单双排')).toHaveLength(30);
+    expect(screen.getAllByText('灵活排位')).toHaveLength(30);
+    expect(screen.getAllByText('6 场')).toHaveLength(10);
   });
 
   it('renders exactly five deterministic slots per team for duplicate and unknown lanes', () => {

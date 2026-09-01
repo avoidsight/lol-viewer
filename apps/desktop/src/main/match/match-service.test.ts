@@ -531,6 +531,29 @@ describe('MatchService', () => {
     expect(cache.put.mock.calls.every(([player]) => player.status === 'ready' && player.scope === 'all')).toBe(true);
   });
 
+  it('keeps twenty recent matches so the renderer can switch between all and ranked history', async () => {
+    const twentyGameHistory = {
+      games: Array.from({ length: 20 }, (_, index) => ({
+        ...history.games[0],
+        gameId: index + 1,
+        gameCreation: 10_000 - index,
+        queueId: index % 2 === 0 ? 420 : 430
+      }))
+    };
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') {
+        return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queueId: 420 } };
+      }
+      if (path.includes('/ranked-stats/')) return { queues: [] };
+      return twentyGameHistory;
+    });
+
+    const result = await new MatchService({ get } as LcuClient).loadLiveMatch('all', vi.fn());
+
+    expect(result.players[0].matches).toHaveLength(20);
+    expect(result.players[0].matches.filter((entry) => entry.queueId === 420)).toHaveLength(10);
+  });
+
   it.each(['get', 'put'] as const)('keeps live-match loading operational when cache.%s throws', async (operation) => {
     const cache = {
       get: vi.fn(() => {
