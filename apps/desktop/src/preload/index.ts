@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { PersonalHistorySnapshot, PlayerSnapshot, QueueScope } from '../shared/domain';
 import {
   MATCH_GET_CHANNEL,
+  MATCH_ROSTER_GET_CHANNEL,
   MATCH_CANCEL_CHANNEL,
   MATCH_RETRY_CHANNEL,
   GAMEFLOW_PHASE_GET_CHANNEL,
@@ -18,6 +19,7 @@ import {
   appSettingsPatchSchema,
   appSettingsSchema,
   liveMatchSchema,
+  liveRosterSchema,
   liveMatchRequestSchema,
   gameflowPhaseSchema,
   gameflowSessionIdentitySchema,
@@ -30,19 +32,28 @@ import {
   championDetailsRequestSchema,
   championDetailsSchema,
   personalHistorySchema,
+  personalHistoryTargetSchema,
   type AppSettings,
   type ChampionLane,
   type LiveMatch,
-  type LolViewerApi
+  type LiveRoster,
+  type LolViewerApi,
+  type PersonalHistoryTarget
 } from '../shared/ipc';
 
 const api: LolViewerApi = Object.freeze({
-  getPersonalHistory: async (): Promise<PersonalHistorySnapshot> =>
-    personalHistorySchema.parse(await ipcRenderer.invoke(PERSONAL_HISTORY_GET_CHANNEL)),
+  getPersonalHistory: async (target?: PersonalHistoryTarget): Promise<PersonalHistorySnapshot> => {
+    const input = personalHistoryTargetSchema.optional().parse(target);
+    return personalHistorySchema.parse(await (input === undefined
+      ? ipcRenderer.invoke(PERSONAL_HISTORY_GET_CHANNEL)
+      : ipcRenderer.invoke(PERSONAL_HISTORY_GET_CHANNEL, input)));
+  },
   getLiveMatch: async (scope: QueueScope, generation = 0): Promise<LiveMatch> => {
     const input = liveMatchRequestSchema.parse({ scope: queueScopeSchema.parse(scope), generation });
     return liveMatchSchema.parse(await ipcRenderer.invoke(MATCH_GET_CHANNEL, input));
   },
+  getLiveRoster: async (): Promise<LiveRoster> =>
+    liveRosterSchema.parse(await ipcRenderer.invoke(MATCH_ROSTER_GET_CHANNEL)),
   getGameflowPhase: async (): Promise<string> =>
     gameflowPhaseSchema.parse(await ipcRenderer.invoke(GAMEFLOW_PHASE_GET_CHANNEL)),
   getGameflowSessionIdentity: async () =>

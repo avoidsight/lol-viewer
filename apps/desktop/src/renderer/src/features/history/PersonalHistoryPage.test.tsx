@@ -31,6 +31,21 @@ const snapshot: PersonalHistorySnapshot = {
     summonerSpellIds: [4, 12],
     allyChampionIds: [index + 1, 101, 102, 103, 104],
     enemyChampionIds: [201, 202, 203, 204, 205],
+    allyPlayers: [
+      { championId: index + 1, playerId: 'me', displayName: '召唤师' },
+      ...Array.from({ length: 4 }, (_, playerIndex) => ({
+        championId: 101 + playerIndex,
+        playerId: `ally-${index}-${playerIndex}`,
+        displayName: `队友 ${playerIndex + 1}`
+      }))
+    ],
+    enemyPlayers: Array.from({ length: 5 }, (_, playerIndex) => ({
+      championId: 201 + playerIndex,
+      playerId: `enemy-${index}-${playerIndex}`,
+      puuid: `enemy-puuid-${index}-${playerIndex}`,
+      displayName: `对手 ${playerIndex + 1}`,
+      profileIconId: 30 + playerIndex
+    })),
     achievements: index === 0 ? [
       { type: 'MOST_KILLS' as const, value: 8 },
       { type: 'MOST_DAMAGE' as const, value: 31_500 }
@@ -110,6 +125,28 @@ describe('PersonalHistoryPage', () => {
     expect(container.querySelector('.personal-history__content')).toBeInTheDocument();
     expect(container.querySelector('.personal-history__favorites-panel')).toBeInTheDocument();
     expect(container.querySelector('.personal-history__matches-panel')).toBeInTheDocument();
+  });
+
+  it('opens another player history from a clickable team champion portrait', () => {
+    const onPlayerSelect = vi.fn();
+    render(<PersonalHistoryPage snapshot={snapshot} state="ready" onPlayerSelect={onPlayerSelect} />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: '查看 对手 1 的个人战绩' })[0]);
+
+    expect(onPlayerSelect).toHaveBeenCalledWith({
+      playerId: 'enemy-0-0',
+      puuid: 'enemy-puuid-0-0',
+      displayName: '对手 1',
+      profileIconId: 30
+    });
+    expect(screen.queryByRole('button', { name: '查看 召唤师 的个人战绩' })).not.toBeInTheDocument();
+  });
+
+  it('shows a return action while viewing another player', () => {
+    const onBack = vi.fn();
+    render(<PersonalHistoryPage snapshot={snapshot} state="ready" onBack={onBack} />);
+    fireEvent.click(screen.getByRole('button', { name: /返回我的战绩/ }));
+    expect(onBack).toHaveBeenCalledOnce();
   });
 
   it('renders an accessible refresh action and inline refresh failure', () => {

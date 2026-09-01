@@ -16,6 +16,7 @@ function install(getLiveMatch: LolViewerApi['getLiveMatch'] = vi.fn().mockResolv
   const unsubscribe = vi.fn();
   const api = {
     getPersonalHistory: vi.fn().mockResolvedValue(history), getLiveMatch,
+    getLiveRoster: vi.fn().mockResolvedValue({ ...match, players: match.players.map(({ playerId, displayName, teamId, isLocalTeam, lane, championId }) => ({ playerId, displayName, teamId, isLocalTeam, lane, championId })) }),
     getGameflowPhase: vi.fn().mockResolvedValue('InProgress'),
     getGameflowSessionIdentity: vi.fn().mockResolvedValue({ phase: 'InProgress', gameId: 'game-1' }),
     onPlayerUpdated: vi.fn((next) => { order?.push('subscribe'); listener = next; return unsubscribe; }),
@@ -118,6 +119,39 @@ describe('App tab lifecycle', () => {
     expect(screen.getByText('刷新失败，请重试')).toBeVisible();
   });
 
+  it('navigates to another player history from a match portrait and returns to the local snapshot', async () => {
+    const localHistory: PersonalHistorySnapshot = {
+      ...history,
+      matches: [{
+        matchId: 'match-1', queueId: 420, endedAt: 1, durationSeconds: 1200,
+        championId: 1, win: true, kills: 2, deaths: 1, assists: 3,
+        allyPlayers: [{ championId: 1, playerId: 'me', displayName: '召唤师' }],
+        enemyPlayers: [{ championId: 2, playerId: 'other', puuid: 'other-puuid', displayName: '对手' }]
+      }],
+      sampleSize: 1,
+      wins: 1,
+      winRate: 1
+    };
+    const otherHistory: PersonalHistorySnapshot = {
+      ...history,
+      playerId: 'other',
+      displayName: '对手',
+      profileIconId: 2
+    };
+    const { api } = install();
+    vi.mocked(api.getPersonalHistory).mockImplementation(async (target) => target ? otherHistory : localHistory);
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '查看 对手 的个人战绩' }));
+    expect(await screen.findByRole('heading', { name: '对手' })).toBeVisible();
+    expect(api.getPersonalHistory).toHaveBeenLastCalledWith({
+      playerId: 'other', puuid: 'other-puuid', displayName: '对手'
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /返回我的战绩/ }));
+    expect(await screen.findByRole('heading', { name: '召唤师' })).toBeVisible();
+  });
+
   it('subscribes before requesting all modes, then cancels on exit', async () => {
     const order: string[] = []; const request = deferred<LiveMatch>();
     const { api, unsubscribe } = install(vi.fn((scope, generation) => { order.push(`request:${scope}:${generation}`); return request.promise; }), order);
@@ -172,7 +206,7 @@ describe('App tab lifecycle', () => {
     expect(screen.getByText('Player One')).toBeVisible();
   });
 
-  it('clears the previous match immediately while a tab re-entry refresh is pending', async () => {
+  it('keeps the previous match visible while a tab re-entry refresh is pending', async () => {
     const refresh = deferred<LiveMatch>();
     const { api } = install(vi.fn().mockResolvedValueOnce(match).mockImplementationOnce(() => refresh.promise));
     render(<App initialTab="live" />);
@@ -183,7 +217,7 @@ describe('App tab lifecycle', () => {
     fireEvent.click(tabs[1]);
 
     await waitFor(() => expect(api.getLiveMatch).toHaveBeenCalledTimes(2));
-    expect(screen.queryByText('Player One')).not.toBeInTheDocument();
+    expect(screen.getByText('Player One')).toBeVisible();
   });
   it('shows retryable error only when the request rejects', async () => {
     const request = deferred<LiveMatch>(); install(() => request.promise); render(<App />);
@@ -246,6 +280,7 @@ describe('App tab lifecycle', () => {
       const nextPlayer = { ...player, playerId: 'two', displayName: 'Player Two', championId: 2 };
       const getLiveMatch = vi.fn().mockResolvedValueOnce(match).mockResolvedValueOnce({ ...match, players: [nextPlayer] });
       const { api } = install(getLiveMatch);
+      vi.mocked(api.getLiveRoster).mockResolvedValue({ ...match, players: [{ playerId: 'two', displayName: 'Player Two', teamId: 100, isLocalTeam: true, lane: 'TOP', championId: 2 }] });
       const phaseApi = api as unknown as { getGameflowSessionIdentity: ReturnType<typeof vi.fn> };
       phaseApi.getGameflowSessionIdentity.mockResolvedValueOnce({ phase: 'InProgress', gameId: 'game-1' }).mockResolvedValueOnce({ phase: 'ChampSelect', gameId: 'game-2' });
       render(<App initialTab="live" />);
@@ -283,13 +318,57 @@ describe('App tab lifecycle', () => {
     } finally {
       vi.useRealTimers();
     }
-  });  it('clears the previous roster after game end and loads the next match on the next active phase', async () => {
+  });
+  it('keeps the champion-select roster through game start without reloading or blanking it', async () => {
+    vi.useFakeTimers();
+    try {
+      const getLiveMatch = vi.fn().mockResolvedValue(match);
+      const { api } = install(getLiveMatch);
+      const identityApi = api as unknown as { getGameflowSessionIdentity: ReturnType<typeof vi.fn> };
+      identityApi.getGameflowSessionIdentity
+        .mockResolvedValueOnce({ phase: 'ChampSelect', gameId: 'game-1' })
+        .mockResolvedValueOnce({ phase: 'GameStart', gameId: 'game-1' })
+        .mockResolvedValue({ phase: 'InProgress', gameId: 'game-1' });
+      render(<App initialTab="live" />);
+      await act(async () => { await Promise.resolve(); });
+      expect(screen.getByText('Player One')).toBeVisible();
+
+      await act(async () => { vi.advanceTimersByTime(6_000); await Promise.resolve(); await Promise.resolve(); });
+
+      expect(screen.getByText('Player One')).toBeVisible();
+      expect(getLiveMatch).toHaveBeenCalledOnce();
+      expect(api.cancelLiveMatch).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('refreshes only the lightweight roster while champion select remains active', async () => {
+    vi.useFakeTimers();
+    try {
+      const { api } = install();
+      vi.mocked(api.getGameflowSessionIdentity).mockResolvedValue({ phase: 'ChampSelect', gameId: 'game-1' });
+      render(<App initialTab="live" />);
+      await act(async () => { await Promise.resolve(); });
+
+      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
+      expect(api.getLiveRoster).toHaveBeenCalledOnce();
+      expect(api.getLiveMatch).toHaveBeenCalledOnce();
+
+      await act(async () => { vi.advanceTimersByTime(1_500); await Promise.resolve(); });
+      expect(api.getLiveRoster).toHaveBeenCalledTimes(2);
+      expect(api.getLiveMatch).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('retains the previous roster after game end and replaces it when the next match starts', async () => {
     vi.useFakeTimers();
     try {
       const nextPlayer = { ...player, playerId: 'two', displayName: 'Player Two', championId: 2 };
       const nextMatch = { ...match, players: [nextPlayer] };
       const getLiveMatch = vi.fn().mockResolvedValueOnce(match).mockResolvedValueOnce(nextMatch);
       const { api } = install(getLiveMatch);
+      vi.mocked(api.getLiveRoster).mockResolvedValue({ ...match, players: [{ playerId: 'two', displayName: 'Player Two', teamId: 100, isLocalTeam: true, lane: 'TOP', championId: 2 }] });
       const phaseApi = api as unknown as { getGameflowSessionIdentity: ReturnType<typeof vi.fn> };
       phaseApi.getGameflowSessionIdentity.mockResolvedValueOnce({ phase: 'EndOfGame', gameId: 'game-1' }).mockResolvedValueOnce({ phase: 'ChampSelect', gameId: 'game-2' });
       render(<App initialTab="live" />);
@@ -297,7 +376,8 @@ describe('App tab lifecycle', () => {
       expect(screen.getByText('Player One')).toBeVisible();
 
       await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); });
-      expect(screen.queryByText('Player One')).not.toBeInTheDocument();
+      expect(screen.getByText('Player One')).toBeVisible();
+      expect(api.cancelLiveMatch).not.toHaveBeenCalled();
 
       await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
       expect(getLiveMatch).toHaveBeenCalledTimes(2);
@@ -306,10 +386,11 @@ describe('App tab lifecycle', () => {
       vi.useRealTimers();
     }
   });
-  it('shows the resolved match mode and has no scope controls', async () => {
+  it('shows the resolved match mode and defaults non-ranked matches to all history', async () => {
     install(); render(<App />); fireEvent.click(screen.getByRole('tab', { name: '对战信息' }));
     expect(await screen.findByText('极地大乱斗')).toBeVisible();
-    expect(screen.queryByRole('button', { name: '全部模式' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '全部对局' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '排位对局' })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('keeps the champion guide callback stable across parent updates', async () => {

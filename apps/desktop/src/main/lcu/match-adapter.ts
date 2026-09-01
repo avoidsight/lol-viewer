@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Lane, MatchAchievement, MatchSummary, QueueScope } from '../../shared/domain';
+import type { Lane, MatchAchievement, MatchParticipantSummary, MatchSummary, QueueScope } from '../../shared/domain';
 import { isBuildItem } from '../../shared/items';
 export { describeQueue } from '../../shared/queue';
 
@@ -36,12 +36,27 @@ const participantSchema = z.object({
     .optional()
 });
 
+const participantIdentitySchema = z.object({
+  participantId: z.number().int().positive(),
+  player: z.object({
+    summonerId: z.union([z.string(), z.number()]).optional(),
+    puuid: z.string().min(1).optional(),
+    gameName: z.string().optional(),
+    tagLine: z.string().optional(),
+    summonerName: z.string().optional(),
+    displayName: z.string().optional(),
+    profileIconId: z.number().int().nonnegative().optional(),
+    profileIcon: z.number().int().nonnegative().optional()
+  }).passthrough()
+});
+
 export const matchHistoryGameSchema = z.object({
   gameId: z.union([z.string(), z.number()]),
   queueId: z.number().int(),
   gameCreation: z.number().int().nonnegative(),
   gameDuration: z.number().int().nonnegative(),
-  participants: z.array(participantSchema).min(1)
+  participants: z.array(participantSchema).min(1),
+  participantIdentities: z.array(participantIdentitySchema).optional()
 });
 
 export const matchHistoryResponseSchema = z.preprocess((input) => {
@@ -74,6 +89,35 @@ function teamShare(
   return total > 0 ? localValue / total : undefined;
 }
 
+function participantSummaries(
+  game: z.infer<typeof matchHistoryGameSchema>,
+  participants: Array<z.infer<typeof participantSchema>>
+): MatchParticipantSummary[] {
+  const identities = new Map(
+    (game.participantIdentities ?? []).map((identity) => [identity.participantId, identity.player])
+  );
+  return participants.map((participant) => {
+    const identity = participant.participantId === undefined
+      ? undefined
+      : identities.get(participant.participantId);
+    const gameName = identity?.gameName?.trim();
+    const tagLine = identity?.tagLine?.trim();
+    const fallbackName = identity?.summonerName?.trim() || identity?.displayName?.trim();
+    const displayName = gameName ? `${gameName}${tagLine ? `#${tagLine}` : ''}` : fallbackName;
+    const playerId = identity?.summonerId === undefined
+      ? identity?.puuid
+      : String(identity.summonerId);
+    const profileIconId = identity?.profileIconId ?? identity?.profileIcon;
+    return {
+      championId: participant.championId,
+      ...(playerId ? { playerId } : {}),
+      ...(identity?.puuid ? { puuid: identity.puuid } : {}),
+      ...(displayName ? { displayName } : {}),
+      ...(profileIconId === undefined ? {} : { profileIconId })
+    };
+  });
+}
+
 function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
   const participant = game.participants[0];
   const lane = normalizeLane(participant.timeline?.lane);
@@ -101,6 +145,16 @@ function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
       .filter((entry) => entry.teamId !== undefined && entry.teamId !== participant.teamId)
       .map((entry) => entry.championId)
       .slice(0, 5);
+  const allyParticipants = participant.teamId === undefined
+    ? []
+    : game.participants.filter((entry) => entry.teamId === participant.teamId).slice(0, 5);
+  const enemyParticipants = participant.teamId === undefined
+    ? []
+    : game.participants
+      .filter((entry) => entry.teamId !== undefined && entry.teamId !== participant.teamId)
+      .slice(0, 5);
+  const allyPlayers = participantSummaries(game, allyParticipants);
+  const enemyPlayers = participantSummaries(game, enemyParticipants);
   const teamParticipants = participant.teamId === undefined
     ? []
     : game.participants.filter((entry) => entry.teamId === participant.teamId);
@@ -164,6 +218,8 @@ function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
     ...(summonerSpellIds === undefined ? {} : { summonerSpellIds }),
     ...(allyChampionIds === undefined ? {} : { allyChampionIds }),
     ...(enemyChampionIds === undefined ? {} : { enemyChampionIds }),
+    ...(allyPlayers.length === 0 ? {} : { allyPlayers }),
+    ...(enemyPlayers.length === 0 ? {} : { enemyPlayers }),
     ...(participant.stats.goldEarned === undefined ? {} : { goldEarned: participant.stats.goldEarned }),
     ...(participant.stats.totalDamageDealtToChampions === undefined
       ? {}

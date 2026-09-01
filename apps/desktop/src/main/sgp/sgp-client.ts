@@ -6,7 +6,9 @@ const leagueSessionTokenSchema = z.string().min(1);
 const sgpParticipantSchema = z.object({
   puuid: z.string(), championId: z.number().int().nonnegative(),
   kills: z.number().int().nonnegative(), deaths: z.number().int().nonnegative(),
-  assists: z.number().int().nonnegative(), win: z.boolean(), teamId: z.number().int().optional()
+  assists: z.number().int().nonnegative(), win: z.boolean(), teamId: z.number().int().optional(),
+  riotIdGameName: z.string().optional(), riotIdTagline: z.string().optional(),
+  summonerName: z.string().optional(), profileIconId: z.number().int().nonnegative().optional()
 });
 const sgpHistorySchema = z.object({ games: z.array(z.object({ json: z.object({
   gameId: z.number(), queueId: z.number().int(), gameCreation: z.number(),
@@ -61,7 +63,8 @@ export function createSgpClient(lcu: LcuClient, rsoPlatformId: string, request: 
           queueId: game.queueId,
           gameCreation: game.gameCreation,
           gameDuration: game.gameDuration,
-          participants: ordered.map((participant) => ({
+          participants: ordered.map((participant, index) => ({
+            participantId: index + 1,
             championId: participant.championId,
             ...(participant.teamId === undefined ? {} : { teamId: participant.teamId }),
             stats: {
@@ -69,6 +72,16 @@ export function createSgpClient(lcu: LcuClient, rsoPlatformId: string, request: 
               kills: participant.kills,
               deaths: participant.deaths,
               assists: participant.assists
+            }
+          })),
+          participantIdentities: ordered.map((participant, index) => ({
+            participantId: index + 1,
+            player: {
+              puuid: participant.puuid,
+              ...(participant.riotIdGameName ? { gameName: participant.riotIdGameName } : {}),
+              ...(participant.riotIdTagline ? { tagLine: participant.riotIdTagline } : {}),
+              ...(participant.summonerName ? { summonerName: participant.summonerName } : {}),
+              ...(participant.profileIconId === undefined ? {} : { profileIconId: participant.profileIconId })
             }
           }))
         }];

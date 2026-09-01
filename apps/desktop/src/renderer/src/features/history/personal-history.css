@@ -40,6 +40,11 @@
 .personal-history__identity p strong { color: #c9d3e2; font-weight: 600; }
 .personal-history__name-row { display: flex; gap: 9px; align-items: center; }
 .personal-history__cached { padding: 3px 7px; border: 1px solid #d7b45a; border-radius: 999px; color: #d7b45a; font-size: 10px; }
+.personal-history__back { margin: 0 0 5px; padding: 0; border: 0; color: #7dd3fc; background: transparent; cursor: pointer; font-size: 10px; }
+.personal-history__back:hover { color: #bae6fd; text-decoration: underline; }
+.personal-history__unavailable { display: grid; min-height: 220px; place-items: center; align-content: center; gap: 12px; }
+.personal-history__unavailable button { padding: 8px 12px; border: 1px solid #39c6f4; border-radius: 7px; color: #e8f7ff; background: #12304a; cursor: pointer; }
+.personal-history__unavailable p { margin: 0; color: #a9b9cd; }
 
 .personal-history__summary { display: grid; grid-template-columns: repeat(4, minmax(72px, 1fr)); margin: 0; }
 .personal-history__metric { min-width: 0; padding-left: 14px; border-left: 1px solid #253653; }
@@ -139,6 +144,22 @@
 .personal-history__performance-share { opacity: .82; }
 .personal-history__teams { display: grid; gap: 4px; }
 .personal-history__teams > div { display: grid; grid-template-columns: repeat(5, 20px); gap: 3px; }
+.personal-history__team-player {
+  display: block;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+}
+.personal-history__team-player--link { cursor: pointer; }
+.personal-history__team-player--link:hover .personal-history__team-icon,
+.personal-history__team-player--link:focus-visible .personal-history__team-icon {
+  border-color: #39c6f4;
+  box-shadow: 0 0 0 2px rgb(57 198 244 / 28%);
+}
+.personal-history__team-player--link:focus-visible { outline: 0; }
 .personal-history__team-icon, .personal-history__team-slot {
   width: 20px;
   height: 20px;

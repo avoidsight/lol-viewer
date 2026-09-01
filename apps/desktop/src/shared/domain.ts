@@ -17,6 +17,14 @@ export interface MatchAchievement {
   value: number;
 }
 
+export interface MatchParticipantSummary {
+  championId: number;
+  playerId?: string;
+  puuid?: string;
+  displayName?: string;
+  profileIconId?: number;
+}
+
 export interface MatchSummary {
   matchId: string;
   queueId: number;
@@ -33,6 +41,8 @@ export interface MatchSummary {
   summonerSpellIds?: [number, number];
   allyChampionIds?: number[];
   enemyChampionIds?: number[];
+  allyPlayers?: MatchParticipantSummary[];
+  enemyPlayers?: MatchParticipantSummary[];
   goldEarned?: number;
   totalDamageDealtToChampions?: number;
   totalDamageTaken?: number;

@@ -52,7 +52,15 @@ describe('preload match API validation', () => {
     await expect(api.getGameflowSessionIdentity()).resolves.toEqual({ phase: 'InProgress', gameId: '12345' });
     electron.invoke.mockResolvedValue({ phase: 'InProgress', gameId: '' });
     await expect(api.getGameflowSessionIdentity()).rejects.toThrow();
-  });  it('does not deliver an invalid player update to the listener', async () => {
+  });
+
+  it('validates lightweight roster refresh responses', async () => {
+    const api = await loadApi();
+    electron.invoke.mockResolvedValue({ players: [{ playerId: 'missing-fields' }] });
+    await expect(api.getLiveRoster()).rejects.toThrow();
+  });
+
+  it('does not deliver an invalid player update to the listener', async () => {
     const api = await loadApi();
     const listener = vi.fn();
     api.onPlayerUpdated(listener);
@@ -121,6 +129,11 @@ describe('preload match API validation', () => {
 
     await expect(api.getPersonalHistory()).resolves.toEqual(snapshot);
     expect(electron.invoke).toHaveBeenCalledWith(PERSONAL_HISTORY_GET_CHANNEL);
+
+    const target = { playerId: 'target', puuid: 'target-puuid', displayName: '目标玩家' };
+    await expect(api.getPersonalHistory(target)).resolves.toEqual(snapshot);
+    expect(electron.invoke).toHaveBeenLastCalledWith(PERSONAL_HISTORY_GET_CHANNEL, target);
+    await expect(api.getPersonalHistory({ playerId: '' })).rejects.toThrow();
 
     electron.invoke.mockResolvedValue({ ...snapshot, unexpected: true });
     await expect(api.getPersonalHistory()).rejects.toThrow();

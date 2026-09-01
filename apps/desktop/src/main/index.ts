@@ -21,6 +21,7 @@ import { PersonalHistoryService } from './history/personal-history-service';
 import { ReadyCheckAutoAcceptor } from './match/ready-check-auto-acceptor';
 import { createSgpClient } from './sgp/sgp-client';
 import { registerLcuAssetProtocol } from './lcu/asset-protocol';
+import type { LiveMatch, LiveRoster } from '../shared/ipc';
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'lol-asset',
@@ -30,6 +31,20 @@ protocol.registerSchemesAsPrivileged([{
 let database: Database.Database | undefined;
 let coordinator: GameflowCoordinator | undefined;
 let readyCheckAutoAcceptor: ReadyCheckAutoAcceptor | undefined;
+
+function rosterFromMatch(match: LiveMatch): LiveRoster {
+  return {
+    ...match,
+    players: match.players.map(({ playerId, displayName, teamId, isLocalTeam, lane, championId }) => ({
+      playerId,
+      displayName,
+      teamId,
+      ...(isLocalTeam === undefined ? {} : { isLocalTeam }),
+      lane,
+      championId
+    }))
+  };
+}
 
 function createWindow(): void {
   const window = new BrowserWindow({
@@ -104,11 +119,15 @@ void app.whenReady().then(() => {
     readyCheckAutoAcceptor.start();
   }
   registerHistoryIpc({
-    load: async () => {
-      if (fixtureMode) return createFixturePersonalHistory();
+    load: async (target) => {
+      if (fixtureMode) return createFixturePersonalHistory(target);
       const connection = await discoverLcuConnection();
       if (!connection) throw new Error('League client is unavailable');
-      return new PersonalHistoryService(createLcuClient(connection), personalHistoryCache).load();
+      const lcu = createLcuClient(connection);
+      const sgp = connection.region?.toUpperCase() === 'TENCENT' && connection.rsoPlatformId
+        ? createSgpClient(lcu, connection.rsoPlatformId)
+        : undefined;
+      return new PersonalHistoryService(lcu, personalHistoryCache, sgp).load(target);
     }
   });
   coordinator = new GameflowCoordinator(async (scope, onPlayer, signal) => {
@@ -125,6 +144,13 @@ void app.whenReady().then(() => {
   });
   registerMatchIpc({
     loadLiveMatch: (scope, onPlayer) => coordinator!.loadLiveMatch(scope, onPlayer),
+    getLiveRoster: async () => {
+      if (aramFixtureMode) return rosterFromMatch(createFixtureAramLiveMatch('all'));
+      if (fixtureMode) return rosterFromMatch(createFixtureLiveMatch('all'));
+      const connection = await discoverLcuConnection();
+      if (!connection) throw new Error('League client is unavailable');
+      return new MatchService(createLcuClient(connection)).loadLiveRoster();
+    },
     retry: () => coordinator?.retry(),
     cancel: () => coordinator?.cancel(),
     getGameflowPhase: async () => {

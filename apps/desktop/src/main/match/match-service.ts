@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Lane, MatchSummary, PlayerSnapshot, QueueScope } from '../../shared/domain';
-import type { LiveMatch } from '../../shared/ipc';
+import type { LiveMatch, LiveRoster } from '../../shared/ipc';
 import { formatRank } from '../../shared/rank';
 import type { LcuClient, LcuError } from '../lcu/http-client';
 import { adaptMatchHistory, describeQueue } from '../lcu/match-adapter';
@@ -71,6 +71,19 @@ const assetVersionSchema = z.string().regex(/^\d+\.\d+(?:\.\d+){0,2}$/);
 const retryDelays = [250, 750] as const;
 const lanes = new Set<Lane>(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'UNKNOWN']);
 const standardPositions = new Set(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']);
+type Participant = z.infer<typeof participantSchema> & { teamId: number };
+type CurrentSummoner = z.infer<typeof currentSummonerSchema>;
+
+interface LoadedRoster {
+  participants: Participant[];
+  local?: Participant;
+  localTeamId: number | null;
+  queueId: number;
+  modeName: string;
+  positionOrderReliable: boolean;
+  currentSummoner?: CurrentSummoner;
+  champSelectFallback: boolean;
+}
 
 export interface MatchServiceOptions {
   sleep?: (milliseconds: number) => Promise<void>;
@@ -131,75 +144,39 @@ export class MatchService {
     this.sgp = options.sgp;
   }
 
+  async loadLiveRoster(signal?: AbortSignal): Promise<LiveRoster> {
+    const roster = await this.loadRoster(signal);
+    return {
+      players: roster.participants.map((participant) => {
+        const isLocalPlayer = participant === roster.local;
+        return {
+          playerId: String(isLocalPlayer && roster.currentSummoner ? roster.currentSummoner.summonerId : participant.summonerId),
+          displayName: ((isLocalPlayer ? roster.currentSummoner?.displayName : undefined) ?? participant.summonerName.trim()) || '未知玩家',
+          teamId: participant.teamId,
+          ...(roster.localTeamId === null ? {} : { isLocalTeam: participant.teamId === roster.localTeamId }),
+          lane: laneOf(participant.selectedPosition),
+          championId: participant.championId
+        };
+      }),
+      localTeamId: roster.localTeamId,
+      queueId: roster.queueId,
+      modeName: roster.modeName,
+      positionOrderReliable: roster.positionOrderReliable
+    };
+  }
+
   async loadLiveMatch(_scope: QueueScope, onPlayer: (player: PlayerSnapshot) => void, signal?: AbortSignal): Promise<LiveMatch> {
-    checkCancelled(signal);
-    const gameflowSession = sessionSchema.parse(
-      await this.client.get('/lol-gameflow/v1/session', sessionSchema)
-    );
-    checkCancelled(signal);
-    let teamOne = gameflowSession.gameData.teamOne.map((participant) => ({ ...participant, teamId: participant.teamId ?? 100 }));
-    let teamTwo = gameflowSession.gameData.teamTwo.map((participant) => ({ ...participant, teamId: participant.teamId ?? 200 }));
-    let champSelectFallback = false;
-    let champSelectQueueId: number | undefined;
-    if (gameflowSession.phase === 'ChampSelect' || (teamOne.length === 0 && teamTwo.length === 0)) {
-      const champSelect = champSelectSessionSchema.parse(
-        await this.client.get('/lol-champ-select/v1/session', champSelectSessionSchema)
-      );
-      checkCancelled(signal);
-      const normalizeTeam = (
-        team: z.infer<typeof champSelectParticipantSchema>[],
-        teamId: number,
-        sideName: string
-      ): Array<z.infer<typeof participantSchema> & { teamId: number }> => team.map((participant, index) => ({
-        summonerId: participant.summonerId,
-        summonerName: participant.gameName || participant.playerAlias || `${sideName}玩家 ${index + 1}`,
-        teamId,
-        selectedPosition: participant.assignedPosition,
-        championId: participant.championId,
-        ...(participant.cellId !== undefined && participant.cellId === champSelect.localPlayerCellId ? { isLocalPlayer: true } : {})
-      }));
-      teamOne = normalizeTeam(champSelect.myTeam, 100, '己方');
-      teamTwo = normalizeTeam(champSelect.theirTeam, 200, '敌方');
-      champSelectQueueId = champSelect.queueId;
-      champSelectFallback = true;
-    }
-    const queueId = gameflowSession.gameData.queue?.id
-      ?? gameflowSession.gameData.queueId
-      ?? champSelectQueueId
-      ?? 0;
-    const modeName = describeQueue(queueId);
-    let positionOrderReliable = false;
-    let currentSummoner: z.infer<typeof currentSummonerSchema> | undefined;
-    try {
-      currentSummoner = currentSummonerSchema.parse(
-        await this.client.get('/lol-summoner/v1/current-summoner', currentSummonerSchema)
-      );
-    } catch {
-      checkCancelled(signal);
-      currentSummoner = undefined;
-    }
-    if (!champSelectFallback && currentSummoner?.puuid && teamOne.length + teamTwo.length === 9) {
-      const selection = gameflowSession.gameData.playerChampionSelections?.find(
-        (entry) => entry.puuid === currentSummoner?.puuid
-      );
-      const incompleteTeam = teamOne.length === 4 ? teamOne : teamTwo.length === 4 ? teamTwo : undefined;
-      const teamId = teamOne.length === 4 ? 100 : teamTwo.length === 4 ? 200 : undefined;
-      if (selection && incompleteTeam && teamId !== undefined) {
-        incompleteTeam.push({
-          summonerId: currentSummoner.summonerId,
-          summonerName: currentSummoner.displayName ?? '我的账号',
-          teamId,
-          championId: selection.championId,
-          isLocalPlayer: true
-        });
-      }
-    }
-    if (teamOne.length !== 5 || teamTwo.length !== 5) {
-      throw new Error('Live roster is incomplete');
-    }
-    positionOrderReliable = queueId !== 0 && queueId !== 450
-      && hasReliablePositions(teamOne)
-      && hasReliablePositions(teamTwo);
+    const roster = await this.loadRoster(signal);
+    const {
+      participants,
+      local,
+      localTeamId,
+      queueId,
+      modeName,
+      positionOrderReliable,
+      currentSummoner,
+      champSelectFallback
+    } = roster;
     checkCancelled(signal);
     let assetVersion: string | undefined;
     try {
@@ -211,14 +188,6 @@ export class MatchService {
       assetVersion = undefined;
     }
     checkCancelled(signal);
-    const allParticipants = [...teamOne, ...teamTwo];
-    const local = allParticipants.find((participant) => participant.isLocalPlayer)
-      ?? (currentSummoner ? allParticipants.find((participant) => String(participant.summonerId) === String(currentSummoner.summonerId)) : undefined);
-    const localTeamId = local?.teamId ?? (champSelectFallback ? 100 : null);
-    const participants = local ? [
-      ...allParticipants.filter((participant) => participant.teamId === localTeamId),
-      ...allParticipants.filter((participant) => participant.teamId !== localTeamId)
-    ] : allParticipants;
     const players = await mapLimit(participants, 4, async (participant) => {
       checkCancelled(signal);
       const isLocalPlayer = participant === local;
@@ -295,7 +264,7 @@ export class MatchService {
               signal
             );
           }
-          matches = adaptMatchHistory(rawHistory, { scope: 'all', limit: 10 });
+          matches = adaptMatchHistory(rawHistory, { scope: 'all', limit: 20 });
         } catch {
           checkCancelled(signal);
           matches = null;
@@ -338,6 +307,86 @@ export class MatchService {
     }, signal);
     checkCancelled(signal);
     return { players, localTeamId, queueId, modeName, positionOrderReliable };
+  }
+
+  private async loadRoster(signal?: AbortSignal): Promise<LoadedRoster> {
+    checkCancelled(signal);
+    const gameflowSession = sessionSchema.parse(
+      await this.client.get('/lol-gameflow/v1/session', sessionSchema)
+    );
+    checkCancelled(signal);
+    let teamOne = gameflowSession.gameData.teamOne.map((participant) => ({ ...participant, teamId: participant.teamId ?? 100 }));
+    let teamTwo = gameflowSession.gameData.teamTwo.map((participant) => ({ ...participant, teamId: participant.teamId ?? 200 }));
+    let champSelectFallback = false;
+    let champSelectQueueId: number | undefined;
+    if (gameflowSession.phase === 'ChampSelect' || (teamOne.length === 0 && teamTwo.length === 0)) {
+      const champSelect = champSelectSessionSchema.parse(
+        await this.client.get('/lol-champ-select/v1/session', champSelectSessionSchema)
+      );
+      checkCancelled(signal);
+      const normalizeTeam = (
+        team: z.infer<typeof champSelectParticipantSchema>[],
+        teamId: number,
+        sideName: string
+      ): Array<z.infer<typeof participantSchema> & { teamId: number }> => team.map((participant, index) => ({
+        summonerId: participant.summonerId,
+        summonerName: participant.gameName || participant.playerAlias || `${sideName}玩家 ${index + 1}`,
+        teamId,
+        selectedPosition: participant.assignedPosition,
+        championId: participant.championId,
+        ...(participant.cellId !== undefined && participant.cellId === champSelect.localPlayerCellId ? { isLocalPlayer: true } : {})
+      }));
+      teamOne = normalizeTeam(champSelect.myTeam, 100, '己方');
+      teamTwo = normalizeTeam(champSelect.theirTeam, 200, '敌方');
+      champSelectQueueId = champSelect.queueId;
+      champSelectFallback = true;
+    }
+    const queueId = gameflowSession.gameData.queue?.id
+      ?? gameflowSession.gameData.queueId
+      ?? champSelectQueueId
+      ?? 0;
+    const modeName = describeQueue(queueId);
+    let currentSummoner: CurrentSummoner | undefined;
+    try {
+      currentSummoner = currentSummonerSchema.parse(
+        await this.client.get('/lol-summoner/v1/current-summoner', currentSummonerSchema)
+      );
+    } catch {
+      checkCancelled(signal);
+      currentSummoner = undefined;
+    }
+    if (!champSelectFallback && currentSummoner?.puuid && teamOne.length + teamTwo.length === 9) {
+      const selection = gameflowSession.gameData.playerChampionSelections?.find(
+        (entry) => entry.puuid === currentSummoner?.puuid
+      );
+      const incompleteTeam = teamOne.length === 4 ? teamOne : teamTwo.length === 4 ? teamTwo : undefined;
+      const teamId = teamOne.length === 4 ? 100 : teamTwo.length === 4 ? 200 : undefined;
+      if (selection && incompleteTeam && teamId !== undefined) {
+        incompleteTeam.push({
+          summonerId: currentSummoner.summonerId,
+          summonerName: currentSummoner.displayName ?? '我的账号',
+          teamId,
+          championId: selection.championId,
+          isLocalPlayer: true
+        });
+      }
+    }
+    if (teamOne.length !== 5 || teamTwo.length !== 5) {
+      throw new Error('Live roster is incomplete');
+    }
+    const positionOrderReliable = queueId !== 0 && queueId !== 450
+      && hasReliablePositions(teamOne)
+      && hasReliablePositions(teamTwo);
+    const allParticipants = [...teamOne, ...teamTwo];
+    const local = allParticipants.find((participant) => participant.isLocalPlayer)
+      ?? (currentSummoner ? allParticipants.find((participant) => String(participant.summonerId) === String(currentSummoner.summonerId)) : undefined);
+    const localTeamId = local?.teamId ?? (champSelectFallback ? 100 : null);
+    const participants: Participant[] = local ? [
+      ...allParticipants.filter((participant) => participant.teamId === localTeamId),
+      ...allParticipants.filter((participant) => participant.teamId !== localTeamId)
+    ] : allParticipants;
+    checkCancelled(signal);
+    return { participants, ...(local ? { local } : {}), localTeamId, queueId, modeName, positionOrderReliable, ...(currentSummoner ? { currentSummoner } : {}), champSelectFallback };
   }
 
   private async getHistoryWithRetry(playerId: string, useCurrentSummonerRoute = false, signal?: AbortSignal): Promise<unknown> {

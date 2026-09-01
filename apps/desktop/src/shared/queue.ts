@@ -1,3 +1,7 @@
+export function isRankedQueue(queueId: number): boolean {
+  return queueId === 420 || queueId === 440;
+}
+
 export function describeQueue(queueId: number): string {
   if (queueId === 420) return '单双排';
   if (queueId === 440) return '灵活排位';

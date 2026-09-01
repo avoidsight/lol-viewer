@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { Lane, MatchSummary, PlayerSnapshot } from '../../../../shared/domain';
@@ -54,6 +56,17 @@ const fixtureLiveMatch: LiveMatch = {
 };
 
 describe('LiveMatchPage', () => {
+  it('labels champion select, in-game, previous-match, and new-match states', () => {
+    const { rerender } = render(<LiveMatchPage match={fixtureLiveMatch} lifecycleStatus="current" gameflowPhase="ChampSelect" />);
+    expect(screen.getByText('英雄选择中')).toBeVisible();
+    rerender(<LiveMatchPage match={fixtureLiveMatch} lifecycleStatus="current" gameflowPhase="InProgress" />);
+    expect(screen.getByText('游戏进行中')).toBeVisible();
+    rerender(<LiveMatchPage match={fixtureLiveMatch} lifecycleStatus="last-match" gameflowPhase="EndOfGame" />);
+    expect(screen.getByText('上一局记录')).toBeVisible();
+    rerender(<LiveMatchPage lifecycleStatus="new-match-loading" gameflowPhase="ChampSelect" />);
+    expect(screen.getByText('新对局加载中')).toBeVisible();
+  });
+
   it('renders validated team 200 as our top team and uses neutral labels without orientation', () => {
     const team200 = { ...fixtureLiveMatch, localTeamId: 200 };
     const { rerender } = render(<LiveMatchPage match={team200} />);
@@ -69,6 +82,11 @@ describe('LiveMatchPage', () => {
     expect(screen.getAllByTestId('player-card')).toHaveLength(10);
     expect(screen.getAllByTestId('recent-match')).toHaveLength(100);
     expect(screen.getAllByText('8/3/4')).toHaveLength(10);
+    const historyLists = screen.getAllByRole('list', { name: /最近排位对局/ });
+    expect(historyLists).toHaveLength(10);
+    expect(historyLists.every((list) => list.tabIndex === 0)).toBe(true);
+    const css = readFileSync(resolve('src/renderer/src/features/live/live-match.css'), 'utf8');
+    expect(css).toMatch(/\.player-card__matches\s*\{[^}]*max-height:\s*150px;[^}]*overflow-y:\s*auto;/s);
 
     const teams = screen.getAllByRole('group', { name: /方队伍/ });
     expect(teams).toHaveLength(2);
@@ -124,12 +142,36 @@ describe('LiveMatchPage', () => {
     expect(screen.getByText('正在加载战绩…')).toBeVisible();
     expect(screen.getByText('战绩受国服隐私保护')).toBeVisible();
     expect(screen.getByText('仅获取到 3/10 场')).toBeVisible();
+    expect(screen.getByRole('list', { name: 'Player 2最近排位对局' })).not.toHaveAttribute('tabindex');
   });
 
-  it('shows match mode without queue-scope controls', () => {
-    render(<LiveMatchPage match={fixtureLiveMatch} />);
+  it('defaults to ranked history in solo and flex queues', () => {
+    const { rerender } = render(<LiveMatchPage match={fixtureLiveMatch} />);
     expect(document.querySelector('.live-match-page__mode')).toHaveTextContent('单双排');
-    expect(screen.queryByRole('button', { name: '全部模式' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '排位对局' })).toHaveAttribute('aria-pressed', 'true');
+
+    rerender(<LiveMatchPage match={{ ...fixtureLiveMatch, queueId: 440, modeName: '灵活排位' }} />);
+    expect(screen.getByRole('button', { name: '排位对局' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('defaults to all history outside ranked queues and filters both ranked queue types', () => {
+    const mixedPlayers = fixtureLiveMatch.players.map((entry) => ({
+      ...entry,
+      matches: entry.matches.map((recent, index) => ({
+        ...recent,
+        queueId: [420, 440, 430, 450][index % 4]
+      }))
+    }));
+    render(<LiveMatchPage match={{ ...fixtureLiveMatch, players: mixedPlayers, queueId: 450, modeName: '极地大乱斗' }} />);
+
+    expect(screen.getByRole('button', { name: '全部对局' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByTestId('recent-match')).toHaveLength(100);
+    fireEvent.click(screen.getByRole('button', { name: '排位对局' }));
+    expect(screen.getByRole('button', { name: '排位对局' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByTestId('recent-match')).toHaveLength(60);
+    expect(screen.getAllByText('单双排')).toHaveLength(30);
+    expect(screen.getAllByText('灵活排位')).toHaveLength(30);
+    expect(screen.getAllByText('6 场')).toHaveLength(10);
   });
 
   it('renders exactly five deterministic slots per team for duplicate and unknown lanes', () => {

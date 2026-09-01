@@ -1,5 +1,7 @@
 import type { PlayerSnapshot } from '../../../../shared/domain';
 import { localizeRank } from '../../../../shared/rank';
+import { isRankedQueue } from '../../../../shared/queue';
+import type { LiveHistoryScope } from './LiveMatchPage';
 import RecentMatch from './RecentMatch';
 
 const laneNames = { TOP: '上路', JUNGLE: '打野', MIDDLE: '中路', BOTTOM: '下路', UTILITY: '辅助', UNKNOWN: '未知位置' } as const;
@@ -7,8 +9,13 @@ const percent = (value: number): string => `${Math.round(value * 100)}%`;
 const championIconUrl = (_version: string | undefined, championId: number) =>
   `lol-asset://champion-icons/${championId}.png`;
 
-export default function PlayerCard({ player, displayLane = player.lane, displayLabel, uncertain = false }: { player: PlayerSnapshot; displayLane?: keyof typeof laneNames; displayLabel?: string; uncertain?: boolean }) {
+export default function PlayerCard({ player, historyScope = 'all', displayLane = player.lane, displayLabel, uncertain = false }: { player: PlayerSnapshot; historyScope?: LiveHistoryScope; displayLane?: keyof typeof laneNames; displayLabel?: string; uncertain?: boolean }) {
   const championIcon = player.championId > 0 ? championIconUrl(player.assetVersion, player.championId) : undefined;
+  const scopedMatches = player.matches.filter((match) => historyScope === 'all' || isRankedQueue(match.queueId));
+  const visibleMatches = scopedMatches.slice(0, 10);
+  const wins = visibleMatches.filter((match) => match.win).length;
+  const championMatches = visibleMatches.filter((match) => match.championId === player.championId);
+  const championWins = championMatches.filter((match) => match.win).length;
   return <article className="player-card" data-testid="player-card" data-history-state={player.status} data-lane={displayLane} aria-labelledby={`player-${player.playerId}`}>
     <header className="player-card__header">
       {championIcon
@@ -26,9 +33,9 @@ export default function PlayerCard({ player, displayLane = player.lane, displayL
       : player.status === 'unavailable'
         ? <p className="player-card__state player-card__state--private" role="status">战绩受国服隐私保护</p>
         : <>
-          <dl className="player-card__summary"><div><dt>样本</dt><dd>{player.sampleSize} 场</dd></div><div><dt>胜率</dt><dd>{percent(player.winRate)}</dd></div><div><dt>当前英雄</dt><dd>{player.currentChampionGames} 场 / {percent(player.currentChampionWinRate)}</dd></div></dl>
-          {player.matches.length < 10 && <p className="player-card__notice">仅获取到 {player.matches.length}/10 场</p>}
-          <ol className="player-card__matches" aria-label={`${player.displayName}最近对局`}>{player.matches.slice(0, 10).map((match) => <RecentMatch key={match.matchId} match={match} assetVersion={player.assetVersion} />)}</ol>
+          <dl className="player-card__summary"><div><dt>样本</dt><dd>{visibleMatches.length} 场</dd></div><div><dt>胜率</dt><dd>{percent(visibleMatches.length ? wins / visibleMatches.length : 0)}</dd></div><div><dt>当前英雄</dt><dd>{championMatches.length} 场 / {percent(championMatches.length ? championWins / championMatches.length : 0)}</dd></div></dl>
+          {visibleMatches.length < 10 && <p className="player-card__notice">{historyScope === 'ranked' && visibleMatches.length === 0 ? '最近记录中没有排位对局' : `仅获取到 ${visibleMatches.length}/10 场`}</p>}
+          <ol className="player-card__matches" tabIndex={visibleMatches.length > 5 ? 0 : undefined} aria-label={`${player.displayName}${historyScope === 'ranked' ? '最近排位对局' : '最近对局'}`}>{visibleMatches.map((match) => <RecentMatch key={match.matchId} match={match} assetVersion={player.assetVersion} />)}</ol>
         </>}
   </article>;
 }
