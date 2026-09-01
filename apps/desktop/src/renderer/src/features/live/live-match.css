@@ -5,6 +5,11 @@
 .live-match-page__toolbar h1 { margin: 0; font-size: 24px; }
 .live-match-page__toolbar div > span { color: #71849e; font-size: 11px; }
 .live-match-page__controls { display: flex; align-items: center; gap: 12px; }
+.live-match-page__status { padding: 5px 9px; border: 1px solid #334155; border-radius: 999px; color: #cbd5e1; background: #111827; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.live-match-page__status[data-status="current"] { border-color: #2dd4bf; color: #5eead4; background: rgb(19 78 74 / 24%); }
+.live-match-page__status[data-status="last-match"] { border-color: #64748b; color: #cbd5e1; background: rgb(51 65 85 / 40%); }
+.live-match-page__status[data-status="new-match-loading"], .live-match-page__status[data-status="loading"] { border-color: #38bdf8; color: #7dd3fc; background: rgb(7 89 133 / 24%); }
+.live-match-page__status[data-status="error"] { border-color: #fb7185; color: #fda4af; background: rgb(136 19 55 / 22%); }
 .live-match-page__scope { display: flex; gap: 3px; padding: 3px; border: 1px solid #334155; border-radius: 8px; background: #0f172a; }
 .live-match-page__scope button { padding: 6px 11px; border: 0; border-radius: 5px; color: #94a3b8; background: transparent; cursor: pointer; font-size: 11px; }
 .live-match-page__scope button:hover { color: #e2e8f0; background: #1e293b; }

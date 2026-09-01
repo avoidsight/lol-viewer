@@ -56,6 +56,17 @@ const fixtureLiveMatch: LiveMatch = {
 };
 
 describe('LiveMatchPage', () => {
+  it('labels champion select, in-game, previous-match, and new-match states', () => {
+    const { rerender } = render(<LiveMatchPage match={fixtureLiveMatch} lifecycleStatus="current" gameflowPhase="ChampSelect" />);
+    expect(screen.getByText('英雄选择中')).toBeVisible();
+    rerender(<LiveMatchPage match={fixtureLiveMatch} lifecycleStatus="current" gameflowPhase="InProgress" />);
+    expect(screen.getByText('游戏进行中')).toBeVisible();
+    rerender(<LiveMatchPage match={fixtureLiveMatch} lifecycleStatus="last-match" gameflowPhase="EndOfGame" />);
+    expect(screen.getByText('上一局记录')).toBeVisible();
+    rerender(<LiveMatchPage lifecycleStatus="new-match-loading" gameflowPhase="ChampSelect" />);
+    expect(screen.getByText('新对局加载中')).toBeVisible();
+  });
+
   it('renders validated team 200 as our top team and uses neutral labels without orientation', () => {
     const team200 = { ...fixtureLiveMatch, localTeamId: 200 };
     const { rerender } = render(<LiveMatchPage match={team200} />);
