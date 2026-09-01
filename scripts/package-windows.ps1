@@ -1,8 +1,12 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param()
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
+$Utf8Encoding = New-Object System.Text.UTF8Encoding($false)
+[Console]::InputEncoding = $Utf8Encoding
+[Console]::OutputEncoding = $Utf8Encoding
+$OutputEncoding = $Utf8Encoding
 
 $RequiredNodeMajor = 22
 $PnpmVersion = "10.13.1"
