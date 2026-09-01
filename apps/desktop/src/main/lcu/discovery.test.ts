@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { discoverLcuConnection } from './discovery';
+import { discoverLcuConnection, LcuConnectionDiscovery, type LcuConnection } from './discovery';
 
 describe('discoverLcuConnection', () => {
   const temporaryLockfiles = new Set<string>();
@@ -80,5 +80,62 @@ describe('discoverLcuConnection', () => {
       protocol: 'https'
     });
 
+  });
+});
+
+describe('LcuConnectionDiscovery', () => {
+  const connection: LcuConnection = { port: 53122, password: 'secret', protocol: 'https' };
+
+  it('reuses a healthy connection without starting another discovery', async () => {
+    const discover = vi.fn(async () => connection);
+    const cache = new LcuConnectionDiscovery(discover);
+
+    await expect(cache.get()).resolves.toBe(connection);
+    await expect(cache.get()).resolves.toBe(connection);
+
+    expect(discover).toHaveBeenCalledTimes(1);
+  });
+
+  it('shares one in-flight discovery between concurrent callers', async () => {
+    let resolve!: (value: LcuConnection) => void;
+    const discover = vi.fn(() => new Promise<LcuConnection>((done) => { resolve = done; }));
+    const cache = new LcuConnectionDiscovery(discover);
+
+    const first = cache.get();
+    const second = cache.get();
+    resolve(connection);
+
+    await expect(Promise.all([first, second])).resolves.toEqual([connection, connection]);
+    expect(discover).toHaveBeenCalledTimes(1);
+  });
+
+  it('backs off after an unavailable result and retries when the delay expires', async () => {
+    let now = 1_000;
+    const discover = vi.fn<() => Promise<LcuConnection | null>>()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(connection);
+    const cache = new LcuConnectionDiscovery(discover, 3_000, () => now);
+
+    await expect(cache.get()).resolves.toBeNull();
+    now = 3_999;
+    await expect(cache.get()).resolves.toBeNull();
+    now = 4_000;
+    await expect(cache.get()).resolves.toBe(connection);
+
+    expect(discover).toHaveBeenCalledTimes(2);
+  });
+
+  it('rediscovers after the cached connection is invalidated', async () => {
+    const replacement = { ...connection, port: 53123 };
+    const discover = vi.fn<() => Promise<LcuConnection | null>>()
+      .mockResolvedValueOnce(connection)
+      .mockResolvedValueOnce(replacement);
+    const cache = new LcuConnectionDiscovery(discover);
+
+    await cache.get();
+    cache.invalidate(connection);
+
+    await expect(cache.get()).resolves.toBe(replacement);
+    expect(discover).toHaveBeenCalledTimes(2);
   });
 });
