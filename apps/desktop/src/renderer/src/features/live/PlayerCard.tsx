@@ -41,11 +41,11 @@ export default function PlayerCard({ player, historyScope = 'all', displayLane =
       </div>
     </header>
     {player.status === 'loading'
-      ? <p className="player-card__state" role="status">正在加载战绩…</p>
+      ? <div className="player-card__state player-card__skeleton" role="status" aria-label="正在加载战绩"><span className="player-card__sr-only">正在加载战绩…</span><i /><i /><i /><i /></div>
       : player.status === 'unavailable'
         ? <p className="player-card__state player-card__state--private" role="status">{player.errorCode ? unavailableLabels[player.errorCode] : '战绩暂时无法读取'}</p>
         : <>
-          <dl className="player-card__summary"><div><dt>近20场样本</dt><dd>{scopedMatches.length} 场</dd></div><div><dt>样本胜率</dt><dd>{percent(scopedMatches.length ? wins / scopedMatches.length : 0)}</dd></div><div><dt>该英雄胜率</dt><dd>{championMatches.length} 场 / {percent(championMatches.length ? championWins / championMatches.length : 0)}</dd></div></dl>
+          <dl className="player-card__summary"><div><dt>近20场样本</dt><dd>{scopedMatches.length} 场</dd></div><div className="player-card__summary-primary"><dt>样本胜率</dt><dd>{percent(scopedMatches.length ? wins / scopedMatches.length : 0)}</dd></div><div className="player-card__summary-champion"><dt>该英雄胜率</dt><dd>{championMatches.length} 场 / {percent(championMatches.length ? championWins / championMatches.length : 0)}</dd></div></dl>
           <p className="player-card__notice">{sampleNotice}</p>
           <ol className="player-card__matches" tabIndex={visibleMatches.length > 5 ? 0 : undefined} aria-label={`${player.displayName}${historyScope === 'ranked' ? '最近排位对局' : '最近对局'}`}>{visibleMatches.map((match) => <RecentMatch key={match.matchId} match={match} assetVersion={player.assetVersion} />)}</ol>
         </>}

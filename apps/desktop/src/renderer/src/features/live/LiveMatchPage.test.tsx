@@ -70,6 +70,8 @@ describe('LiveMatchPage', () => {
   it('renders validated team 200 as our top team and uses neutral labels without orientation', () => {
     const team200 = { ...fixtureLiveMatch, localTeamId: 200 };
     const { rerender } = render(<LiveMatchPage match={team200} />);
+    expect(screen.getByRole('group', { name: '我方队伍' })).toHaveClass('team-panel--ally');
+    expect(screen.getByRole('group', { name: '敌方队伍' })).toHaveClass('team-panel--enemy');
     expect(within(screen.getByRole('group', { name: '我方队伍' })).getByText('Player 5')).toBeVisible();
     rerender(<LiveMatchPage match={{ ...fixtureLiveMatch, localTeamId: null }} />);
     expect(screen.queryByRole('group', { name: '我方队伍' })).not.toBeInTheDocument();
@@ -152,6 +154,8 @@ describe('LiveMatchPage', () => {
 
     expect(screen.getByRole('status', { name: '阵容加载进度 4/10' })).toBeVisible();
     expect(screen.getByRole('progressbar')).toHaveAttribute('value', '4');
+    expect(document.querySelectorAll('.live-match-page__loading-slots > span')).toHaveLength(10);
+    expect(document.querySelectorAll('.live-match-page__loading-slots > .is-loaded')).toHaveLength(4);
   });
 
   it('calculates selected-champion stats from the full recent-20 sample while listing ten', () => {
