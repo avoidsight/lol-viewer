@@ -86,7 +86,7 @@ export function createFixturePersonalHistory(target?: PersonalHistoryTarget): Pe
     favoriteChampions: favoriteChampionsFor(matches),
     assetVersion: '26.1.1',
     itemIconPaths: {},
-    historyDataVersion: 5,
+    historyDataVersion: 6,
     cached: false,
     updatedAt: Date.UTC(2026, 0, 1)
   };

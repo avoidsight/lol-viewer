@@ -12,6 +12,8 @@ import {
   matchHistoryResponseSchema
 } from '../lcu/match-adapter';
 
+const PERSONAL_HISTORY_DATA_VERSION = 6;
+
 const currentSummonerSchema = z.object({
   summonerId: z.union([z.string(), z.number()]),
   displayName: z.string(),
@@ -133,7 +135,7 @@ export class PersonalHistoryService {
             match.enemyChampionIds !== undefined &&
             match.allyChampionIds.length + match.enemyChampionIds.length > 1);
         if (
-          fresh?.historyDataVersion === 5 &&
+          fresh?.historyDataVersion === PERSONAL_HISTORY_DATA_VERSION &&
           fresh.itemIconPaths !== undefined &&
           supportsRichMatchRows
         ) return fresh;
@@ -153,13 +155,26 @@ export class PersonalHistoryService {
         .sort((left, right) => right.gameCreation - left.gameCreation)
         .slice(0, 20);
       const enrichedGames = await mapLimit(listedGames, 4, async (game) => {
-        if (game.participants.length > 1 && (game.participantIdentities?.length ?? 0) > 1) return game;
+        const hasCompleteTeamMetrics = game.participants.length > 1 && game.participants.every((participant) =>
+          participant.stats.totalDamageDealtToChampions !== undefined &&
+          participant.stats.totalDamageTaken !== undefined &&
+          participant.stats.goldEarned !== undefined
+        );
+        if (
+          game.participants.length > 1 &&
+          (game.participantIdentities?.length ?? 0) > 1 &&
+          hasCompleteTeamMetrics
+        ) return game;
         try {
           const detailedGame = await this.client.get(
             `/lol-match-history/v1/games/${encodeURIComponent(String(game.gameId))}`,
             matchHistoryGameSchema
           );
-          const localParticipantId = game.participants[0]?.participantId;
+          const targetIdentity = detailedGame.participantIdentities?.find((identity) =>
+            (puuid !== undefined && identity.player.puuid === puuid) ||
+            (identity.player.summonerId !== undefined && String(identity.player.summonerId) === playerId)
+          );
+          const localParticipantId = targetIdentity?.participantId ?? game.participants[0]?.participantId;
           const localIndex = localParticipantId === undefined
             ? -1
             : detailedGame.participants.findIndex(
@@ -218,7 +233,7 @@ export class PersonalHistoryService {
         favoriteChampions: favoriteChampions(history),
         ...(patchResult.status === 'fulfilled' ? { assetVersion: patchResult.value } : {}),
         itemIconPaths,
-        historyDataVersion: 5,
+        historyDataVersion: PERSONAL_HISTORY_DATA_VERSION,
         cached: false,
         updatedAt: Date.now()
       });
