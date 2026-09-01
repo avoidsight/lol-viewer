@@ -28,8 +28,8 @@ function install(getLiveMatch: LolViewerApi['getLiveMatch'] = vi.fn().mockResolv
       { key: 'W', name: '劳伦特心眼刀', description: '', iconPath: '/w.png' }, { key: 'E', name: '夺命连刺', description: '', iconPath: '/e.png' },
       { key: 'R', name: '无双挑战', description: '', iconPath: '/r.png' }
     ] }),
-    getSettings: vi.fn().mockResolvedValue({ queueScope: 'ranked-solo', autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false }),
-    updateSettings: vi.fn().mockImplementation(async (patch) => ({ queueScope: 'ranked-solo', autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false, ...patch })), clearCache: vi.fn()
+    getSettings: vi.fn().mockResolvedValue({ autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false }),
+    updateSettings: vi.fn().mockImplementation(async (patch) => ({ autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false, ...patch })), clearCache: vi.fn()
   } as unknown as LolViewerApi;
   window.lolViewer = api;
   return { api, unsubscribe, emit: (value: PlayerSnapshot, generation?: number) => listener?.(value, generation) };
@@ -183,10 +183,10 @@ describe('App tab lifecycle', () => {
     window.removeEventListener('unhandledrejection', unhandled);
   });
 
-  it('shows lobby waiting without ten placeholder slots', async () => {
+  it('shows initial loading progress without ten placeholder slots', async () => {
     install(() => new Promise(() => undefined)); render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: '对战信息' }));
-    expect(await screen.findByText('等待进入英雄选择或游戏')).toBeVisible();
+    expect(await screen.findByRole('status', { name: '阵容加载进度 0/10' })).toBeVisible();
     expect(screen.queryByTestId('player-slot')).not.toBeInTheDocument();
   });
 
@@ -223,7 +223,13 @@ describe('App tab lifecycle', () => {
     const request = deferred<LiveMatch>(); install(() => request.promise); render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: '对战信息' }));
     await act(async () => request.reject(new Error('offline')));
-    expect(screen.getByRole('alert')).toHaveTextContent('对战信息暂时无法读取，请重试');
+    expect(screen.getByRole('alert')).toHaveTextContent('对战数据暂时无法读取，正在自动重试');
+  });
+
+  it('explains when the League client is not connected', async () => {
+    install(vi.fn().mockRejectedValue(new Error('League client is unavailable')));
+    render(<App initialTab="live" />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('未连接到英雄联盟客户端，请先启动客户端');
   });
 
   it('shows an error without exposing manual live controls', async () => {
@@ -243,6 +249,10 @@ describe('App tab lifecycle', () => {
     expect(screen.queryByRole('switch', { name: /自动接受匹配/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Retry live match' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: '设置' }));
+    const autoOpen = await screen.findByRole('switch', { name: /自动打开对战信息/ });
+    expect(autoOpen).toBeChecked();
+    fireEvent.click(autoOpen);
+    await waitFor(() => expect(api.updateSettings).toHaveBeenCalledWith({ autoOpenLiveMatch: false }));
     const toggle = await screen.findByRole('switch', { name: /自动接受匹配/ });
     expect(toggle).not.toBeChecked();
     fireEvent.click(toggle);
@@ -250,7 +260,7 @@ describe('App tab lifecycle', () => {
     expect(toggle).toBeChecked();
   });
 
-  it('does not cancel a slow live request and retries three seconds after it fails', async () => {
+  it('does not cancel a slow live request and slows retries after the game starts', async () => {
     vi.useFakeTimers();
     try {
       const first = deferred<LiveMatch>();
@@ -264,7 +274,7 @@ describe('App tab lifecycle', () => {
       expect(api.cancelLiveMatch).not.toHaveBeenCalled();
 
       await act(async () => first.reject(new Error('not in game')));
-      await act(async () => { vi.advanceTimersByTime(2_999); await Promise.resolve(); });
+      await act(async () => { vi.advanceTimersByTime(14_999); await Promise.resolve(); });
       expect(api.getLiveMatch).toHaveBeenCalledOnce();
       await act(async () => { vi.advanceTimersByTime(1); await Promise.resolve(); });
       expect(api.getLiveMatch).toHaveBeenCalledTimes(2);
@@ -289,7 +299,7 @@ describe('App tab lifecycle', () => {
 
       await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); });
       expect(getLiveMatch).toHaveBeenCalledOnce();
-      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
+      await act(async () => { vi.advanceTimersByTime(15_000); await Promise.resolve(); await Promise.resolve(); });
       expect(getLiveMatch).toHaveBeenCalledTimes(2);
       expect(screen.getByText('Player Two')).toBeVisible();
     } finally {
@@ -312,7 +322,7 @@ describe('App tab lifecycle', () => {
 
       await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); });
       expect(getLiveMatch).toHaveBeenCalledOnce();
-      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
+      await act(async () => { vi.advanceTimersByTime(15_000); await Promise.resolve(); await Promise.resolve(); });
       expect(getLiveMatch).toHaveBeenCalledTimes(2);
       expect(screen.getByText('Player Two')).toBeVisible();
     } finally {
@@ -405,6 +415,7 @@ describe('App tab lifecycle', () => {
     vi.useFakeTimers();
     try {
       const { api } = install();
+      vi.mocked(api.getGameflowSessionIdentity).mockResolvedValue({ phase: 'None' });
       vi.mocked(api.getPersonalHistory)
         .mockRejectedValueOnce(new Error('League client is unavailable'))
         .mockResolvedValueOnce(history);
@@ -419,10 +430,31 @@ describe('App tab lifecycle', () => {
     }
   });
 
-  it('highlights the live tab when champion select starts while on the history page', async () => {
+  it('automatically opens live match when champion select starts', async () => {
     vi.useFakeTimers();
     try {
       const { api } = install();
+      vi.mocked(api.getGameflowSessionIdentity)
+        .mockResolvedValueOnce({ phase: 'None' })
+        .mockResolvedValueOnce({ phase: 'ChampSelect', gameId: 'game-1' });
+      render(<App />);
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
+      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
+
+      expect(screen.getByRole('tab', { name: '对战信息' })).toHaveAttribute('aria-selected', 'true');
+      expect(api.getLiveMatch).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('highlights the live tab instead when automatic opening is disabled', async () => {
+    vi.useFakeTimers();
+    try {
+      const { api } = install();
+      vi.mocked(api.getSettings).mockResolvedValue({ autoOpenLiveMatch: false, showLaneDifferences: true, autoAcceptReadyCheck: false });
       const identityApi = api as unknown as { getGameflowSessionIdentity: ReturnType<typeof vi.fn> };
       identityApi.getGameflowSessionIdentity
         .mockResolvedValueOnce({ phase: 'None' })

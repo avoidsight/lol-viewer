@@ -8,6 +8,7 @@ export type LiveMatchStatus =
   | 'last-match'
   | 'new-match-loading'
   | 'error';
+export type LiveMatchErrorReason = 'client-unavailable' | 'not-in-match' | 'data-unavailable';
 
 export interface LiveMatchViewState {
   status: LiveMatchStatus;
@@ -15,6 +16,7 @@ export interface LiveMatchViewState {
   progress: PlayerSnapshot[];
   requesting: boolean;
   phase?: string;
+  errorReason?: LiveMatchErrorReason;
 }
 
 export type LiveMatchAction =
@@ -22,7 +24,7 @@ export type LiveMatchAction =
   | { type: 'player-updated'; player: PlayerSnapshot }
   | { type: 'request-succeeded'; match: LiveMatch }
   | { type: 'roster-refreshed'; roster: LiveRoster }
-  | { type: 'request-failed' }
+  | { type: 'request-failed'; reason?: LiveMatchErrorReason }
   | { type: 'phase-observed'; phase: string; active: boolean }
   | { type: 'new-match-detected'; phase: string };
 
@@ -71,7 +73,8 @@ export function liveMatchReducer(
             ...state,
             status: state.status === 'new-match-loading' ? 'new-match-loading' : 'loading',
             progress: [],
-            requesting: true
+            requesting: true,
+            errorReason: undefined
           };
     case 'player-updated':
       return {
@@ -88,7 +91,8 @@ export function liveMatchReducer(
         match: action.match,
         progress: [],
         requesting: false,
-        ...(state.phase ? { phase: state.phase } : {})
+        ...(state.phase ? { phase: state.phase } : {}),
+        errorReason: undefined
       };
     case 'roster-refreshed':
       return state.match
@@ -97,7 +101,7 @@ export function liveMatchReducer(
     case 'request-failed':
       return state.match
         ? { ...state, requesting: false }
-        : { ...state, status: 'error', requesting: false };
+        : { ...state, status: 'error', requesting: false, errorReason: action.reason ?? 'data-unavailable' };
     case 'phase-observed':
       return {
         ...state,

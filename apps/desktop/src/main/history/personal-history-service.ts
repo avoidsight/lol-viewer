@@ -72,6 +72,19 @@ function favoriteChampions(matches: PersonalHistorySnapshot['matches']): Favorit
     .sort((left, right) => right.games - left.games || left.championId - right.championId);
 }
 
+async function mapLimit<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  async function worker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      results[index] = await mapper(items[index]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  return results;
+}
+
 export class PersonalHistoryService {
   constructor(
     private readonly client: LcuClient,
@@ -142,7 +155,7 @@ export class PersonalHistoryService {
       const listedGames = [...listedHistory.games]
         .sort((left, right) => right.gameCreation - left.gameCreation)
         .slice(0, 20);
-      const enrichedGames = await Promise.all(listedGames.map(async (game) => {
+      const enrichedGames = await mapLimit(listedGames, 4, async (game) => {
         if (game.participants.length > 1 && (game.participantIdentities?.length ?? 0) > 1) return game;
         try {
           const detailedGame = await this.client.get(
@@ -166,7 +179,7 @@ export class PersonalHistoryService {
         } catch {
           return game;
         }
-      }));
+      });
       const history = adaptMatchHistory({ games: enrichedGames }, { scope: 'all', limit: 20 });
       const rankRequest = target && puuid && this.sgp
         ? this.sgp.getRankedStats(puuid)

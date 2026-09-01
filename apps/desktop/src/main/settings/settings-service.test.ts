@@ -10,7 +10,6 @@ describe('SettingsService', () => {
     const service = new SettingsService(database, new MatchCache(database));
 
     expect(service.update({ autoOpenLiveMatch: false })).toEqual({
-      queueScope: 'ranked-solo',
       autoOpenLiveMatch: false,
       showLaneDifferences: true,
       autoAcceptReadyCheck: false
@@ -34,9 +33,9 @@ describe('SettingsService', () => {
     migrateDatabase(database);
     const service = new SettingsService(database, new MatchCache(database));
 
-    (service.get() as { queueScope: string }).queueScope = 'invalid';
+    (service.get() as { autoOpenLiveMatch: boolean }).autoOpenLiveMatch = false;
 
-    expect(service.get().queueScope).toBe('ranked-solo');
+    expect(service.get().autoOpenLiveMatch).toBe(true);
   });
 
   it('clears history without deleting settings', () => {
@@ -44,7 +43,7 @@ describe('SettingsService', () => {
     migrateDatabase(database);
     const cache = new MatchCache(database);
     const service = new SettingsService(database, cache);
-    service.update({ queueScope: 'ranked-solo' });
+    service.update({ autoOpenLiveMatch: false });
     cache.put({
       playerId: 'player-1', displayName: 'Player', teamId: 100, lane: 'TOP', championId: 1,
       scope: 'ranked-solo', matches: [], sampleSize: 0, wins: 0, losses: 0, winRate: 0,
@@ -54,7 +53,7 @@ describe('SettingsService', () => {
 
     service.clearCache();
 
-    expect(service.get().queueScope).toBe('ranked-solo');
+    expect(service.get().autoOpenLiveMatch).toBe(false);
     expect(cache.get('player-1', 'ranked-solo')).toBeNull();
   });
 

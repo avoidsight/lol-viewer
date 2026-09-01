@@ -5,6 +5,12 @@ export type QueueScope = 'ranked-solo' | 'all';
 export type QueueMode = 'RANKED' | 'NORMAL' | 'ARAM' | 'OTHER';
 
 export type DataStatus = 'loading' | 'ready' | 'unavailable';
+export type PlayerDataErrorCode =
+  | 'PRIVACY_RESTRICTED'
+  | 'CLIENT_UNAVAILABLE'
+  | 'DATA_SERVICE_UNAVAILABLE'
+  | 'INVALID_RESPONSE'
+  | 'UNKNOWN';
 
 export type MatchAchievementType =
   | 'MOST_KILLS'
@@ -100,6 +106,7 @@ export interface PlayerSnapshot {
   currentChampionWins: number;
   currentChampionWinRate: number;
   status: DataStatus;
+  errorCode?: PlayerDataErrorCode;
   error?: string;
   updatedAt: number;
 }

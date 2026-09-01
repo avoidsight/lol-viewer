@@ -140,6 +140,9 @@ describe('PersonalHistoryPage', () => {
       profileIconId: 30
     });
     expect(screen.queryByRole('button', { name: '查看 召唤师 的个人战绩' })).not.toBeInTheDocument();
+    const css = readFileSync(resolve('src/renderer/src/features/history/personal-history.css'), 'utf8');
+    expect(css).toMatch(/\.personal-history__team-player\s*\{[^}]*width:\s*28px;[^}]*height:\s*28px;/s);
+    expect(css).toMatch(/\.personal-history__team-player--link:focus-visible\s*\{[^}]*outline:\s*2px solid #fbbf24;/s);
   });
 
   it('shows a return action while viewing another player', () => {

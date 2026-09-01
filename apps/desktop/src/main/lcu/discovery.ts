@@ -17,6 +17,7 @@ export interface LcuConnection {
 }
 
 const execFileAsync = promisify(execFile);
+const unavailableRetryMs = 3_000;
 
 function commandLineConnection(process: ProcessInfo): LcuConnection | null {
   if (process.name && !/^LeagueClientUx(?:\.exe)?$/i.test(process.name)) return null;
@@ -57,12 +58,16 @@ function lockfileConnection(contents: string): LcuConnection | null {
 async function runningProcesses(): Promise<ProcessInfo[]> {
   if (process.platform !== 'win32') return [];
   try {
-    const { stdout } = await execFileAsync('powershell.exe', [
-      '-NoProfile',
-      '-NonInteractive',
-      '-Command',
-      "Get-CimInstance Win32_Process -Filter \"Name='LeagueClientUx.exe'\" | Select-Object Name,CommandLine | ConvertTo-Json -Compress"
-    ]);
+    const { stdout } = await execFileAsync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        "Get-CimInstance Win32_Process -Filter \"Name='LeagueClientUx.exe'\" | Select-Object Name,CommandLine | ConvertTo-Json -Compress"
+      ],
+      { windowsHide: true, timeout: 5_000 }
+    );
     if (!stdout.trim()) return [];
     const result = JSON.parse(stdout) as
       | { Name?: string; CommandLine?: string }
@@ -83,9 +88,7 @@ function lockfilePaths(): string[] {
   return roots.map((root) => join(root, 'Riot Games', 'League of Legends', 'lockfile'));
 }
 
-export async function discoverLcuConnection(
-  processes?: ProcessInfo[]
-): Promise<LcuConnection | null> {
+async function discoverUncached(processes?: ProcessInfo[]): Promise<LcuConnection | null> {
   for (const processInfo of processes ?? (await runningProcesses())) {
     const connection = commandLineConnection(processInfo);
     if (connection) return connection;
@@ -100,4 +103,61 @@ export async function discoverLcuConnection(
     }
   }
   return null;
+}
+
+type Discover = () => Promise<LcuConnection | null>;
+
+export class LcuConnectionDiscovery {
+  private cached: LcuConnection | undefined;
+  private inFlight: Promise<LcuConnection | null> | undefined;
+  private retryAfter = 0;
+
+  constructor(
+    private readonly discover: Discover,
+    private readonly retryMs = unavailableRetryMs,
+    private readonly now: () => number = Date.now
+  ) {}
+
+  get(): Promise<LcuConnection | null> {
+    if (this.cached) return Promise.resolve(this.cached);
+    if (this.inFlight) return this.inFlight;
+    if (this.now() < this.retryAfter) return Promise.resolve(null);
+
+    const request = this.discover()
+      .then((connection) => {
+        if (connection) {
+          this.cached = connection;
+          this.retryAfter = 0;
+        } else {
+          this.retryAfter = this.now() + this.retryMs;
+        }
+        return connection;
+      })
+      .finally(() => {
+        if (this.inFlight === request) this.inFlight = undefined;
+      });
+    this.inFlight = request;
+    return request;
+  }
+
+  invalidate(connection?: LcuConnection): void {
+    if (
+      connection &&
+      this.cached &&
+      (connection.port !== this.cached.port || connection.password !== this.cached.password)
+    ) return;
+    this.cached = undefined;
+    this.retryAfter = 0;
+  }
+}
+
+const sharedDiscovery = new LcuConnectionDiscovery(() => discoverUncached());
+
+export function discoverLcuConnection(processes?: ProcessInfo[]): Promise<LcuConnection | null> {
+  // Explicit process input is used by diagnostics/tests and must not alter the shared runtime cache.
+  return processes === undefined ? sharedDiscovery.get() : discoverUncached(processes);
+}
+
+export function invalidateLcuConnection(connection?: LcuConnection): void {
+  sharedDiscovery.invalidate(connection);
 }

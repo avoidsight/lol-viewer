@@ -18,8 +18,8 @@ describe('registerSettingsIpc', () => {
     const sender = {};
     electron.getAllWindows.mockReturnValue([{ webContents: sender, isDestroyed: () => false }]);
     const service = {
-      get: vi.fn(() => ({ queueScope: 'ranked-solo' as const, autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false })),
-      update: vi.fn((patch) => ({ queueScope: 'ranked-solo' as const, autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false, ...patch })),
+      get: vi.fn(() => ({ autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false })),
+      update: vi.fn((patch) => ({ autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false, ...patch })),
       clearCache: vi.fn()
     };
     registerSettingsIpc(service);
@@ -36,10 +36,10 @@ describe('registerSettingsIpc', () => {
     service.clearCache.mockReturnValueOnce('unexpected' as never);
     await expect(clear({ sender })).rejects.toThrow();
 
-    service.get.mockReturnValueOnce({ queueScope: 'invalid' } as never);
+    service.get.mockReturnValueOnce({ autoOpenLiveMatch: 'invalid' } as never);
     await expect(get({ sender })).rejects.toThrow();
 
-    service.update.mockReturnValueOnce({ queueScope: 'invalid' } as never);
+    service.update.mockReturnValueOnce({ autoOpenLiveMatch: 'invalid' } as never);
     await expect(update({ sender }, {})).rejects.toThrow();
   });
 });

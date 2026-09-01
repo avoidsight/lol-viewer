@@ -2,7 +2,7 @@ import { request as httpsRequest } from 'node:https';
 import type { RequestOptions } from 'node:https';
 import type { ClientRequest, IncomingMessage } from 'node:http';
 import type { z } from 'zod';
-import type { LcuConnection } from './discovery';
+import { invalidateLcuConnection, type LcuConnection } from './discovery';
 
 export interface LcuError extends Error {
   code: 'LCU_UNAVAILABLE' | 'LCU_AUTH' | 'LCU_INVALID_RESPONSE' | 'LCU_RESPONSE_TOO_LARGE';
@@ -80,6 +80,7 @@ export function createLcuClient(
             );
             response.on('end', () => {
               if (response.statusCode === 401 || response.statusCode === 403) {
+                invalidateLcuConnection(connection);
                 finish(() => reject(lcuError('LCU_AUTH', 'LCU authentication failed')));
                 return;
               }
@@ -111,11 +112,13 @@ export function createLcuClient(
 
         req.on('timeout', () => {
           req.destroy();
+          invalidateLcuConnection(connection);
           finish(() => reject(lcuError('LCU_UNAVAILABLE', 'LCU request timed out')));
         });
-        req.on('error', () =>
-          finish(() => reject(lcuError('LCU_UNAVAILABLE', 'LCU is unavailable')))
-        );
+        req.on('error', () => {
+          invalidateLcuConnection(connection);
+          finish(() => reject(lcuError('LCU_UNAVAILABLE', 'LCU is unavailable')));
+        });
         req.end();
       });
   }
