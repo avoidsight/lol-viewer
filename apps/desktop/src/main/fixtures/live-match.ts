@@ -1,5 +1,5 @@
 import type { FavoriteChampion, MatchSummary, PersonalHistorySnapshot, PlayerSnapshot, QueueScope } from '../../shared/domain';
-import type { LiveMatch } from '../../shared/ipc';
+import type { LiveMatch, PersonalHistoryTarget } from '../../shared/ipc';
 
 const lanes = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'] as const;
 
@@ -18,15 +18,36 @@ function liveMatchesFor(playerIndex: number): MatchSummary[] {
   }));
 }
 
-function personalMatchesFor(): MatchSummary[] {
+function personalMatchesFor(target?: PersonalHistoryTarget): MatchSummary[] {
   const queueIds = [420, 430, 440, 450] as const;
   const templates = liveMatchesFor(0);
-  return Array.from({ length: 20 }, (_, matchIndex) => ({
-    ...templates[matchIndex % templates.length],
-    matchId: `fixture-personal-${matchIndex}`,
-    queueId: queueIds[matchIndex % queueIds.length],
-    endedAt: Date.UTC(2026, 0, 1) - matchIndex * 1_800_000
-  }));
+  return Array.from({ length: 20 }, (_, matchIndex) => {
+    const base = templates[matchIndex % templates.length];
+    const allies = Array.from({ length: 5 }, (_, index) => ({
+      championId: index === 0 ? base.championId : 20 + index,
+      playerId: index === 0 ? target?.playerId ?? 'fixture-personal-player' : `fixture-ally-${matchIndex}-${index}`,
+      puuid: index === 0 ? target?.puuid ?? 'fixture-personal-puuid' : `fixture-ally-puuid-${matchIndex}-${index}`,
+      displayName: index === 0 ? target?.displayName ?? 'Fixture Personal Player' : `Fixture Ally ${index}`,
+      profileIconId: index === 0 ? target?.profileIconId ?? 29 : 29 + index
+    }));
+    const enemies = Array.from({ length: 5 }, (_, index) => ({
+      championId: 30 + index,
+      playerId: `fixture-enemy-${matchIndex}-${index}`,
+      puuid: `fixture-enemy-puuid-${matchIndex}-${index}`,
+      displayName: `Fixture Enemy ${index + 1}`,
+      profileIconId: 40 + index
+    }));
+    return {
+      ...base,
+      matchId: `fixture-personal-${matchIndex}`,
+      queueId: queueIds[matchIndex % queueIds.length],
+      endedAt: Date.UTC(2026, 0, 1) - matchIndex * 1_800_000,
+      allyChampionIds: allies.map(({ championId }) => championId),
+      enemyChampionIds: enemies.map(({ championId }) => championId),
+      allyPlayers: allies,
+      enemyPlayers: enemies
+    };
+  });
 }
 
 function favoriteChampionsFor(matches: MatchSummary[]): FavoriteChampion[] {
@@ -45,16 +66,16 @@ function favoriteChampionsFor(matches: MatchSummary[]): FavoriteChampion[] {
     .slice(0, 5);
 }
 
-export function createFixturePersonalHistory(): PersonalHistorySnapshot {
-  const matches = personalMatchesFor();
+export function createFixturePersonalHistory(target?: PersonalHistoryTarget): PersonalHistorySnapshot {
+  const matches = personalMatchesFor(target);
   const wins = matches.filter((match) => match.win).length;
   const kills = matches.reduce((sum, match) => sum + match.kills, 0);
   const deaths = matches.reduce((sum, match) => sum + match.deaths, 0);
   const assists = matches.reduce((sum, match) => sum + match.assists, 0);
   return {
-    playerId: 'fixture-personal-player',
-    displayName: 'Fixture Personal Player',
-    profileIconId: 29,
+    playerId: target?.playerId ?? 'fixture-personal-player',
+    displayName: target?.displayName ?? 'Fixture Personal Player',
+    profileIconId: target?.profileIconId ?? 29,
     rank: 'GOLD IV 50 LP',
     matches,
     sampleSize: matches.length,
@@ -64,6 +85,8 @@ export function createFixturePersonalHistory(): PersonalHistorySnapshot {
     averageKda: (kills + assists) / deaths,
     favoriteChampions: favoriteChampionsFor(matches),
     assetVersion: '26.1.1',
+    itemIconPaths: {},
+    historyDataVersion: 5,
     cached: false,
     updatedAt: Date.UTC(2026, 0, 1)
   };

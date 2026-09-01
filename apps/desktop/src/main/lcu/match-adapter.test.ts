@@ -104,6 +104,40 @@ describe('adaptMatchHistory', () => {
     expect(result.teamGoldShare).toBeCloseTo(14_250 / 54_250);
   });
 
+  it('keeps participant identities with each team composition for history navigation', () => {
+    const base = structuredClone(fixture.games[0]);
+    const participants = Array.from({ length: 10 }, (_, index) => ({
+      championId: index + 1,
+      participantId: index + 1,
+      teamId: index < 5 ? 100 : 200,
+      stats: { win: index < 5, kills: 1, deaths: 1, assists: 1 }
+    }));
+    const participantIdentities = Array.from({ length: 10 }, (_, index) => ({
+        participantId: index + 1,
+        player: {
+          summonerId: 1000 + index,
+          puuid: `puuid-${index}`,
+          gameName: `Player ${index}`,
+          tagLine: 'CN1',
+          profileIconId: 20 + index
+        }
+      }));
+
+    const result = adaptMatchHistory({
+      games: [{ ...base, participants, participantIdentities }]
+    }, { scope: 'all', limit: 10 })[0];
+
+    expect(result.allyPlayers).toHaveLength(5);
+    expect(result.enemyPlayers).toHaveLength(5);
+    expect(result.enemyPlayers?.[0]).toEqual({
+      championId: 6,
+      playerId: '1005',
+      puuid: 'puuid-5',
+      displayName: 'Player 5#CN1',
+      profileIconId: 25
+    });
+  });
+
   it.each(['championId', 'win', 'kills', 'deaths', 'assists'])('rejects a match missing %s', (field) => {
     const game = structuredClone(fixture.games[0]);
     const target = field === 'championId' ? game.participants[0] : game.participants[0].stats;

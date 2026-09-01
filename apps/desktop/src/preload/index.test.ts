@@ -122,6 +122,11 @@ describe('preload match API validation', () => {
     await expect(api.getPersonalHistory()).resolves.toEqual(snapshot);
     expect(electron.invoke).toHaveBeenCalledWith(PERSONAL_HISTORY_GET_CHANNEL);
 
+    const target = { playerId: 'target', puuid: 'target-puuid', displayName: '目标玩家' };
+    await expect(api.getPersonalHistory(target)).resolves.toEqual(snapshot);
+    expect(electron.invoke).toHaveBeenLastCalledWith(PERSONAL_HISTORY_GET_CHANNEL, target);
+    await expect(api.getPersonalHistory({ playerId: '' })).rejects.toThrow();
+
     electron.invoke.mockResolvedValue({ ...snapshot, unexpected: true });
     await expect(api.getPersonalHistory()).rejects.toThrow();
   });

@@ -21,7 +21,7 @@ const cachedSnapshot: PersonalHistorySnapshot = {
   playerId: '7', displayName: 'Cached Player', profileIconId: 29, matches: [], sampleSize: 0,
   wins: 0, losses: 0, winRate: 0, averageKda: 0, favoriteChampions: [], cached: false,
   itemIconPaths: {},
-  historyDataVersion: 4,
+  historyDataVersion: 5,
   updatedAt: 1_000
 };
 
@@ -84,6 +84,44 @@ describe('PersonalHistoryService', () => {
     });
     expect(cache.getLatest('7')).toEqual({ ...result, cached: true });
     expect(get).toHaveBeenCalledWith('/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=40', expect.anything());
+  });
+
+  it('loads another player by puuid through Tencent SGP without replacing the current summoner', async () => {
+    const database = new Database(':memory:');
+    migrateDatabase(database);
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-game-data/assets/v1/items.json') return [];
+      if (path === '/lol-patch/v1/game-version') return '15.14.1';
+      throw new Error(`optional endpoint offline: ${path}`);
+    }) as LcuClient['get'];
+    const sgp = {
+      getHistory: vi.fn().mockResolvedValue({ games: [game(0)] }),
+      getRankedStats: vi.fn().mockResolvedValue({
+        queues: [{ queueType: 'RANKED_SOLO_5x5', tier: 'GOLD', division: 'I', leaguePoints: 77 }]
+      })
+    };
+    const service = new PersonalHistoryService(
+      { get } as LcuClient,
+      new PersonalHistoryCache(database),
+      sgp
+    );
+
+    const result = await service.load({
+      playerId: 'target-summoner',
+      puuid: 'target-puuid',
+      displayName: '目标玩家#CN1',
+      profileIconId: 88
+    });
+
+    expect(result).toMatchObject({
+      playerId: 'target-summoner',
+      displayName: '目标玩家#CN1',
+      profileIconId: 88,
+      rank: '黄金 I 77 胜点'
+    });
+    expect(sgp.getHistory).toHaveBeenCalledWith('target-puuid', 40);
+    expect(sgp.getRankedStats).toHaveBeenCalledWith('target-puuid');
+    expect(get).not.toHaveBeenCalledWith('/lol-summoner/v1/current-summoner', expect.anything());
   });
 
   it('loads each game detail when the Tencent history list only contains the local participant', async () => {

@@ -30,15 +30,21 @@ import {
   championDetailsRequestSchema,
   championDetailsSchema,
   personalHistorySchema,
+  personalHistoryTargetSchema,
   type AppSettings,
   type ChampionLane,
   type LiveMatch,
-  type LolViewerApi
+  type LolViewerApi,
+  type PersonalHistoryTarget
 } from '../shared/ipc';
 
 const api: LolViewerApi = Object.freeze({
-  getPersonalHistory: async (): Promise<PersonalHistorySnapshot> =>
-    personalHistorySchema.parse(await ipcRenderer.invoke(PERSONAL_HISTORY_GET_CHANNEL)),
+  getPersonalHistory: async (target?: PersonalHistoryTarget): Promise<PersonalHistorySnapshot> => {
+    const input = personalHistoryTargetSchema.optional().parse(target);
+    return personalHistorySchema.parse(await (input === undefined
+      ? ipcRenderer.invoke(PERSONAL_HISTORY_GET_CHANNEL)
+      : ipcRenderer.invoke(PERSONAL_HISTORY_GET_CHANNEL, input)));
+  },
   getLiveMatch: async (scope: QueueScope, generation = 0): Promise<LiveMatch> => {
     const input = liveMatchRequestSchema.parse({ scope: queueScopeSchema.parse(scope), generation });
     return liveMatchSchema.parse(await ipcRenderer.invoke(MATCH_GET_CHANNEL, input));

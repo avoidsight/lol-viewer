@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PersonalHistorySnapshot, PlayerSnapshot } from '../../shared/domain';
-import type { AppSettings, LiveMatch, LolViewerApi } from '../../shared/ipc';
+import type { AppSettings, LiveMatch, LolViewerApi, PersonalHistoryTarget } from '../../shared/ipc';
 import AppShell, { type AppTab } from './AppShell';
 import ChampionLibraryPage from './features/champions/ChampionLibraryPage';
 import PersonalHistoryPage from './features/history/PersonalHistoryPage';
@@ -16,6 +16,7 @@ const clientRetryDelayMs = 3_000;
 export default function App({ initialTab = 'history' }: { initialTab?: AppTab } = {}) {
   const [page, setPage] = useState<AppTab>(initialTab);
   const [history, setHistory] = useState<PersonalHistorySnapshot>();
+  const [historyTarget, setHistoryTarget] = useState<PersonalHistoryTarget>();
   const [historyState, setHistoryState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const [historyRefreshing, setHistoryRefreshing] = useState(false);
   const [historyRefreshError, setHistoryRefreshError] = useState('');
@@ -30,13 +31,15 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   const generation = useRef(0);
   const pageRef = useRef(page);
   const historyRequest = useRef<Promise<PersonalHistorySnapshot> | undefined>(undefined);
+  const ownHistoryRef = useRef<PersonalHistorySnapshot | undefined>(undefined);
+  const historyNavigation = useRef(0);
   const historyRefreshingRef = useRef(false);
   const liveSnapshotRef = useRef(false);
   const currentGameIdRef = useRef<string | undefined>(undefined);
   const liveRequestingRef = useRef(false);
 
   useEffect(() => {
-    if (page !== 'history') return;
+    if (page !== 'history' || historyTarget) return;
     let active = true;
     const api = window.lolViewer;
     if (!api) { setHistoryState('unavailable'); return; }
@@ -45,17 +48,17 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     void request.then((snapshot) => {
       if (!active) return;
       if (!snapshot) { if (!history) setHistoryState('unavailable'); return; }
-      setHistory(snapshot); setHistoryState('ready');
+      ownHistoryRef.current = snapshot; setHistory(snapshot); setHistoryState('ready');
     }).catch(() => { if (active && !history) setHistoryState('unavailable'); }).finally(() => {
       if (historyRequest.current === request) historyRequest.current = undefined;
     });
     return () => { active = false; };
-  }, [page]);
+  }, [page, historyTarget]);
 
   useEffect(() => { pageRef.current = page; }, [page]);
 
   useEffect(() => {
-    if (page !== 'history' || historyState !== 'unavailable' || !window.lolViewer) return;
+    if (page !== 'history' || historyTarget || historyState !== 'unavailable' || !window.lolViewer) return;
     let active = true;
     let timer: number | undefined;
     const poll = async (): Promise<void> => {
@@ -63,7 +66,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
       try {
         const snapshot = await window.lolViewer.getPersonalHistory();
         if (!active) return;
-        if (snapshot) { setHistory(snapshot); setHistoryState('ready'); return; }
+        if (snapshot) { ownHistoryRef.current = snapshot; setHistory(snapshot); setHistoryState('ready'); return; }
       } catch {
         // The League client is still starting; retry shortly.
       }
@@ -71,7 +74,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     };
     timer = window.setTimeout(() => void poll(), clientRetryDelayMs);
     return () => { active = false; if (timer !== undefined) window.clearTimeout(timer); };
-  }, [page, historyState]);
+  }, [page, historyState, historyTarget]);
 
   useEffect(() => {
     const api = window.lolViewer;
@@ -191,8 +194,9 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     setHistoryRefreshing(true);
     setHistoryRefreshError('');
     try {
-      const snapshot = await window.lolViewer.getPersonalHistory();
+      const snapshot = await window.lolViewer.getPersonalHistory(historyTarget);
       if (!snapshot) throw new Error('History unavailable');
+      if (!historyTarget) ownHistoryRef.current = snapshot;
       setHistory(snapshot);
       setHistoryState('ready');
     } catch {
@@ -201,6 +205,31 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
       historyRefreshingRef.current = false;
       setHistoryRefreshing(false);
     }
+  };
+  const viewPlayerHistory = async (target: PersonalHistoryTarget): Promise<void> => {
+    const api = window.lolViewer;
+    if (!api || target.playerId === history?.playerId) return;
+    const requestId = ++historyNavigation.current;
+    setHistoryTarget(target);
+    setHistory(undefined);
+    setHistoryRefreshError('');
+    setHistoryState('loading');
+    try {
+      const snapshot = await api.getPersonalHistory(target);
+      if (requestId !== historyNavigation.current) return;
+      setHistory(snapshot);
+      setHistoryState('ready');
+    } catch {
+      if (requestId !== historyNavigation.current) return;
+      setHistoryState('unavailable');
+    }
+  };
+  const returnToOwnHistory = (): void => {
+    historyNavigation.current += 1;
+    setHistoryTarget(undefined);
+    setHistory(ownHistoryRef.current);
+    setHistoryState(ownHistoryRef.current ? 'ready' : 'loading');
+    setHistoryRefreshError('');
   };
   const clearCache = async () => { setMessage('Clearing cache…'); try { await window.lolViewer?.clearCache(); setMessage('Cache cleared'); } catch { setMessage('Cache could not be cleared'); } };
   const updateLaneSetting = async (showLaneDifferences: boolean) => {
@@ -220,7 +249,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
       : null;
 
   const content = <>
-    <div hidden={page !== 'history'}><PersonalHistoryPage snapshot={history} state={historyState} onRefresh={() => void refreshHistory()} refreshing={historyRefreshing} refreshError={historyRefreshError} /></div>
+    <div hidden={page !== 'history'}><PersonalHistoryPage snapshot={history} state={historyState} onRefresh={() => void refreshHistory()} onPlayerSelect={(target) => void viewPlayerHistory(target)} onBack={historyTarget ? returnToOwnHistory : undefined} refreshing={historyRefreshing} refreshError={historyRefreshError} /></div>
     <div hidden={page !== 'live'}><LiveMatchPage match={match} players={match ? undefined : progress} showLaneDifferences={settings.showLaneDifferences} notice={liveNotice} /></div>
     {page === 'champions' && <ChampionLibraryPage getCatalog={getChampionCatalog} getDetails={getChampionDetails} getGuide={getChampionGuide} />}
     {page === 'settings' && <SettingsPage settings={settings} message={message} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onLaneDifferencesChange={(checked) => void updateLaneSetting(checked)} onClearCache={() => void clearCache()} />}

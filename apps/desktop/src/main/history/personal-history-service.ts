@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import type { FavoriteChampion, PersonalHistorySnapshot } from '../../shared/domain';
 import { formatRank } from '../../shared/rank';
-import { personalHistorySchema } from '../../shared/ipc';
+import { personalHistorySchema, type PersonalHistoryTarget } from '../../shared/ipc';
 import type { PersonalHistoryCache } from '../cache/database';
 import type { LcuClient } from '../lcu/http-client';
+import type { SgpClient } from '../sgp/sgp-client';
 import {
   adaptMatchHistory,
   matchHistoryGameSchema,
@@ -13,8 +14,17 @@ import {
 const currentSummonerSchema = z.object({
   summonerId: z.union([z.string(), z.number()]),
   displayName: z.string(),
-  profileIconId: z.number().int().nonnegative()
+  profileIconId: z.number().int().nonnegative(),
+  puuid: z.string().min(1).optional()
 });
+const targetSummonerSchema = z.object({
+  summonerId: z.union([z.string(), z.number()]).optional(),
+  puuid: z.string().min(1).optional(),
+  displayName: z.string().optional(),
+  gameName: z.string().optional(),
+  tagLine: z.string().optional(),
+  profileIconId: z.number().int().nonnegative().optional()
+}).passthrough();
 const rankedStatsSchema = z.object({
   queues: z.array(z.object({
     queueType: z.string(), tier: z.string(), division: z.string(), leaguePoints: z.number().int()
@@ -65,42 +75,75 @@ function favoriteChampions(matches: PersonalHistorySnapshot['matches']): Favorit
 export class PersonalHistoryService {
   constructor(
     private readonly client: LcuClient,
-    private readonly cache: Pick<PersonalHistoryCache, 'getFresh' | 'getLatest' | 'put'>
+    private readonly cache: Pick<PersonalHistoryCache, 'getFresh' | 'getLatest' | 'put'>,
+    private readonly sgp?: SgpClient
   ) {}
 
-  async load(): Promise<PersonalHistorySnapshot> {
-    let playerId: string | undefined;
+  async load(target?: PersonalHistoryTarget): Promise<PersonalHistorySnapshot> {
+    let playerId = target?.playerId;
     try {
-      const summoner = currentSummonerSchema.parse(
-        await this.client.get('/lol-summoner/v1/current-summoner', currentSummonerSchema)
-      );
-      playerId = String(summoner.summonerId);
+      let displayName: string;
+      let profileIconId: number;
+      let puuid = target?.puuid;
+      if (target) {
+        let resolved: z.infer<typeof targetSummonerSchema> | undefined;
+        if (!target.displayName || target.profileIconId === undefined || !target.puuid) {
+          try {
+            const path = target.puuid
+              ? `/lol-summoner/v2/summoners/puuid/${encodeURIComponent(target.puuid)}`
+              : `/lol-summoner/v1/summoners/${encodeURIComponent(target.playerId)}`;
+            resolved = targetSummonerSchema.parse(await this.client.get(path, targetSummonerSchema));
+          } catch {
+            resolved = undefined;
+          }
+        }
+        puuid = puuid ?? resolved?.puuid;
+        playerId = resolved?.summonerId === undefined ? target.playerId : String(resolved.summonerId);
+        const gameName = resolved?.gameName?.trim();
+        const tagLine = resolved?.tagLine?.trim();
+        displayName = target.displayName
+          ?? (gameName ? `${gameName}${tagLine ? `#${tagLine}` : ''}` : resolved?.displayName?.trim())
+          ?? '未知玩家';
+        profileIconId = target.profileIconId ?? resolved?.profileIconId ?? 0;
+      } else {
+        const summoner = currentSummonerSchema.parse(
+          await this.client.get('/lol-summoner/v1/current-summoner', currentSummonerSchema)
+        );
+        playerId = String(summoner.summonerId);
+        displayName = summoner.displayName;
+        profileIconId = summoner.profileIconId;
+        puuid = summoner.puuid;
+      }
       try {
-    const fresh = this.cache.getFresh(playerId);
-    const supportsRichMatchRows = fresh?.matches.every(
-      (match) =>
-        match.summonerSpellIds !== undefined &&
-        match.allyChampionIds !== undefined &&
-        match.enemyChampionIds !== undefined &&
-        match.allyChampionIds.length + match.enemyChampionIds.length > 1,
-    );
-    if (
-      fresh?.historyDataVersion === 4 &&
-      fresh.itemIconPaths !== undefined &&
-      supportsRichMatchRows
-    ) return fresh;
+        const fresh = this.cache.getFresh(playerId);
+        const supportsRichMatchRows = fresh?.matches.every((match) => target
+          ? match.allyPlayers !== undefined && match.enemyPlayers !== undefined
+          : match.summonerSpellIds !== undefined &&
+            match.allyChampionIds !== undefined &&
+            match.enemyChampionIds !== undefined &&
+            match.allyChampionIds.length + match.enemyChampionIds.length > 1);
+        if (
+          fresh?.historyDataVersion === 5 &&
+          fresh.itemIconPaths !== undefined &&
+          supportsRichMatchRows
+        ) return fresh;
       } catch {
         // A cache read failure must not prevent an online refresh.
       }
-      const listedHistory = matchHistoryResponseSchema.parse(await this.client.get(
-        '/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=40',
-        matchHistoryResponseSchema
-      ));
+      const rawHistory = target && puuid && this.sgp
+        ? await this.sgp.getHistory(puuid, 40)
+        : await this.client.get(
+          target
+            ? `/lol-match-history/v1/products/lol/${encodeURIComponent(puuid ?? playerId)}/matches?begIndex=0&endIndex=40`
+            : '/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=40',
+          matchHistoryResponseSchema
+        );
+      const listedHistory = matchHistoryResponseSchema.parse(rawHistory);
       const listedGames = [...listedHistory.games]
         .sort((left, right) => right.gameCreation - left.gameCreation)
         .slice(0, 20);
       const enrichedGames = await Promise.all(listedGames.map(async (game) => {
-        if (game.participants.length > 1) return game;
+        if (game.participants.length > 1 && (game.participantIdentities?.length ?? 0) > 1) return game;
         try {
           const detailedGame = await this.client.get(
             `/lol-match-history/v1/games/${encodeURIComponent(String(game.gameId))}`,
@@ -125,8 +168,11 @@ export class PersonalHistoryService {
         }
       }));
       const history = adaptMatchHistory({ games: enrichedGames }, { scope: 'all', limit: 20 });
+      const rankRequest = target && puuid && this.sgp
+        ? this.sgp.getRankedStats(puuid)
+        : this.client.get(`/lol-ranked/v1/ranked-stats/${encodeURIComponent(playerId)}`, rankedStatsSchema);
       const [rankResult, patchResult, itemsResult] = await Promise.allSettled([
-        this.client.get(`/lol-ranked/v1/ranked-stats/${encodeURIComponent(playerId)}`, rankedStatsSchema),
+        rankRequest,
         this.client.get('/lol-patch/v1/game-version', assetVersionSchema),
         this.client.get('/lol-game-data/assets/v1/items.json', itemMetadataSchema)
       ]);
@@ -154,8 +200,8 @@ export class PersonalHistoryService {
       );
       const snapshot = personalHistorySchema.parse({
         playerId,
-        displayName: summoner.displayName,
-        profileIconId: summoner.profileIconId,
+        displayName,
+        profileIconId,
         ...(rank === undefined ? {} : { rank }),
         matches: history,
         sampleSize: history.length,
@@ -166,7 +212,7 @@ export class PersonalHistoryService {
         favoriteChampions: favoriteChampions(history),
         ...(patchResult.status === 'fulfilled' ? { assetVersion: patchResult.value } : {}),
         itemIconPaths,
-        historyDataVersion: 4,
+        historyDataVersion: 5,
         cached: false,
         updatedAt: Date.now()
       });

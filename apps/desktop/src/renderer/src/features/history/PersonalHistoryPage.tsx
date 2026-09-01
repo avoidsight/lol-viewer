@@ -1,4 +1,5 @@
-import type { MatchSummary, PersonalHistorySnapshot } from '../../../../shared/domain';
+import type { MatchParticipantSummary, MatchSummary, PersonalHistorySnapshot } from '../../../../shared/domain';
+import type { PersonalHistoryTarget } from '../../../../shared/ipc';
 import { localizeRank } from '../../../../shared/rank';
 import { isBuildItem } from '../../../../shared/items';
 import { describeQueue } from '../../../../shared/queue';
@@ -49,29 +50,53 @@ function SummonerSpells({ spellIds, assetVersion }: {
   </div>;
 }
 
-function TeamComposition({ match, assetVersion }: {
+function TeamComposition({ match, assetVersion, viewerPlayerId, onPlayerSelect }: {
   match: MatchSummary;
   assetVersion?: string;
+  viewerPlayerId: string;
+  onPlayerSelect?: (target: PersonalHistoryTarget) => void;
 }) {
-  const teamRow = (side: 'ally' | 'enemy', championIds: number[] | undefined) =>
+  const teamRow = (
+    side: 'ally' | 'enemy',
+    championIds: number[] | undefined,
+    players: MatchParticipantSummary[] | undefined
+  ) =>
     Array.from({ length: 5 }, (_, index) => {
-      const championId = championIds?.[index];
+      const player = players?.[index];
+      const championId = player?.championId ?? championIds?.[index];
       if (championId === undefined) {
         return <span key={`${side}-${index}`} className="personal-history__team-slot" aria-hidden="true" />;
       }
-      const isLocal = side === 'ally' && championId === match.championId;
-      return <img
+      const isLocal = player?.playerId === viewerPlayerId
+        || (!players && side === 'ally' && championId === match.championId);
+      const image = <img
+          className={`personal-history__team-icon${isLocal ? ' is-local' : ''}`}
+          src={championIconUrl(assetVersion, championId)}
+          alt={`${side === 'ally' ? '己方' : '敌方'}英雄 ${championId}`}
+          loading="lazy"
+        />;
+      if (!player?.playerId || isLocal || !onPlayerSelect) {
+        return <span key={`${side}-${index}-${championId}`} className="personal-history__team-player">{image}</span>;
+      }
+      const label = player.displayName ?? `英雄 ${championId} 玩家`;
+      return <button
         key={`${side}-${index}-${championId}`}
-        className={`personal-history__team-icon${isLocal ? ' is-local' : ''}`}
-        src={championIconUrl(assetVersion, championId)}
-        alt={`${side === 'ally' ? '己方' : '敌方'}英雄 ${championId}`}
-        loading="lazy"
-      />;
+        type="button"
+        className="personal-history__team-player personal-history__team-player--link"
+        aria-label={`查看 ${label} 的个人战绩`}
+        title={`查看 ${label} 的个人战绩`}
+        onClick={() => onPlayerSelect({
+          playerId: player.playerId!,
+          ...(player.puuid ? { puuid: player.puuid } : {}),
+          ...(player.displayName ? { displayName: player.displayName } : {}),
+          ...(player.profileIconId === undefined ? {} : { profileIconId: player.profileIconId })
+        })}
+      >{image}</button>;
     });
 
   return <div className="personal-history__teams" data-testid="team-composition">
-    <div>{teamRow('ally', match.allyChampionIds)}</div>
-    <div>{teamRow('enemy', match.enemyChampionIds)}</div>
+    <div>{teamRow('ally', match.allyChampionIds, match.allyPlayers)}</div>
+    <div>{teamRow('enemy', match.enemyChampionIds, match.enemyPlayers)}</div>
   </div>;
 }
 
@@ -130,10 +155,12 @@ function formatEndedAt(endedAt: number): string {
   }).format(new Date(endedAt));
 }
 
-function MatchRow({ match, assetVersion, itemIconPaths }: {
+function MatchRow({ match, assetVersion, itemIconPaths, viewerPlayerId, onPlayerSelect }: {
   match: MatchSummary;
   assetVersion?: string;
   itemIconPaths?: Record<string, string>;
+  viewerPlayerId: string;
+  onPlayerSelect?: (target: PersonalHistoryTarget) => void;
 }) {
   const kda = (match.kills + match.assists) / Math.max(1, match.deaths);
   return <article data-testid="personal-match" className={match.win ? 'is-win' : 'is-loss'}>
@@ -168,7 +195,7 @@ function MatchRow({ match, assetVersion, itemIconPaths }: {
       })}
     </div>
     <PerformanceMetrics match={match} />
-    <TeamComposition match={match} assetVersion={assetVersion} />
+    <TeamComposition match={match} assetVersion={assetVersion} viewerPlayerId={viewerPlayerId} onPlayerSelect={onPlayerSelect} />
     <time dateTime={new Date(match.endedAt).toISOString()}>
       <b>{formatEndedAt(match.endedAt)}</b>
       <span>时长 {Math.round(match.durationSeconds / 60)} 分钟</span>
@@ -176,18 +203,20 @@ function MatchRow({ match, assetVersion, itemIconPaths }: {
   </article>;
 }
 
-export default function PersonalHistoryPage({ snapshot, state, onRefresh, refreshing = false, refreshError = '' }: {
+export default function PersonalHistoryPage({ snapshot, state, onRefresh, onPlayerSelect, onBack, refreshing = false, refreshError = '' }: {
   snapshot?: PersonalHistorySnapshot;
   state: HistoryState;
   onRefresh?: () => void;
+  onPlayerSelect?: (target: PersonalHistoryTarget) => void;
+  onBack?: () => void;
   refreshing?: boolean;
   refreshError?: string;
 }) {
   if (state === 'loading') {
-    return <main className="personal-history"><p role="status">正在加载个人战绩…</p></main>;
+    return <main className="personal-history"><div className="personal-history__unavailable">{onBack && <button type="button" onClick={onBack}>返回我的战绩</button>}<p role="status">正在加载个人战绩…</p></div></main>;
   }
   if (state === 'unavailable' || !snapshot) {
-    return <main className="personal-history"><p role="alert">请先启动英雄联盟客户端</p></main>;
+    return <main className="personal-history"><div className="personal-history__unavailable">{onBack && <button type="button" onClick={onBack}>返回我的战绩</button>}<p role="alert">{onBack ? '该玩家战绩暂时无法读取' : '请先启动英雄联盟客户端'}</p></div></main>;
   }
 
   return <main className="personal-history">
@@ -195,6 +224,7 @@ export default function PersonalHistoryPage({ snapshot, state, onRefresh, refres
       <header className="personal-history__hero">
         <img className="personal-history__hero-avatar" src={profileIconUrl(snapshot.assetVersion, snapshot.profileIconId)} alt={`${snapshot.displayName}头像`} />
         <div className="personal-history__identity">
+          {onBack && <button className="personal-history__back" type="button" onClick={onBack}>← 返回我的战绩</button>}
           <div className="personal-history__name-row">
             <h1>{snapshot.displayName}</h1>
             {snapshot.cached && <strong className="personal-history__cached">缓存数据</strong>}
@@ -239,6 +269,8 @@ export default function PersonalHistoryPage({ snapshot, state, onRefresh, refres
               match={match}
               assetVersion={snapshot.assetVersion}
               itemIconPaths={snapshot.itemIconPaths}
+              viewerPlayerId={snapshot.playerId}
+              onPlayerSelect={onPlayerSelect}
             />)}
           </div>
         </section>

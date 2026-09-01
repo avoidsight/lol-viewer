@@ -20,6 +20,13 @@ const matchAchievementSchema = z.object({
   type: z.enum(['MOST_KILLS', 'MOST_ASSISTS', 'MOST_DAMAGE', 'MOST_DAMAGE_TAKEN']),
   value: z.number().nonnegative()
 }).strict();
+const matchParticipantSummarySchema = z.object({
+  championId: z.number().int().nonnegative(),
+  playerId: z.string().min(1).optional(),
+  puuid: z.string().min(1).optional(),
+  displayName: z.string().min(1).optional(),
+  profileIconId: z.number().int().nonnegative().optional()
+}).strict();
 export const queueScopeSchema = z.enum(['ranked-solo', 'all']);
 export const appSettingsSchema = z.object({
   queueScope: queueScopeSchema,
@@ -48,6 +55,8 @@ export const matchSummarySchema = z.object({
   ]).optional(),
   allyChampionIds: z.array(z.number().int().nonnegative()).max(5).optional(),
   enemyChampionIds: z.array(z.number().int().nonnegative()).max(5).optional(),
+  allyPlayers: z.array(matchParticipantSummarySchema).max(5).optional(),
+  enemyPlayers: z.array(matchParticipantSummarySchema).max(5).optional(),
   goldEarned: z.number().int().nonnegative().optional(),
   totalDamageDealtToChampions: z.number().int().nonnegative().optional(),
   totalDamageTaken: z.number().int().nonnegative().optional(),
@@ -85,6 +94,14 @@ export const personalHistorySchema: z.ZodType<PersonalHistorySnapshot> = z.objec
   cached: z.boolean(),
   updatedAt: z.number()
 }).strict();
+
+export const personalHistoryTargetSchema = z.object({
+  playerId: z.string().min(1),
+  puuid: z.string().min(1).optional(),
+  displayName: z.string().min(1).optional(),
+  profileIconId: z.number().int().nonnegative().optional()
+}).strict();
+export type PersonalHistoryTarget = z.infer<typeof personalHistoryTargetSchema>;
 
 export const playerSnapshotSchema: z.ZodType<PlayerSnapshot> = z.object({
   playerId: z.string(),
@@ -169,7 +186,7 @@ export interface LiveMatch {
 }
 
 export interface LolViewerApi {
-  getPersonalHistory(): Promise<PersonalHistorySnapshot>;
+  getPersonalHistory(target?: PersonalHistoryTarget): Promise<PersonalHistorySnapshot>;
   getLiveMatch(scope: QueueScope, generation?: number): Promise<LiveMatch>;
   getGameflowPhase(): Promise<string>;
   getGameflowSessionIdentity(): Promise<GameflowSessionIdentity>;

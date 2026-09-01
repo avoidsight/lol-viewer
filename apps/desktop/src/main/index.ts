@@ -104,11 +104,15 @@ void app.whenReady().then(() => {
     readyCheckAutoAcceptor.start();
   }
   registerHistoryIpc({
-    load: async () => {
-      if (fixtureMode) return createFixturePersonalHistory();
+    load: async (target) => {
+      if (fixtureMode) return createFixturePersonalHistory(target);
       const connection = await discoverLcuConnection();
       if (!connection) throw new Error('League client is unavailable');
-      return new PersonalHistoryService(createLcuClient(connection), personalHistoryCache).load();
+      const lcu = createLcuClient(connection);
+      const sgp = connection.region?.toUpperCase() === 'TENCENT' && connection.rsoPlatformId
+        ? createSgpClient(lcu, connection.rsoPlatformId)
+        : undefined;
+      return new PersonalHistoryService(lcu, personalHistoryCache, sgp).load(target);
     }
   });
   coordinator = new GameflowCoordinator(async (scope, onPlayer, signal) => {

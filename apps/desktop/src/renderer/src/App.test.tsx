@@ -118,6 +118,39 @@ describe('App tab lifecycle', () => {
     expect(screen.getByText('刷新失败，请重试')).toBeVisible();
   });
 
+  it('navigates to another player history from a match portrait and returns to the local snapshot', async () => {
+    const localHistory: PersonalHistorySnapshot = {
+      ...history,
+      matches: [{
+        matchId: 'match-1', queueId: 420, endedAt: 1, durationSeconds: 1200,
+        championId: 1, win: true, kills: 2, deaths: 1, assists: 3,
+        allyPlayers: [{ championId: 1, playerId: 'me', displayName: '召唤师' }],
+        enemyPlayers: [{ championId: 2, playerId: 'other', puuid: 'other-puuid', displayName: '对手' }]
+      }],
+      sampleSize: 1,
+      wins: 1,
+      winRate: 1
+    };
+    const otherHistory: PersonalHistorySnapshot = {
+      ...history,
+      playerId: 'other',
+      displayName: '对手',
+      profileIconId: 2
+    };
+    const { api } = install();
+    vi.mocked(api.getPersonalHistory).mockImplementation(async (target) => target ? otherHistory : localHistory);
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '查看 对手 的个人战绩' }));
+    expect(await screen.findByRole('heading', { name: '对手' })).toBeVisible();
+    expect(api.getPersonalHistory).toHaveBeenLastCalledWith({
+      playerId: 'other', puuid: 'other-puuid', displayName: '对手'
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /返回我的战绩/ }));
+    expect(await screen.findByRole('heading', { name: '召唤师' })).toBeVisible();
+  });
+
   it('subscribes before requesting all modes, then cancels on exit', async () => {
     const order: string[] = []; const request = deferred<LiveMatch>();
     const { api, unsubscribe } = install(vi.fn((scope, generation) => { order.push(`request:${scope}:${generation}`); return request.promise; }), order);
