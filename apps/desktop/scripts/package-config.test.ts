@@ -36,6 +36,9 @@ describe('desktop packaging metadata', () => {
     expect(launcher).toContain('pause >nul');
     expect(packageScript.charCodeAt(0)).toBe(0xfeff);
     expect(packageScript).toContain('[Console]::OutputEncoding = $Utf8Encoding');
+    expect(packageScript).toContain('"--source", "winget"');
+    expect(packageScript).toContain('$installArguments = $wingetArguments + "--force"');
+    expect(packageScript).toContain('$officialNodePath = Join-Path $env:ProgramFiles "nodejs"');
     expect(packageScript).toContain('pnpm@$PnpmVersion');
     expect(packageScript).toContain('install", "--frozen-lockfile');
     expect(packageScript).toContain('"apps/desktop", "package:win"');

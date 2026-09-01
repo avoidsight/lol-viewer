@@ -28,7 +28,18 @@ function Write-Step {
 function Refresh-ProcessPath {
     $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-    $env:Path = "$machinePath;$userPath"
+    $officialNodePath = Join-Path $env:ProgramFiles "nodejs"
+    $pathParts = @()
+    if (Test-Path $officialNodePath) {
+        $pathParts += $officialNodePath
+    }
+    if ($machinePath) {
+        $pathParts += $machinePath
+    }
+    if ($userPath) {
+        $pathParts += $userPath
+    }
+    $env:Path = $pathParts -join ";"
 }
 
 function Install-Or-UpdateNode {
@@ -39,16 +50,33 @@ function Install-Or-UpdateNode {
         throw "未找到 Node.js $RequiredNodeMajor+，并且当前系统没有 winget。请先从 https://nodejs.org/ 安装 Node.js LTS 后重新运行。"
     }
 
+    $wingetArguments = @(
+        "--id", "OpenJS.NodeJS.LTS",
+        "--exact",
+        "--source", "winget",
+        "--accept-package-agreements",
+        "--accept-source-agreements"
+    )
+
     if ($IsUpgrade) {
         Write-Host "Node.js 版本过低，正在通过 winget 更新 LTS 版本……" -ForegroundColor Yellow
-        & $winget.Source upgrade --id OpenJS.NodeJS.LTS --exact --accept-package-agreements --accept-source-agreements
+        & $winget.Source upgrade @wingetArguments
+        $wingetExitCode = $LASTEXITCODE
+
+        if ($wingetExitCode -ne 0) {
+            Write-Host "winget 未识别现有的 Node.js 安装，改为安装并覆盖为最新 LTS 版本……" -ForegroundColor Yellow
+            $installArguments = $wingetArguments + "--force"
+            & $winget.Source install @installArguments
+            $wingetExitCode = $LASTEXITCODE
+        }
     } else {
         Write-Host "未检测到 Node.js，正在通过 winget 安装 LTS 版本……" -ForegroundColor Yellow
-        & $winget.Source install --id OpenJS.NodeJS.LTS --exact --accept-package-agreements --accept-source-agreements
+        & $winget.Source install @wingetArguments
+        $wingetExitCode = $LASTEXITCODE
     }
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "winget 安装 Node.js 失败（退出码：$LASTEXITCODE）。"
+    if ($wingetExitCode -ne 0) {
+        throw "winget 安装 Node.js 失败（退出码：$wingetExitCode）。请从 https://nodejs.org/ 手动安装 LTS 版本后重试。"
     }
 
     Refresh-ProcessPath
