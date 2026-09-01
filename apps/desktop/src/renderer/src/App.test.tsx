@@ -205,7 +205,7 @@ describe('App tab lifecycle', () => {
     expect(screen.getByText('Player One')).toBeVisible();
   });
 
-  it('clears the previous match immediately while a tab re-entry refresh is pending', async () => {
+  it('keeps the previous match visible while a tab re-entry refresh is pending', async () => {
     const refresh = deferred<LiveMatch>();
     const { api } = install(vi.fn().mockResolvedValueOnce(match).mockImplementationOnce(() => refresh.promise));
     render(<App initialTab="live" />);
@@ -216,7 +216,7 @@ describe('App tab lifecycle', () => {
     fireEvent.click(tabs[1]);
 
     await waitFor(() => expect(api.getLiveMatch).toHaveBeenCalledTimes(2));
-    expect(screen.queryByText('Player One')).not.toBeInTheDocument();
+    expect(screen.getByText('Player One')).toBeVisible();
   });
   it('shows retryable error only when the request rejects', async () => {
     const request = deferred<LiveMatch>(); install(() => request.promise); render(<App />);
@@ -316,7 +316,31 @@ describe('App tab lifecycle', () => {
     } finally {
       vi.useRealTimers();
     }
-  });  it('clears the previous roster after game end and loads the next match on the next active phase', async () => {
+  });
+  it('keeps the champion-select roster through game start without reloading or blanking it', async () => {
+    vi.useFakeTimers();
+    try {
+      const getLiveMatch = vi.fn().mockResolvedValue(match);
+      const { api } = install(getLiveMatch);
+      const identityApi = api as unknown as { getGameflowSessionIdentity: ReturnType<typeof vi.fn> };
+      identityApi.getGameflowSessionIdentity
+        .mockResolvedValueOnce({ phase: 'ChampSelect', gameId: 'game-1' })
+        .mockResolvedValueOnce({ phase: 'GameStart', gameId: 'game-1' })
+        .mockResolvedValue({ phase: 'InProgress', gameId: 'game-1' });
+      render(<App initialTab="live" />);
+      await act(async () => { await Promise.resolve(); });
+      expect(screen.getByText('Player One')).toBeVisible();
+
+      await act(async () => { vi.advanceTimersByTime(6_000); await Promise.resolve(); await Promise.resolve(); });
+
+      expect(screen.getByText('Player One')).toBeVisible();
+      expect(getLiveMatch).toHaveBeenCalledOnce();
+      expect(api.cancelLiveMatch).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('retains the previous roster after game end and replaces it when the next match starts', async () => {
     vi.useFakeTimers();
     try {
       const nextPlayer = { ...player, playerId: 'two', displayName: 'Player Two', championId: 2 };
@@ -330,7 +354,8 @@ describe('App tab lifecycle', () => {
       expect(screen.getByText('Player One')).toBeVisible();
 
       await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); });
-      expect(screen.queryByText('Player One')).not.toBeInTheDocument();
+      expect(screen.getByText('Player One')).toBeVisible();
+      expect(api.cancelLiveMatch).not.toHaveBeenCalled();
 
       await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
       expect(getLiveMatch).toHaveBeenCalledTimes(2);

@@ -90,10 +90,10 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     const currentGeneration = ++generation.current;
     setLiveRequesting(true);
     liveRequestingRef.current = true;
-    setMatch(undefined);
-    liveSnapshotRef.current = false;
-    setProgress([]);
-    setLiveState('waiting');
+    if (!liveSnapshotRef.current) {
+      setProgress([]);
+      setLiveState('waiting');
+    }
     const unsubscribe = api.onPlayerUpdated((player, eventGeneration = currentGeneration) => {
       if (!active || eventGeneration !== currentGeneration || player.scope !== 'all') return;
       setProgress((current) => [...current.filter((entry) => entry.playerId !== player.playerId), player]);
@@ -125,9 +125,9 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
         if (!active) return;
         const isActive = activePhases.has(phase);
         const enteredChampionSelect = previousPhase !== undefined && phase === 'ChampSelect' && previousPhase !== 'ChampSelect';
-        const gameIdChanged = identity.gameId !== undefined && currentGameIdRef.current !== undefined && identity.gameId !== currentGameIdRef.current;
+        const gameIdChanged = isActive && identity.gameId !== undefined && currentGameIdRef.current !== undefined && identity.gameId !== currentGameIdRef.current;
         previousPhase = phase;
-        if (identity.gameId !== undefined) currentGameIdRef.current = identity.gameId;
+        if (isActive && identity.gameId !== undefined) currentGameIdRef.current = identity.gameId;
         if ((gameIdChanged || enteredChampionSelect) && liveSnapshotRef.current && !liveRequestingRef.current) {
           generation.current += 1;
           liveSnapshotRef.current = false;
@@ -135,15 +135,6 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
           setProgress([]);
           setLiveState('waiting');
           setRetryNonce((value) => value + 1);
-        } else if (!isActive && (liveSnapshotRef.current || liveRequestingRef.current)) {
-          generation.current += 1;
-          liveSnapshotRef.current = false;
-          liveRequestingRef.current = false;
-          setMatch(undefined);
-          setProgress([]);
-          setLiveRequesting(false);
-          setLiveState('waiting');
-          void Promise.resolve(api.cancelLiveMatch?.()).catch(() => undefined);
         } else if (isActive && !liveSnapshotRef.current && !liveRequestingRef.current) {
           setRetryNonce((value) => value + 1);
         }
