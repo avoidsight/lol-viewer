@@ -44,4 +44,24 @@ describe('liveMatchReducer', () => {
     });
     expect(loading.status).toBe('new-match-loading');
   });
+
+  it('merges champion-select changes without discarding loaded history', () => {
+    const historicalPlayer = {
+      ...player,
+      matches: [{ matchId: 'm1', queueId: 420, endedAt: 1, durationSeconds: 600, championId: 2, win: true, kills: 1, deaths: 1, assists: 1 }]
+    };
+    const ready = liveMatchReducer(initialLiveMatchState, {
+      type: 'request-succeeded',
+      match: { ...match, players: [historicalPlayer] }
+    });
+    const refreshed = liveMatchReducer(ready, {
+      type: 'roster-refreshed',
+      roster: {
+        ...match,
+        players: [{ playerId: '1', displayName: 'Player', teamId: 100, lane: 'TOP', championId: 2 }]
+      }
+    });
+
+    expect(refreshed.match?.players[0]).toMatchObject({ championId: 2, matches: historicalPlayer.matches, currentChampionGames: 1, currentChampionWins: 1, currentChampionWinRate: 1 });
+  });
 });

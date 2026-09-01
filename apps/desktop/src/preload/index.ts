@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { PersonalHistorySnapshot, PlayerSnapshot, QueueScope } from '../shared/domain';
 import {
   MATCH_GET_CHANNEL,
+  MATCH_ROSTER_GET_CHANNEL,
   MATCH_CANCEL_CHANNEL,
   MATCH_RETRY_CHANNEL,
   GAMEFLOW_PHASE_GET_CHANNEL,
@@ -18,6 +19,7 @@ import {
   appSettingsPatchSchema,
   appSettingsSchema,
   liveMatchSchema,
+  liveRosterSchema,
   liveMatchRequestSchema,
   gameflowPhaseSchema,
   gameflowSessionIdentitySchema,
@@ -34,6 +36,7 @@ import {
   type AppSettings,
   type ChampionLane,
   type LiveMatch,
+  type LiveRoster,
   type LolViewerApi,
   type PersonalHistoryTarget
 } from '../shared/ipc';
@@ -49,6 +52,8 @@ const api: LolViewerApi = Object.freeze({
     const input = liveMatchRequestSchema.parse({ scope: queueScopeSchema.parse(scope), generation });
     return liveMatchSchema.parse(await ipcRenderer.invoke(MATCH_GET_CHANNEL, input));
   },
+  getLiveRoster: async (): Promise<LiveRoster> =>
+    liveRosterSchema.parse(await ipcRenderer.invoke(MATCH_ROSTER_GET_CHANNEL)),
   getGameflowPhase: async (): Promise<string> =>
     gameflowPhaseSchema.parse(await ipcRenderer.invoke(GAMEFLOW_PHASE_GET_CHANNEL)),
   getGameflowSessionIdentity: async () =>

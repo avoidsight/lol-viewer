@@ -36,6 +36,31 @@ function deferred<T>() {
 }
 
 describe('MatchService', () => {
+  it('refreshes a champion-select roster without loading rank or match history', async () => {
+    const team = (offset: number) => Array.from({ length: 5 }, (_, index) => ({
+      cellId: offset + index,
+      summonerId: String(offset + index),
+      championId: offset + index,
+      assignedPosition: index === 0 ? 'TOP' : '',
+      gameName: `Player ${offset + index}`,
+      playerAlias: ''
+    }));
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') return { phase: 'ChampSelect', gameData: { teamOne: [], teamTwo: [], queueId: 420 } };
+      if (path === '/lol-champ-select/v1/session') return { myTeam: team(10), theirTeam: team(20), localPlayerCellId: 10, queueId: 420 };
+      if (path === '/lol-summoner/v1/current-summoner') return { summonerId: 'me', displayName: 'Me' };
+      throw new Error(`Unexpected heavyweight request: ${path}`);
+    });
+
+    const result = await new MatchService({ get } as LcuClient).loadLiveRoster();
+
+    expect(result).toMatchObject({ queueId: 420, modeName: '单双排', localTeamId: 100 });
+    expect(result.players).toHaveLength(10);
+    expect(result.players[0]).toMatchObject({ playerId: 'me', displayName: 'Me', championId: 10, isLocalTeam: true });
+    expect(get).toHaveBeenCalledTimes(3);
+    expect(get.mock.calls.some(([path]) => String(path).includes('match-history') || String(path).includes('ranked-stats'))).toBe(false);
+  });
+
   it('falls back to the champ-select roster when the gameflow roster is empty', async () => {
     const champSelectTeam = (offset: number) => Array.from({ length: 5 }, (_, index) => ({
       summonerId: String(offset + index + 1),

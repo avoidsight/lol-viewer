@@ -52,7 +52,15 @@ describe('preload match API validation', () => {
     await expect(api.getGameflowSessionIdentity()).resolves.toEqual({ phase: 'InProgress', gameId: '12345' });
     electron.invoke.mockResolvedValue({ phase: 'InProgress', gameId: '' });
     await expect(api.getGameflowSessionIdentity()).rejects.toThrow();
-  });  it('does not deliver an invalid player update to the listener', async () => {
+  });
+
+  it('validates lightweight roster refresh responses', async () => {
+    const api = await loadApi();
+    electron.invoke.mockResolvedValue({ players: [{ playerId: 'missing-fields' }] });
+    await expect(api.getLiveRoster()).rejects.toThrow();
+  });
+
+  it('does not deliver an invalid player update to the listener', async () => {
     const api = await loadApi();
     const listener = vi.fn();
     api.onPlayerUpdated(listener);

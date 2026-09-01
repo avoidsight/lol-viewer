@@ -26,6 +26,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   const [settings, setSettings] = useState<AppSettings>(defaults);
   const [message, setMessage] = useState('');
   const [retryNonce, setRetryNonce] = useState(0);
+  const hasLiveMatch = liveView.match !== undefined;
   const generation = useRef(0);
   const pageRef = useRef(page);
   const historyRequest = useRef<Promise<PersonalHistorySnapshot> | undefined>(undefined);
@@ -140,6 +141,28 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     const timer = window.setInterval(() => void checkPhase(), 3_000);
     return () => { active = false; window.clearInterval(timer); };
   }, [dispatchLive, page]);
+  useEffect(() => {
+    if (page !== 'live' || liveView.phase !== 'ChampSelect' || !hasLiveMatch) return;
+    const api = window.lolViewer;
+    if (!api) return;
+    let active = true;
+    let requesting = false;
+    const refreshRoster = async (): Promise<void> => {
+      if (!active || requesting) return;
+      requesting = true;
+      try {
+        const roster = await api.getLiveRoster();
+        if (active) dispatchLive({ type: 'roster-refreshed', roster });
+      } catch {
+        // Champion-select data can be briefly incomplete while players join.
+      } finally {
+        requesting = false;
+      }
+    };
+    void refreshRoster();
+    const timer = window.setInterval(() => void refreshRoster(), 1_500);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [dispatchLive, hasLiveMatch, liveView.phase, page]);
   useEffect(() => {
     let active = true;
     let previousPhase: string | undefined;

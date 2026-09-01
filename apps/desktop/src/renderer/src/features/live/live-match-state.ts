@@ -1,5 +1,5 @@
 import type { PlayerSnapshot } from '../../../../shared/domain';
-import type { LiveMatch } from '../../../../shared/ipc';
+import type { LiveMatch, LiveRoster } from '../../../../shared/ipc';
 
 export type LiveMatchStatus =
   | 'waiting'
@@ -21,6 +21,7 @@ export type LiveMatchAction =
   | { type: 'request-started' }
   | { type: 'player-updated'; player: PlayerSnapshot }
   | { type: 'request-succeeded'; match: LiveMatch }
+  | { type: 'roster-refreshed'; roster: LiveRoster }
   | { type: 'request-failed' }
   | { type: 'phase-observed'; phase: string; active: boolean }
   | { type: 'new-match-detected'; phase: string };
@@ -30,6 +31,33 @@ export const initialLiveMatchState: LiveMatchViewState = {
   progress: [],
   requesting: false
 };
+
+function mergeRoster(match: LiveMatch, roster: LiveRoster): LiveMatch {
+  const existingByTeam = new Map<number, PlayerSnapshot[]>();
+  const used = new Set<PlayerSnapshot>();
+  for (const player of match.players) {
+    existingByTeam.set(player.teamId, [...(existingByTeam.get(player.teamId) ?? []), player]);
+  }
+  const players = roster.players.map((player) => {
+    const team = existingByTeam.get(player.teamId) ?? [];
+    const existing = team.find((entry) => !used.has(entry) && entry.playerId === player.playerId)
+      ?? team.find((entry) => !used.has(entry));
+    if (!existing) return undefined;
+    used.add(existing);
+    const championMatches = existing.matches.filter((entry) => entry.championId === player.championId);
+    const currentChampionWins = championMatches.filter((entry) => entry.win).length;
+    return {
+      ...existing,
+      ...player,
+      currentChampionGames: championMatches.length,
+      currentChampionWins,
+      currentChampionWinRate: championMatches.length ? currentChampionWins / championMatches.length : 0
+    };
+  }).filter((player): player is PlayerSnapshot => player !== undefined);
+  return players.length === roster.players.length
+    ? { ...roster, players }
+    : match;
+}
 
 export function liveMatchReducer(
   state: LiveMatchViewState,
@@ -62,6 +90,10 @@ export function liveMatchReducer(
         requesting: false,
         ...(state.phase ? { phase: state.phase } : {})
       };
+    case 'roster-refreshed':
+      return state.match
+        ? { ...state, match: mergeRoster(state.match, action.roster) }
+        : state;
     case 'request-failed':
       return state.match
         ? { ...state, requesting: false }

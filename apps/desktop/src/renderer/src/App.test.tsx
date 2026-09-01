@@ -16,6 +16,7 @@ function install(getLiveMatch: LolViewerApi['getLiveMatch'] = vi.fn().mockResolv
   const unsubscribe = vi.fn();
   const api = {
     getPersonalHistory: vi.fn().mockResolvedValue(history), getLiveMatch,
+    getLiveRoster: vi.fn().mockResolvedValue({ ...match, players: match.players.map(({ playerId, displayName, teamId, isLocalTeam, lane, championId }) => ({ playerId, displayName, teamId, isLocalTeam, lane, championId })) }),
     getGameflowPhase: vi.fn().mockResolvedValue('InProgress'),
     getGameflowSessionIdentity: vi.fn().mockResolvedValue({ phase: 'InProgress', gameId: 'game-1' }),
     onPlayerUpdated: vi.fn((next) => { order?.push('subscribe'); listener = next; return unsubscribe; }),
@@ -279,6 +280,7 @@ describe('App tab lifecycle', () => {
       const nextPlayer = { ...player, playerId: 'two', displayName: 'Player Two', championId: 2 };
       const getLiveMatch = vi.fn().mockResolvedValueOnce(match).mockResolvedValueOnce({ ...match, players: [nextPlayer] });
       const { api } = install(getLiveMatch);
+      vi.mocked(api.getLiveRoster).mockResolvedValue({ ...match, players: [{ playerId: 'two', displayName: 'Player Two', teamId: 100, isLocalTeam: true, lane: 'TOP', championId: 2 }] });
       const phaseApi = api as unknown as { getGameflowSessionIdentity: ReturnType<typeof vi.fn> };
       phaseApi.getGameflowSessionIdentity.mockResolvedValueOnce({ phase: 'InProgress', gameId: 'game-1' }).mockResolvedValueOnce({ phase: 'ChampSelect', gameId: 'game-2' });
       render(<App initialTab="live" />);
@@ -340,6 +342,25 @@ describe('App tab lifecycle', () => {
       vi.useRealTimers();
     }
   });
+  it('refreshes only the lightweight roster while champion select remains active', async () => {
+    vi.useFakeTimers();
+    try {
+      const { api } = install();
+      vi.mocked(api.getGameflowSessionIdentity).mockResolvedValue({ phase: 'ChampSelect', gameId: 'game-1' });
+      render(<App initialTab="live" />);
+      await act(async () => { await Promise.resolve(); });
+
+      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
+      expect(api.getLiveRoster).toHaveBeenCalledOnce();
+      expect(api.getLiveMatch).toHaveBeenCalledOnce();
+
+      await act(async () => { vi.advanceTimersByTime(1_500); await Promise.resolve(); });
+      expect(api.getLiveRoster).toHaveBeenCalledTimes(2);
+      expect(api.getLiveMatch).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('retains the previous roster after game end and replaces it when the next match starts', async () => {
     vi.useFakeTimers();
     try {
@@ -347,6 +368,7 @@ describe('App tab lifecycle', () => {
       const nextMatch = { ...match, players: [nextPlayer] };
       const getLiveMatch = vi.fn().mockResolvedValueOnce(match).mockResolvedValueOnce(nextMatch);
       const { api } = install(getLiveMatch);
+      vi.mocked(api.getLiveRoster).mockResolvedValue({ ...match, players: [{ playerId: 'two', displayName: 'Player Two', teamId: 100, isLocalTeam: true, lane: 'TOP', championId: 2 }] });
       const phaseApi = api as unknown as { getGameflowSessionIdentity: ReturnType<typeof vi.fn> };
       phaseApi.getGameflowSessionIdentity.mockResolvedValueOnce({ phase: 'EndOfGame', gameId: 'game-1' }).mockResolvedValueOnce({ phase: 'ChampSelect', gameId: 'game-2' });
       render(<App initialTab="live" />);
