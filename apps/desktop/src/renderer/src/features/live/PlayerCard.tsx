@@ -20,9 +20,14 @@ export default function PlayerCard({ player, historyScope = 'all', displayLane =
   const championIcon = player.championId > 0 ? championIconUrl(player.assetVersion, player.championId) : undefined;
   const scopedMatches = player.matches.filter((match) => historyScope === 'all' || isRankedQueue(match.queueId));
   const visibleMatches = scopedMatches.slice(0, 10);
-  const wins = visibleMatches.filter((match) => match.win).length;
-  const championMatches = visibleMatches.filter((match) => match.championId === player.championId);
+  const wins = scopedMatches.filter((match) => match.win).length;
+  const championMatches = scopedMatches.filter((match) => match.championId === player.championId);
   const championWins = championMatches.filter((match) => match.win).length;
+  const sampleNotice = historyScope === 'ranked'
+    ? `最近 ${player.matches.length} 场中筛出 ${scopedMatches.length} 场排位${scopedMatches.length > 10 ? ' · 列表展示 10 场' : ''}`
+    : player.matches.length < 10
+      ? `最近战绩仅获取到 ${player.matches.length}/20 场`
+      : `统计最近 ${player.matches.length} 场 · 列表展示 10 场`;
   return <article className="player-card" data-testid="player-card" data-history-state={player.status} data-lane={displayLane} aria-labelledby={`player-${player.playerId}`}>
     <header className="player-card__header">
       {championIcon
@@ -40,8 +45,8 @@ export default function PlayerCard({ player, historyScope = 'all', displayLane =
       : player.status === 'unavailable'
         ? <p className="player-card__state player-card__state--private" role="status">{player.errorCode ? unavailableLabels[player.errorCode] : '战绩暂时无法读取'}</p>
         : <>
-          <dl className="player-card__summary"><div><dt>样本</dt><dd>{visibleMatches.length} 场</dd></div><div><dt>胜率</dt><dd>{percent(visibleMatches.length ? wins / visibleMatches.length : 0)}</dd></div><div><dt>当前英雄</dt><dd>{championMatches.length} 场 / {percent(championMatches.length ? championWins / championMatches.length : 0)}</dd></div></dl>
-          {visibleMatches.length < 10 && <p className="player-card__notice">{historyScope === 'ranked' && visibleMatches.length === 0 ? '最近记录中没有排位对局' : `仅获取到 ${visibleMatches.length}/10 场`}</p>}
+          <dl className="player-card__summary"><div><dt>近20场样本</dt><dd>{scopedMatches.length} 场</dd></div><div><dt>样本胜率</dt><dd>{percent(scopedMatches.length ? wins / scopedMatches.length : 0)}</dd></div><div><dt>该英雄胜率</dt><dd>{championMatches.length} 场 / {percent(championMatches.length ? championWins / championMatches.length : 0)}</dd></div></dl>
+          <p className="player-card__notice">{sampleNotice}</p>
           <ol className="player-card__matches" tabIndex={visibleMatches.length > 5 ? 0 : undefined} aria-label={`${player.displayName}${historyScope === 'ranked' ? '最近排位对局' : '最近对局'}`}>{visibleMatches.map((match) => <RecentMatch key={match.matchId} match={match} assetVersion={player.assetVersion} />)}</ol>
         </>}
   </article>;
