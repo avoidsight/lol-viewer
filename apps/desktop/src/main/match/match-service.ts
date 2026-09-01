@@ -246,19 +246,21 @@ export class MatchService {
       checkCancelled(signal);
       let matches: MatchSummary[] | null = cached?.matches ?? null;
       let historyErrorCode: PlayerDataErrorCode | undefined;
-      let rank: string | undefined;
-      try {
-        const ranked = rankedStatsSchema.parse(playerPuuid && this.sgp
-          ? await this.sgp.getRankedStats(playerPuuid)
-          : await this.client.get(
-            `/lol-ranked/v1/ranked-stats/${encodeURIComponent(lookupId)}`, rankedStatsSchema
-          ));
-        const rankQueueType = queueId === 440 ? 'RANKED_FLEX_SR' : 'RANKED_SOLO_5x5';
-        const selectedRank = ranked.queues.find((queue) => queue.queueType === rankQueueType);
-        if (selectedRank) rank = formatRank(selectedRank.tier, selectedRank.division, selectedRank.leaguePoints);
-      } catch {
-        checkCancelled(signal);
-        rank = undefined;
+      let rank = cached?.rank;
+      if (!cached) {
+        try {
+          const ranked = rankedStatsSchema.parse(playerPuuid && this.sgp
+            ? await this.sgp.getRankedStats(playerPuuid)
+            : await this.client.get(
+              `/lol-ranked/v1/ranked-stats/${encodeURIComponent(lookupId)}`, rankedStatsSchema
+            ));
+          const rankQueueType = queueId === 440 ? 'RANKED_FLEX_SR' : 'RANKED_SOLO_5x5';
+          const selectedRank = ranked.queues.find((queue) => queue.queueType === rankQueueType);
+          if (selectedRank) rank = formatRank(selectedRank.tier, selectedRank.division, selectedRank.leaguePoints);
+        } catch {
+          checkCancelled(signal);
+          rank = undefined;
+        }
       }
       checkCancelled(signal);
       if (!cached) {
