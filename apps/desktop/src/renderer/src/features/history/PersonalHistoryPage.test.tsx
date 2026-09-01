@@ -184,7 +184,7 @@ describe('PersonalHistoryPage', () => {
 
   it('uses the deep-sea palette, rich compact rows, and responsive tiers', () => {
     const css = readFileSync(resolve('src/renderer/src/features/history/personal-history.css'), 'utf8');
-    expect(css).toMatch(/\.personal-history\s*{[^}]*background:\s*#070b16/i);
+    expect(css).toMatch(/\.personal-history\s*{[^}]*background:\s*var\(--ui-page-bg\)/i);
     expect(css).toMatch(/\.personal-history__content\s*{[^}]*grid-template-columns:\s*minmax\(260px,\s*28fr\)\s+minmax\(0,\s*72fr\)/i);
     expect(css).toMatch(/\.personal-history__matches article\s*{[^}]*min-height:\s*66px/i);
     expect(css).toMatch(/\.personal-history__items\s*{[^}]*grid-template-columns:\s*repeat\(3,\s*25px\)/i);

@@ -1,7 +1,38 @@
-.app-shell__bar { align-items: center; background: #0c1424; border-bottom: 1px solid #253653; color: #f4f7fb; display: flex; gap: 2rem; min-height: 58px; padding: 0 1.75rem; }
-.app-shell__brand { white-space: nowrap; }.app-shell__tabs { align-self: stretch; display: flex; gap: .25rem; }
-.app-shell__tabs button { background: transparent; border: 0; border-bottom: 3px solid transparent; color: #9aaac1; cursor: pointer; padding: 0 1rem; }
-.app-shell__tabs button[aria-selected="true"] { border-bottom-color: #39c6f4; color: #f4f7fb; }.app-shell__tabs button:focus-visible { outline: 2px solid #d7b45a; outline-offset: -4px; }
+:root {
+  color-scheme: dark;
+  font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+  --ui-bg: #070b15;
+  --ui-bg-deep: #050913;
+  --ui-surface: #0c1424;
+  --ui-surface-raised: #101b2e;
+  --ui-surface-hover: #17243a;
+  --ui-border: #253653;
+  --ui-border-strong: #38516f;
+  --ui-text: #f4f7fb;
+  --ui-text-soft: #c6d2e2;
+  --ui-muted: #91a2ba;
+  --ui-subtle: #71849e;
+  --ui-accent: #39c6f4;
+  --ui-accent-soft: rgb(57 198 244 / 14%);
+  --ui-success: #2dd4bf;
+  --ui-danger: #fb7185;
+  --ui-warning: #fbbf24;
+  --ui-radius-lg: 14px;
+  --ui-radius-md: 10px;
+  --ui-radius-sm: 7px;
+  --ui-shadow: 0 14px 32px rgb(0 0 0 / 20%);
+  --ui-page-bg: radial-gradient(circle at 50% -10%, #15233d 0, var(--ui-bg) 46%, var(--ui-bg-deep) 100%);
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ui-bg); }
+button { font: inherit; }
+.app-shell__bar { align-items: center; background: rgb(9 16 29 / 96%); border-bottom: 1px solid var(--ui-border); box-shadow: 0 8px 24px rgb(0 0 0 / 16%); color: var(--ui-text); display: flex; gap: 2rem; min-height: 58px; padding: 0 1.75rem; }
+.app-shell__brand { color: var(--ui-text); font-size: 14px; font-weight: 780; letter-spacing: .02em; white-space: nowrap; }.app-shell__tabs { align-self: stretch; display: flex; gap: .25rem; }
+.app-shell__tabs button { background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--ui-muted); cursor: pointer; padding: 0 1rem; }
+.app-shell__tabs button:hover { color: var(--ui-text-soft); background: linear-gradient(180deg, transparent, var(--ui-accent-soft)); }
+.app-shell__tabs button[aria-selected="true"] { border-bottom-color: var(--ui-accent); color: var(--ui-text); }.app-shell__tabs button:focus-visible { outline: 2px solid var(--ui-warning); outline-offset: -4px; }
 @media (max-width: 36rem) { .app-shell__bar { align-items: stretch; flex-direction: column; gap: 0; padding-top: .75rem; } .app-shell__tabs { overflow-x: auto; } .app-shell__tabs button { min-height: 3rem; white-space: nowrap; } }
 
 .app-shell__tabs button.app-shell__tab--attention { color: #ffd76a; position: relative; }

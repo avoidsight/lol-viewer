@@ -1,8 +1,8 @@
 .personal-history {
   min-height: calc(100vh - 58px);
   padding: 14px 18px 32px;
-  background: #070b16;
-  color: #f4f7fb;
+  background: var(--ui-page-bg);
+  color: var(--ui-text);
 }
 
 .personal-history__inner { max-width: 1240px; margin: 0 auto; }
@@ -16,10 +16,10 @@
   gap: 14px;
   align-items: center;
   padding: 12px 14px;
-  border: 1px solid #253653;
-  border-radius: 10px;
-  background: linear-gradient(110deg, #111b2e, #0c1424);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: linear-gradient(110deg, var(--ui-surface-raised), var(--ui-surface));
+  box-shadow: var(--ui-shadow);
 }
 
 .personal-history__refresh { display: grid; align-content: center; justify-items: end; gap: 6px; }
@@ -31,16 +31,16 @@
 .personal-history__hero-avatar {
   width: 56px;
   height: 56px;
-  border: 2px solid #39c6f4;
-  border-radius: 12px;
+  border: 2px solid var(--ui-accent);
+  border-radius: var(--ui-radius-md);
   object-fit: cover;
 }
 
-.personal-history__identity p { margin-bottom: 0; color: #9aaac1; font-size: 11px; }
+.personal-history__identity p { margin-bottom: 0; color: var(--ui-muted); font-size: 11px; }
 .personal-history__identity p strong { color: #c9d3e2; font-weight: 600; }
 .personal-history__name-row { display: flex; gap: 9px; align-items: center; }
 .personal-history__cached { padding: 3px 7px; border: 1px solid #d7b45a; border-radius: 999px; color: #d7b45a; font-size: 10px; }
-.personal-history__back { margin: 0 0 5px; padding: 0; border: 0; color: #7dd3fc; background: transparent; cursor: pointer; font-size: 10px; }
+.personal-history__back { margin: 0 0 5px; padding: 0; border: 0; color: var(--ui-accent); background: transparent; cursor: pointer; font-size: 10px; }
 .personal-history__back:hover { color: #bae6fd; text-decoration: underline; }
 .personal-history__unavailable { display: grid; min-height: 220px; place-items: center; align-content: center; gap: 12px; }
 .personal-history__unavailable button { padding: 8px 12px; border: 1px solid #39c6f4; border-radius: 7px; color: #e8f7ff; background: #12304a; cursor: pointer; }
@@ -50,7 +50,7 @@
 .personal-history__metric { min-width: 0; padding-left: 14px; border-left: 1px solid #253653; }
 .personal-history__metric dt { color: #9aaac1; font-size: 10px; }
 .personal-history__metric dd { margin: 5px 0 0; font-size: 19px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-.personal-history__metric--primary dd { color: #39c6f4; }
+.personal-history__metric--primary dd { color: var(--ui-accent); }
 
 .personal-history__content {
   display: grid;
@@ -60,7 +60,7 @@
   margin-top: 10px;
 }
 
-.personal-history__panel { min-width: 0; padding: 10px; border: 1px solid #253653; border-radius: 10px; background: #0c1424; }
+.personal-history__panel { min-width: 0; padding: 10px; border: 1px solid var(--ui-border); border-radius: var(--ui-radius-md); background: var(--ui-surface); box-shadow: 0 10px 24px rgb(0 0 0 / 12%); }
 .personal-history__panel-heading { display: flex; min-height: 27px; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 7px; }
 .personal-history__panel-heading span { color: #71849e; font-size: 9px; white-space: nowrap; }
 .personal-history__favorites, .personal-history__matches { display: grid; gap: 6px; }
@@ -72,9 +72,9 @@
   align-items: center;
   min-height: 60px;
   padding: 8px;
-  border: 1px solid #253653;
-  border-radius: 8px;
-  background: #111b2e;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-raised);
 }
 
 .personal-history__favorites img { width: 42px; height: 42px; border-radius: 8px; object-fit: cover; }
@@ -92,16 +92,16 @@
   align-items: center;
   min-height: 66px;
   padding: 7px 9px;
-  border: 1px solid #253653;
+  border: 1px solid var(--ui-border);
   border-left: 3px solid #687a96;
   border-radius: 8px;
-  background: #111b2e;
+  background: var(--ui-surface-raised);
   transition: background-color 120ms ease, border-color 120ms ease;
 }
 
-.personal-history__matches article:hover { border-color: #354a6d; background: #17243a; }
-.personal-history__matches article.is-win { border-left-color: #2dd4a7; }
-.personal-history__matches article.is-loss { border-left-color: #ff647c; }
+.personal-history__matches article:hover { border-color: var(--ui-border-strong); background: var(--ui-surface-hover); }
+.personal-history__matches article.is-win { border-left-color: var(--ui-success); }
+.personal-history__matches article.is-loss { border-left-color: var(--ui-danger); }
 .personal-history__match-champion { width: 42px; height: 42px; border-radius: 8px; object-fit: cover; }
 .personal-history__match-result { display: grid; gap: 3px; }
 .personal-history__match-result strong { color: #2dd4a7; font-size: 11px; }

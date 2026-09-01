@@ -1,10 +1,8 @@
-:root { color-scheme: dark; font-family: Inter, "Microsoft YaHei", sans-serif; background: #0b1020; color: #eef2ff; }
-* { box-sizing: border-box; } body { margin: 0; } button { font: inherit; }
-.live-match-page { min-height: 100vh; padding: 20px; background: radial-gradient(circle at top, #192442, #0b1020 55%); }
+.live-match-page { min-height: calc(100vh - 58px); padding: 20px; color: var(--ui-text); background: var(--ui-page-bg); }
 .live-match-page__toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; max-width: 1400px; margin: 0 auto 13px; padding: 4px 2px 0; }
-.live-match-page__heading > span { color: #38bdf8; font-size: 9px; font-weight: 800; letter-spacing: .2em; }
+.live-match-page__heading > span { color: var(--ui-accent); font-size: 9px; font-weight: 800; letter-spacing: .2em; }
 .live-match-page__heading h1 { margin: 3px 0 1px; font-size: 25px; line-height: 1.15; }
-.live-match-page__heading p { margin: 0; color: #71849e; font-size: 11px; }
+.live-match-page__heading p { margin: 0; color: var(--ui-subtle); font-size: 11px; }
 .live-match-page__meta { display: flex; align-items: center; gap: 8px; }
 .live-match-page__status { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid #334155; border-radius: 999px; color: #cbd5e1; background: #111827; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .live-match-page__status i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
@@ -12,17 +10,17 @@
 .live-match-page__status[data-status="last-match"] { border-color: #64748b; color: #cbd5e1; background: rgb(51 65 85 / 40%); }
 .live-match-page__status[data-status="new-match-loading"], .live-match-page__status[data-status="loading"] { border-color: #38bdf8; color: #7dd3fc; background: rgb(7 89 133 / 24%); }
 .live-match-page__status[data-status="error"] { border-color: #fb7185; color: #fda4af; background: rgb(136 19 55 / 22%); }
-.live-match-page__filterbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; max-width: 1400px; margin: 0 auto 14px; padding: 8px 10px 8px 13px; border: 1px solid #263754; border-radius: 10px; background: rgb(10 18 33 / 78%); }
+.live-match-page__filterbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; max-width: 1400px; margin: 0 auto 14px; padding: 8px 10px 8px 13px; border: 1px solid var(--ui-border); border-radius: var(--ui-radius-md); background: rgb(10 18 33 / 78%); }
 .live-match-page__filterbar > div:first-child { display: grid; gap: 2px; }
 .live-match-page__filterbar strong { color: #cbd5e1; font-size: 11px; }
-.live-match-page__scope-caption { color: #71849e; font-size: 9px; white-space: nowrap; }
+.live-match-page__scope-caption { color: var(--ui-subtle); font-size: 9px; white-space: nowrap; }
 .live-match-page__scope { display: flex; gap: 3px; padding: 3px; border: 1px solid #334155; border-radius: 8px; background: #0f172a; }
 .live-match-page__scope button { padding: 6px 11px; border: 0; border-radius: 5px; color: #94a3b8; background: transparent; cursor: pointer; font-size: 11px; }
 .live-match-page__scope button:hover { color: #e2e8f0; background: #1e293b; }
-.live-match-page__scope button[aria-pressed="true"] { color: #082f49; background: #7dd3fc; font-weight: 700; }
-.live-match-page__scope button:focus-visible { outline: 2px solid #fbbf24; outline-offset: 2px; }
+.live-match-page__scope button[aria-pressed="true"] { color: #082f49; background: var(--ui-accent); font-weight: 700; }
+.live-match-page__scope button:focus-visible { outline: 2px solid var(--ui-warning); outline-offset: 2px; }
 .live-match-page__mode { padding: 6px 10px; border: 1px solid #425473; border-radius: 999px; color: #dbe7f5; background: #17243a; font-size: 11px; }
-.live-match-page__scroll:focus-visible { outline: 3px solid #fbbf24; outline-offset: 2px; }
+.live-match-page__scroll:focus-visible { outline: 3px solid var(--ui-warning); outline-offset: 2px; }
 .live-match-page__scroll { overflow-x: auto; padding-bottom: 10px; }
 .live-match-page__notice { display: flex; min-height: 154px; max-width: 1400px; align-items: center; justify-content: center; gap: 18px; margin: 22px auto 12px; padding: 24px; border: 1px solid #2e4260; border-radius: 14px; color: #a9b9cd; background: radial-gradient(circle at 50% 0, rgb(34 59 92 / 48%), rgb(10 17 31 / 90%) 58%); box-shadow: 0 16px 36px rgb(0 0 0 / 18%); }
 .live-match-page__notice > div { display: grid; max-width: 560px; gap: 5px; }
