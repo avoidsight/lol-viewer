@@ -45,6 +45,16 @@ describe('liveMatchReducer', () => {
     expect(loading.status).toBe('new-match-loading');
   });
 
+  it('keeps completed player progress when enrichment is paused at game start', () => {
+    const loading = liveMatchReducer(initialLiveMatchState, { type: 'request-started' });
+    const progressive = liveMatchReducer(loading, { type: 'player-updated', player });
+    const paused = liveMatchReducer(progressive, { type: 'enrichment-paused', phase: 'GameStart' });
+
+    expect(paused).toMatchObject({
+      status: 'paused', requesting: false, phase: 'GameStart', progress: [player]
+    });
+  });
+
   it('merges champion-select changes without discarding loaded history', () => {
     const historicalPlayer = {
       ...player,

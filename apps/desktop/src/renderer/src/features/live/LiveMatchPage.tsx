@@ -30,6 +30,7 @@ function statusLabel(status: LiveMatchStatus, phase: string | undefined): string
   if (status === 'last-match') return '上一局记录';
   if (status === 'new-match-loading') return '新对局加载中';
   if (status === 'error') return '数据暂不可用';
+  if (status === 'paused') return '游戏中已停止补全';
   if (phase === 'ChampSelect') return '英雄选择中';
   if (phase === 'GameStart') return '正在进入游戏';
   if (phase === 'InProgress' || phase === 'Reconnect') return '游戏进行中';

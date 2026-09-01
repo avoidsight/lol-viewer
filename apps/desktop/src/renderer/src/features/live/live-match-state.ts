@@ -7,6 +7,7 @@ export type LiveMatchStatus =
   | 'current'
   | 'last-match'
   | 'new-match-loading'
+  | 'paused'
   | 'error';
 export type LiveMatchErrorReason = 'client-unavailable' | 'not-in-match' | 'data-unavailable';
 
@@ -26,6 +27,7 @@ export type LiveMatchAction =
   | { type: 'roster-refreshed'; roster: LiveRoster }
   | { type: 'request-failed'; reason?: LiveMatchErrorReason }
   | { type: 'phase-observed'; phase: string; active: boolean }
+  | { type: 'enrichment-paused'; phase: string }
   | { type: 'new-match-detected'; phase: string };
 
 export const initialLiveMatchState: LiveMatchViewState = {
@@ -107,6 +109,14 @@ export function liveMatchReducer(
         ...state,
         phase: action.phase,
         ...(state.match ? { status: action.active ? 'current' : 'last-match' } : {})
+      };
+    case 'enrichment-paused':
+      return {
+        ...state,
+        status: 'paused',
+        requesting: false,
+        phase: action.phase,
+        errorReason: undefined
       };
     case 'new-match-detected':
       return {
