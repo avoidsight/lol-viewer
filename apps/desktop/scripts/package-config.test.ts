@@ -30,6 +30,9 @@ describe('desktop packaging metadata', () => {
 
     expect(workspace.scripts?.['package:win']).toBe('pnpm --dir apps/desktop package:win');
     expect(launcher).toContain('scripts\\package-windows.ps1');
+    expect(launcher).toContain('start "LOL Viewer - Windows Packaging" "%ComSpec%"');
+    expect(launcher).toContain('if /I not "%~1"=="--console"');
+    expect(launcher).toContain('pause >nul');
     expect(packageScript).toContain('pnpm@$PnpmVersion');
     expect(packageScript).toContain('install", "--frozen-lockfile');
     expect(packageScript).toContain('"apps/desktop", "package:win"');

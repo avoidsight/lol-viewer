@@ -46,12 +46,14 @@ pnpm verify
 
 ### Windows 一键打包（推荐）
 
-下载或解压完整源码后，直接双击项目根目录的 `package-windows.bat`。脚本会自动：
+下载或解压完整源码后，直接双击项目根目录的 `package-windows.bat`。脚本会打开独立的控制台窗口，持续显示执行进度，并自动：
 
 1. 检查 Node.js 22+；未安装时尝试通过 Windows `winget` 安装 Node.js LTS
 2. 下载并使用项目固定的 pnpm 10.13.1
 3. 安装锁定版本的依赖并构建 Windows x64 NSIS 安装包
 4. 将安装包及 SHA256 校验文件复制到根目录的 `release` 文件夹
+
+打包成功或失败后控制台都会保留，查看结果后按任意键退出。
 
 首次打包需要联网。若电脑没有 `winget`，请先手动安装 [Node.js LTS](https://nodejs.org/)；其余依赖无需单独配置。
 
