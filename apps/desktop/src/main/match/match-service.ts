@@ -29,6 +29,7 @@ const championSelectionSchema = z.object({
 const sessionSchema = z.object({
   phase: z.string().optional(),
   gameData: z.object({
+    gameId: z.union([z.string(), z.number()]).optional(),
     teamOne: gameflowTeamSchema,
     teamTwo: gameflowTeamSchema,
     queue: z.object({ id: z.number().int().nonnegative() }).optional(),
@@ -76,6 +77,7 @@ type CurrentSummoner = z.infer<typeof currentSummonerSchema>;
 
 interface LoadedRoster {
   participants: Participant[];
+  gameId?: string;
   local?: Participant;
   localTeamId: number | null;
   queueId: number;
@@ -168,6 +170,7 @@ export class MatchService {
           championId: participant.championId
         };
       }),
+      ...(roster.gameId ? { gameId: roster.gameId } : {}),
       localTeamId: roster.localTeamId,
       queueId: roster.queueId,
       modeName: roster.modeName,
@@ -321,7 +324,7 @@ export class MatchService {
       return player;
     }, signal);
     checkCancelled(signal);
-    return { players, localTeamId, queueId, modeName, positionOrderReliable };
+    return { players, ...(roster.gameId ? { gameId: roster.gameId } : {}), localTeamId, queueId, modeName, positionOrderReliable };
   }
 
   private async loadRoster(signal?: AbortSignal): Promise<LoadedRoster> {
@@ -401,7 +404,10 @@ export class MatchService {
       ...allParticipants.filter((participant) => participant.teamId !== localTeamId)
     ] : allParticipants;
     checkCancelled(signal);
-    return { participants, ...(local ? { local } : {}), localTeamId, queueId, modeName, positionOrderReliable, ...(currentSummoner ? { currentSummoner } : {}), champSelectFallback };
+    const gameId = gameflowSession.gameData.gameId === undefined
+      ? undefined
+      : String(gameflowSession.gameData.gameId);
+    return { participants, ...(gameId ? { gameId } : {}), ...(local ? { local } : {}), localTeamId, queueId, modeName, positionOrderReliable, ...(currentSummoner ? { currentSummoner } : {}), champSelectFallback };
   }
 
   private async getHistoryWithRetry(playerId: string, useCurrentSummonerRoute = false, signal?: AbortSignal): Promise<unknown> {

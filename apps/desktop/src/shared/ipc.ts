@@ -129,6 +129,7 @@ export const playerSnapshotSchema: z.ZodType<PlayerSnapshot> = z.object({
 
 export const liveMatchSchema = z.object({
   players: z.array(playerSnapshotSchema).length(10),
+  gameId: z.string().min(1).optional(),
   localTeamId: z.number().int().nullable().optional(),
   queueId: z.number().int().nonnegative(),
   modeName: z.string().min(1),
@@ -144,6 +145,7 @@ export const liveRosterPlayerSchema = z.object({
 }).strict();
 export const liveRosterSchema = z.object({
   players: z.array(liveRosterPlayerSchema).length(10),
+  gameId: z.string().min(1).optional(),
   localTeamId: z.number().int().nullable().optional(),
   queueId: z.number().int().nonnegative(),
   modeName: z.string().min(1),
@@ -195,6 +197,7 @@ export type ChampionDetails = z.infer<typeof championDetailsSchema>;
 
 export interface LiveMatch {
   players: PlayerSnapshot[];
+  gameId?: string;
   localTeamId?: number | null;
   queueId: number;
   modeName: string;

@@ -44,6 +44,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   const liveViewRef = useRef(liveView);
   const settingsRef = useRef(settings);
   const currentGameIdRef = useRef<string | undefined>(undefined);
+  const loadedGameIdRef = useRef<string | undefined>(undefined);
   const dispatchLive = useCallback((action: LiveMatchAction): void => {
     liveViewRef.current = liveMatchReducer(liveViewRef.current, action);
     dispatchLiveView(action);
@@ -96,6 +97,11 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
 
   useEffect(() => {
     if (page !== 'live') return;
+    if (
+      liveViewRef.current.match &&
+      loadedGameIdRef.current !== undefined &&
+      loadedGameIdRef.current === currentGameIdRef.current
+    ) return;
     let active = true;
     const api = window.lolViewer;
     if (!api) { dispatchLive({ type: 'request-failed', reason: 'client-unavailable' }); return; }
@@ -107,6 +113,10 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     });
     void api.getLiveMatch('all', currentGeneration).then((next) => {
       if (!active || currentGeneration !== generation.current) return;
+      if (next.gameId) {
+        loadedGameIdRef.current = next.gameId;
+        currentGameIdRef.current = next.gameId;
+      }
       dispatchLive({ type: 'request-succeeded', match: next });
     }).catch((error: unknown) => {
       if (active && currentGeneration === generation.current) dispatchLive({ type: 'request-failed', reason: liveErrorReason(error) });
@@ -148,6 +158,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
         if (pageRef.current === 'live') {
           if ((gameIdChanged || enteredChampionSelect) && liveViewRef.current.match && !liveViewRef.current.requesting) {
             generation.current += 1;
+            loadedGameIdRef.current = undefined;
             dispatchLive({ type: 'new-match-detected', phase });
             setRetryNonce((value) => value + 1);
           } else {

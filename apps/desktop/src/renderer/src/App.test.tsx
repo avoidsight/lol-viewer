@@ -7,7 +7,7 @@ import App from './App';
 
 const history: PersonalHistorySnapshot = { playerId: 'me', displayName: '召唤师', profileIconId: 1, matches: [], sampleSize: 0, wins: 0, losses: 0, winRate: 0, averageKda: 0, favoriteChampions: [], cached: false, updatedAt: 1 };
 const player: PlayerSnapshot = { playerId: 'one', displayName: 'Player One', teamId: 100, isLocalTeam: true, lane: 'TOP', championId: 1, scope: 'all', matches: [], sampleSize: 0, wins: 0, losses: 0, winRate: 0, currentChampionGames: 0, currentChampionWins: 0, currentChampionWinRate: 0, status: 'ready', updatedAt: 1 };
-const match: LiveMatch = { players: [player], queueId: 450, modeName: '极地大乱斗', positionOrderReliable: false };
+const match: LiveMatch = { players: [player], gameId: 'game-1', queueId: 450, modeName: '极地大乱斗', positionOrderReliable: false };
 
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (reason?: unknown) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; }
 
@@ -206,9 +206,8 @@ describe('App tab lifecycle', () => {
     expect(screen.getByText('Player One')).toBeVisible();
   });
 
-  it('keeps the previous match visible while a tab re-entry refresh is pending', async () => {
-    const refresh = deferred<LiveMatch>();
-    const { api } = install(vi.fn().mockResolvedValueOnce(match).mockImplementationOnce(() => refresh.promise));
+  it('reuses the loaded match when re-entering the live tab during the same game', async () => {
+    const { api } = install();
     render(<App initialTab="live" />);
     expect(await screen.findByText('Player One')).toBeVisible();
 
@@ -216,7 +215,8 @@ describe('App tab lifecycle', () => {
     fireEvent.click(tabs[0]);
     fireEvent.click(tabs[1]);
 
-    await waitFor(() => expect(api.getLiveMatch).toHaveBeenCalledTimes(2));
+    await act(async () => { await Promise.resolve(); });
+    expect(api.getLiveMatch).toHaveBeenCalledOnce();
     expect(screen.getByText('Player One')).toBeVisible();
   });
   it('shows retryable error only when the request rejects', async () => {
