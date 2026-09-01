@@ -22,6 +22,20 @@ function liveErrorReason(error: unknown): LiveMatchErrorReason {
   return 'data-unavailable';
 }
 
+function LiveStateNotice({
+  kind,
+  title,
+  detail,
+  alert = false
+}: {
+  kind: 'waiting' | 'loading' | 'paused' | 'error';
+  title: string;
+  detail: string;
+  alert?: boolean;
+}) {
+  return <div role={alert ? 'alert' : 'status'} className={`live-match-page__notice live-match-page__notice--${kind}`}><span className="live-match-page__notice-icon" aria-hidden="true"><i /></span><div><strong>{title}</strong><p>{detail}</p></div></div>;
+}
+
 export default function App({ initialTab = 'history' }: { initialTab?: AppTab } = {}) {
   const [page, setPage] = useState<AppTab>(initialTab);
   const [history, setHistory] = useState<PersonalHistorySnapshot>();
@@ -306,11 +320,11 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     'data-unavailable': '对战数据暂时无法读取，正在自动重试'
   };
   const liveNotice = liveView.status === 'error'
-      ? <p role="alert" className="live-match-page__notice live-match-page__notice--error">{liveErrorMessages[liveView.errorReason ?? 'data-unavailable']}</p>
+      ? <LiveStateNotice kind="error" alert title={liveErrorMessages[liveView.errorReason ?? 'data-unavailable']} detail={liveView.errorReason === 'client-unavailable' ? '启动客户端后会自动重新连接，无需手动刷新。' : 'LOL Viewer 会在后台低频重试，已有数据不会被清空。'} />
       : liveView.status === 'paused'
-        ? <p role="status" className="live-match-page__notice">游戏已经开始，已停止后台补全战绩，避免影响游戏性能</p>
+        ? <LiveStateNotice kind="paused" title="游戏已经开始，已停止后台补全战绩，避免影响游戏性能" detail="已读取的玩家数据会继续保留，下一局将自动恢复加载。" />
       : !liveView.match && liveView.progress.length === 0 && (liveView.status === 'waiting' || liveView.status === 'new-match-loading')
-        ? <p role="status" className="live-match-page__notice">{liveView.status === 'new-match-loading' ? '检测到新对局，正在加载阵容' : '等待进入英雄选择或游戏'}</p>
+        ? <LiveStateNotice kind={liveView.status === 'new-match-loading' ? 'loading' : 'waiting'} title={liveView.status === 'new-match-loading' ? '检测到新对局，正在加载阵容' : '等待进入英雄选择或游戏'} detail={liveView.status === 'new-match-loading' ? '正在识别双方玩家与英雄选择。' : '进入英雄选择后，这里会自动展示双方阵容。'} />
         : null;
 
   const content = <>
