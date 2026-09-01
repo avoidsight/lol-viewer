@@ -13,6 +13,7 @@ declare global { interface Window { lolViewer?: LolViewerApi } }
 const defaults: AppSettings = { autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false };
 const activePhases = new Set(['ChampSelect', 'GameStart', 'InProgress', 'Reconnect']);
 const clientRetryDelayMs = 3_000;
+const inGamePollDelayMs = 15_000;
 
 function liveErrorReason(error: unknown): LiveMatchErrorReason {
   const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
@@ -118,38 +119,64 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   }, [dispatchLive, page, retryNonce]);
 
   useEffect(() => {
-    if (page !== 'live') return;
     let active = true;
     let previousPhase: string | undefined;
-    const checkPhase = async () => {
+    let timer: number | undefined;
+    const schedule = (delayMs: number): void => {
+      if (active) timer = window.setTimeout(() => void checkPhase(), delayMs);
+    };
+    const checkPhase = async (): Promise<void> => {
       const api = window.lolViewer;
-      if (!api) return;
+      if (!active) return;
+      if (!api) {
+        schedule(clientRetryDelayMs);
+        return;
+      }
+      let nextDelay = clientRetryDelayMs;
       try {
         const identity = await api.getGameflowSessionIdentity();
-        const phase = identity.phase;
         if (!active) return;
+        const phase = identity.phase;
         const isActive = activePhases.has(phase);
         const enteredChampionSelect = previousPhase !== undefined && phase === 'ChampSelect' && previousPhase !== 'ChampSelect';
         const gameIdChanged = isActive && identity.gameId !== undefined && currentGameIdRef.current !== undefined && identity.gameId !== currentGameIdRef.current;
+        const enteredActivePhase = isActive && (previousPhase === undefined || !activePhases.has(previousPhase));
         previousPhase = phase;
+        nextDelay = phase === 'InProgress' ? inGamePollDelayMs : clientRetryDelayMs;
         if (isActive && identity.gameId !== undefined) currentGameIdRef.current = identity.gameId;
-        if ((gameIdChanged || enteredChampionSelect) && liveViewRef.current.match && !liveViewRef.current.requesting) {
-          generation.current += 1;
-          dispatchLive({ type: 'new-match-detected', phase });
-          setRetryNonce((value) => value + 1);
-        } else {
-          dispatchLive({ type: 'phase-observed', phase, active: isActive });
-          if (isActive && !liveViewRef.current.match && !liveViewRef.current.requesting) {
+
+        if (pageRef.current === 'live') {
+          if ((gameIdChanged || enteredChampionSelect) && liveViewRef.current.match && !liveViewRef.current.requesting) {
+            generation.current += 1;
+            dispatchLive({ type: 'new-match-detected', phase });
             setRetryNonce((value) => value + 1);
+          } else {
+            dispatchLive({ type: 'phase-observed', phase, active: isActive });
+            if (isActive && !liveViewRef.current.match && !liveViewRef.current.requesting) {
+              setRetryNonce((value) => value + 1);
+            }
           }
+        } else if (enteredActivePhase && settingsRef.current.autoOpenLiveMatch) {
+          pageRef.current = 'live';
+          setPage('live');
+          setLiveAttention(false);
+        } else if (enteredActivePhase) {
+          setLiveAttention(true);
+        } else if (!isActive) {
+          setLiveAttention(false);
         }
       } catch {
         // The League client can briefly disappear between games; keep the last stable UI.
+      } finally {
+        schedule(nextDelay);
       }
     };
-    const timer = window.setInterval(() => void checkPhase(), 3_000);
-    return () => { active = false; window.clearInterval(timer); };
-  }, [dispatchLive, page]);
+    schedule(clientRetryDelayMs);
+    return () => {
+      active = false;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [dispatchLive]);
   useEffect(() => {
     if (page !== 'live' || liveView.phase !== 'ChampSelect' || !hasLiveMatch) return;
     const api = window.lolViewer;
@@ -173,37 +200,13 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     return () => { active = false; window.clearInterval(timer); };
   }, [dispatchLive, hasLiveMatch, liveView.phase, page]);
   useEffect(() => {
-    let active = true;
-    let previousPhase: string | undefined;
-    const checkPhase = async (): Promise<void> => {
-      if (!active || pageRef.current === 'live') return;
-      const api = window.lolViewer;
-      if (!api) return;
-      try {
-        const identity = await api.getGameflowSessionIdentity();
-        if (!active) return;
-        const phase = identity.phase;
-        const isActive = activePhases.has(phase);
-        const enteredActivePhase = isActive && (previousPhase === undefined || !activePhases.has(previousPhase));
-        previousPhase = phase;
-        if (enteredActivePhase && settingsRef.current.autoOpenLiveMatch) {
-          pageRef.current = 'live';
-          setPage('live');
-          setLiveAttention(false);
-        } else if (enteredActivePhase) setLiveAttention(true);
-        else if (!isActive) setLiveAttention(false);
-      } catch {
-        // League client is unavailable; keep the current tab state.
-      }
-    };
-    const timer = window.setInterval(() => void checkPhase(), clientRetryDelayMs);
-    return () => { active = false; window.clearInterval(timer); };
-  }, []);
-  useEffect(() => {
     if (page !== 'live' || liveView.requesting || liveView.status !== 'error' || liveView.match || liveView.progress.length > 0) return;
-    const timer = window.setTimeout(() => setRetryNonce((value) => value + 1), 3_000);
+    const timer = window.setTimeout(
+      () => setRetryNonce((value) => value + 1),
+      liveView.phase === 'InProgress' ? inGamePollDelayMs : clientRetryDelayMs
+    );
     return () => window.clearTimeout(timer);
-  }, [page, liveView.match, liveView.progress.length, liveView.requesting, liveView.status]);
+  }, [page, liveView.match, liveView.phase, liveView.progress.length, liveView.requesting, liveView.status]);
 
   const handleTabChange = (tab: AppTab): void => {
     setPage(tab);

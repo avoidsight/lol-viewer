@@ -7,6 +7,7 @@ const connection: LcuConnection = { port: 53122, password: 'secret', protocol: '
 
 function harness(enabled = true) {
   let callback: (() => void) | undefined;
+  const delays: number[] = [];
   const cancel = vi.fn();
   const discover = vi.fn(async () => connection);
   const get = vi.fn<() => Promise<string>>(async () => 'ReadyCheck');
@@ -15,7 +16,7 @@ function harness(enabled = true) {
     getSettings: () => ({ autoAcceptReadyCheck: enabled }),
     discover,
     createClient: () => ({ get: get as unknown as LcuClient['get'], post }),
-    schedule: (next) => { callback = next; return 1; },
+    schedule: (next, delayMs) => { callback = next; delays.push(delayMs); return 1; },
     cancel
   });
   const runNext = async () => {
@@ -24,7 +25,7 @@ function harness(enabled = true) {
     next?.();
     await vi.waitFor(() => expect(callback).toBeTypeOf('function'));
   };
-  return { acceptor, discover, get, post, cancel, runNext, setPhase: (phase: string) => get.mockResolvedValueOnce(phase) };
+  return { acceptor, discover, get, post, cancel, delays, runNext, setPhase: (phase: string) => get.mockResolvedValueOnce(phase) };
 }
 
 describe('ReadyCheckAutoAcceptor', () => {
@@ -56,6 +57,16 @@ describe('ReadyCheckAutoAcceptor', () => {
     await runNext();
     await runNext();
     expect(discover).toHaveBeenCalledTimes(2);
+  });
+
+  it('slows polling while a game is in progress', async () => {
+    const { acceptor, delays, runNext, setPhase } = harness();
+    setPhase('InProgress');
+    acceptor.start();
+
+    await runNext();
+
+    expect(delays).toEqual([1_000, 15_000]);
   });
 
   it('cancels its scheduled poll when disposed', async () => {

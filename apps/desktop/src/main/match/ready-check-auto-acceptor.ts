@@ -17,6 +17,7 @@ interface ReadyCheckAutoAcceptorOptions {
 }
 
 const gameflowPhaseSchema = z.string().min(1);
+const inGameIntervalMs = 15_000;
 
 export class ReadyCheckAutoAcceptor {
   private readonly schedule: NonNullable<ReadyCheckAutoAcceptorOptions['schedule']>;
@@ -25,11 +26,13 @@ export class ReadyCheckAutoAcceptor {
   private timer: TimerHandle | undefined;
   private started = false;
   private handledReadyCheck = false;
+  private nextIntervalMs: number;
 
   constructor(private readonly options: ReadyCheckAutoAcceptorOptions) {
     this.schedule = options.schedule ?? ((callback, delayMs) => setTimeout(callback, delayMs));
     this.cancel = options.cancel ?? ((handle) => clearTimeout(handle));
     this.intervalMs = options.intervalMs ?? 1_000;
+    this.nextIntervalMs = this.intervalMs;
   }
 
   start(): void {
@@ -46,11 +49,12 @@ export class ReadyCheckAutoAcceptor {
 
   private scheduleNext(): void {
     if (!this.started) return;
-    this.timer = this.schedule(() => void this.poll(), this.intervalMs);
+    this.timer = this.schedule(() => void this.poll(), this.nextIntervalMs);
   }
 
   private async poll(): Promise<void> {
     this.timer = undefined;
+    this.nextIntervalMs = this.intervalMs;
     try {
       if (!this.options.getSettings().autoAcceptReadyCheck) {
         this.handledReadyCheck = false;
@@ -63,6 +67,7 @@ export class ReadyCheckAutoAcceptor {
       }
       const client = this.options.createClient(connection);
       const phase = await client.get('/lol-gameflow/v1/gameflow-phase', gameflowPhaseSchema);
+      this.nextIntervalMs = phase === 'InProgress' ? inGameIntervalMs : this.intervalMs;
       if (phase !== 'ReadyCheck') {
         this.handledReadyCheck = false;
         return;

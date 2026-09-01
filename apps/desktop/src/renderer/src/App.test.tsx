@@ -260,7 +260,7 @@ describe('App tab lifecycle', () => {
     expect(toggle).toBeChecked();
   });
 
-  it('does not cancel a slow live request and retries three seconds after it fails', async () => {
+  it('does not cancel a slow live request and slows retries after the game starts', async () => {
     vi.useFakeTimers();
     try {
       const first = deferred<LiveMatch>();
@@ -274,7 +274,7 @@ describe('App tab lifecycle', () => {
       expect(api.cancelLiveMatch).not.toHaveBeenCalled();
 
       await act(async () => first.reject(new Error('not in game')));
-      await act(async () => { vi.advanceTimersByTime(2_999); await Promise.resolve(); });
+      await act(async () => { vi.advanceTimersByTime(14_999); await Promise.resolve(); });
       expect(api.getLiveMatch).toHaveBeenCalledOnce();
       await act(async () => { vi.advanceTimersByTime(1); await Promise.resolve(); });
       expect(api.getLiveMatch).toHaveBeenCalledTimes(2);
@@ -299,7 +299,7 @@ describe('App tab lifecycle', () => {
 
       await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); });
       expect(getLiveMatch).toHaveBeenCalledOnce();
-      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
+      await act(async () => { vi.advanceTimersByTime(15_000); await Promise.resolve(); await Promise.resolve(); });
       expect(getLiveMatch).toHaveBeenCalledTimes(2);
       expect(screen.getByText('Player Two')).toBeVisible();
     } finally {
@@ -322,7 +322,7 @@ describe('App tab lifecycle', () => {
 
       await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); });
       expect(getLiveMatch).toHaveBeenCalledOnce();
-      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
+      await act(async () => { vi.advanceTimersByTime(15_000); await Promise.resolve(); await Promise.resolve(); });
       expect(getLiveMatch).toHaveBeenCalledTimes(2);
       expect(screen.getByText('Player Two')).toBeVisible();
     } finally {
@@ -440,7 +440,8 @@ describe('App tab lifecycle', () => {
       render(<App />);
       await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 
-      await act(async () => { vi.advanceTimersByTime(6_000); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
+      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
 
       expect(screen.getByRole('tab', { name: '对战信息' })).toHaveAttribute('aria-selected', 'true');
       expect(api.getLiveMatch).toHaveBeenCalledOnce();
