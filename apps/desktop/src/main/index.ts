@@ -22,6 +22,7 @@ import { ReadyCheckAutoAcceptor } from './match/ready-check-auto-acceptor';
 import { createSgpClient } from './sgp/sgp-client';
 import { registerLcuAssetProtocol } from './lcu/asset-protocol';
 import type { LiveMatch, LiveRoster } from '../shared/ipc';
+import { LcuStaticDataCache } from './lcu/static-data-cache';
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'lol-asset',
@@ -74,6 +75,7 @@ void app.whenReady().then(() => {
   const cache = new MatchCache(database);
   const guideCache = new ChampionGuideCache(database);
   const personalHistoryCache = new PersonalHistoryCache(database);
+  const staticData = new LcuStaticDataCache();
   const patchSchema = z.string().regex(/^\d+\.\d+(?:\.\d+){0,2}$/);
   const guideClient = new ChampionGuideClient({
     baseUrl: process.env.CHAMPION_GUIDE_SERVICE_URL ?? 'http://127.0.0.1:8787',
@@ -81,7 +83,7 @@ void app.whenReady().then(() => {
       getPatch: async () => {
         const connection = await discoverLcuConnection();
         if (!connection) throw new Error('League client is unavailable');
-        const version = patchSchema.parse(await createLcuClient(connection).get('/lol-patch/v1/game-version', patchSchema));
+        const version = patchSchema.parse(await staticData.getAssetVersion(createLcuClient(connection)));
         return version.split('.').slice(0, 2).join('.');
       }
     }), cache: guideCache, bundledGuide: getBundledGuide
@@ -91,7 +93,7 @@ void app.whenReady().then(() => {
     if (catalogService) return catalogService;
     const connection = await discoverLcuConnection();
     if (!connection) throw new Error('League client is unavailable');
-    catalogService = new ChampionCatalogService(createLcuClient(connection));
+    catalogService = new ChampionCatalogService(createLcuClient(connection), staticData);
     return catalogService;
   };
   registerChampionIpc({
@@ -127,7 +129,7 @@ void app.whenReady().then(() => {
       const sgp = connection.region?.toUpperCase() === 'TENCENT' && connection.rsoPlatformId
         ? createSgpClient(lcu, connection.rsoPlatformId)
         : undefined;
-      return new PersonalHistoryService(lcu, personalHistoryCache, sgp).load(target);
+      return new PersonalHistoryService(lcu, personalHistoryCache, sgp, staticData).load(target);
     }
   });
   coordinator = new GameflowCoordinator(async (scope, onPlayer, signal) => {
@@ -140,7 +142,7 @@ void app.whenReady().then(() => {
       const sgp = connection.region?.toUpperCase() === 'TENCENT' && connection.rsoPlatformId
         ? createSgpClient(lcu, connection.rsoPlatformId)
         : undefined;
-      return new MatchService(lcu, { cache, ...(sgp ? { sgp } : {}) }).loadLiveMatch(scope, onPlayer, signal);
+      return new MatchService(lcu, { cache, staticData, ...(sgp ? { sgp } : {}) }).loadLiveMatch(scope, onPlayer, signal);
   });
   registerMatchIpc({
     loadLiveMatch: (scope, onPlayer) => coordinator!.loadLiveMatch(scope, onPlayer),

@@ -5,6 +5,7 @@ import { personalHistorySchema, type PersonalHistoryTarget } from '../../shared/
 import type { PersonalHistoryCache } from '../cache/database';
 import type { LcuClient } from '../lcu/http-client';
 import type { SgpClient } from '../sgp/sgp-client';
+import { LcuStaticDataCache, type LcuStaticDataProvider } from '../lcu/static-data-cache';
 import {
   adaptMatchHistory,
   matchHistoryGameSchema,
@@ -30,11 +31,6 @@ const rankedStatsSchema = z.object({
     queueType: z.string(), tier: z.string(), division: z.string(), leaguePoints: z.number().int()
   }))
 });
-const assetVersionSchema = z.string().regex(/^\d+\.\d+(?:\.\d+){0,2}$/);
-const itemMetadataSchema = z.array(z.object({
-  id: z.number().int().positive(),
-  iconPath: z.string().min(1)
-}).passthrough());
 
 function unavailable(): Error & { code: 'HISTORY_UNAVAILABLE' } {
   return Object.assign(new Error('Personal history is unavailable'), { code: 'HISTORY_UNAVAILABLE' as const });
@@ -89,7 +85,8 @@ export class PersonalHistoryService {
   constructor(
     private readonly client: LcuClient,
     private readonly cache: Pick<PersonalHistoryCache, 'getFresh' | 'getLatest' | 'put'>,
-    private readonly sgp?: SgpClient
+    private readonly sgp?: SgpClient,
+    private readonly staticData: LcuStaticDataProvider = new LcuStaticDataCache()
   ) {}
 
   async load(target?: PersonalHistoryTarget): Promise<PersonalHistorySnapshot> {
@@ -186,8 +183,8 @@ export class PersonalHistoryService {
         : this.client.get(`/lol-ranked/v1/ranked-stats/${encodeURIComponent(playerId)}`, rankedStatsSchema);
       const [rankResult, patchResult, itemsResult] = await Promise.allSettled([
         rankRequest,
-        this.client.get('/lol-patch/v1/game-version', assetVersionSchema),
-        this.client.get('/lol-game-data/assets/v1/items.json', itemMetadataSchema)
+        this.staticData.getAssetVersion(this.client),
+        this.staticData.getItemIconPaths(this.client)
       ]);
       let rank: string | undefined;
       if (rankResult.status === 'fulfilled') {
@@ -203,12 +200,8 @@ export class PersonalHistoryService {
       const usedItemIds = new Set(history.flatMap((match) => match.itemIds ?? []));
       const itemIconPaths = Object.fromEntries(
         itemsResult.status === 'fulfilled'
-          ? itemsResult.value
-            .filter((item) =>
-              usedItemIds.has(item.id)
-              && item.iconPath.startsWith('/lol-game-data/assets/')
-              && !item.iconPath.includes('..'))
-            .map((item) => [String(item.id), item.iconPath])
+          ? Object.entries(itemsResult.value)
+            .filter(([itemId]) => usedItemIds.has(Number(itemId)))
           : []
       );
       const snapshot = personalHistorySchema.parse({

@@ -5,6 +5,7 @@ import { formatRank } from '../../shared/rank';
 import type { LcuClient, LcuError } from '../lcu/http-client';
 import { adaptMatchHistory, describeQueue } from '../lcu/match-adapter';
 import type { SgpClient } from '../sgp/sgp-client';
+import { LcuStaticDataCache, type LcuStaticDataProvider } from '../lcu/static-data-cache';
 
 const participantSchema = z.object({
   summonerId: z.union([z.string(), z.number()]),
@@ -68,7 +69,6 @@ const summonerIdentitySchema = z.object({
 });
 
 const matchHistorySchema = z.object({ games: z.array(z.unknown()) });
-const assetVersionSchema = z.string().regex(/^\d+\.\d+(?:\.\d+){0,2}$/);
 const retryDelays = [250, 750] as const;
 const lanes = new Set<Lane>(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'UNKNOWN']);
 const standardPositions = new Set(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']);
@@ -91,6 +91,7 @@ export interface MatchServiceOptions {
   sleep?: (milliseconds: number) => Promise<void>;
   cache?: MatchSnapshotCache;
   sgp?: SgpClient;
+  staticData?: LcuStaticDataProvider;
 }
 
 export interface MatchSnapshotCache {
@@ -149,11 +150,13 @@ export class MatchService {
   private readonly sleep: (milliseconds: number) => Promise<void>;
   private readonly cache: MatchSnapshotCache | undefined;
   private readonly sgp: SgpClient | undefined;
+  private readonly staticData: LcuStaticDataProvider;
 
   constructor(private readonly client: LcuClient, options: MatchServiceOptions = {}) {
     this.sleep = options.sleep ?? ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
     this.cache = options.cache;
     this.sgp = options.sgp;
+    this.staticData = options.staticData ?? new LcuStaticDataCache();
   }
 
   async loadLiveRoster(signal?: AbortSignal): Promise<LiveRoster> {
@@ -193,9 +196,7 @@ export class MatchService {
     checkCancelled(signal);
     let assetVersion: string | undefined;
     try {
-      assetVersion = assetVersionSchema.parse(
-        await this.client.get('/lol-patch/v1/game-version', assetVersionSchema)
-      );
+      assetVersion = await this.staticData.getAssetVersion(this.client);
     } catch {
       checkCancelled(signal);
       assetVersion = undefined;

@@ -4,6 +4,7 @@ import {
   type ChampionCatalogEntry, type ChampionDetails
 } from '../../shared/ipc';
 import type { LcuClient } from '../lcu/http-client';
+import { LcuStaticDataCache, type LcuStaticDataProvider } from '../lcu/static-data-cache';
 
 const rawCatalogSchema = z.array(z.object({
   id: z.number().int(), name: z.string(), description: z.string(), alias: z.string(),
@@ -12,7 +13,6 @@ const rawCatalogSchema = z.array(z.object({
 const rawAbilitySchema = z.object({
   name: z.string(), abilityIconPath: z.string(), description: z.string().default('')
 }).passthrough();
-const rawItemsSchema = z.array(z.object({ id: z.number().int().positive(), iconPath: z.string().min(1) }).passthrough());
 const rawDetailsSchema = z.object({
   id: z.number().int().positive(), name: z.string(), title: z.string(), alias: z.string(),
   shortBio: z.string().default(''), roles: z.array(z.string()).default([]),
@@ -23,8 +23,10 @@ const rawDetailsSchema = z.object({
 export class ChampionCatalogService {
   private catalog?: ChampionCatalogEntry[];
   private readonly details = new Map<number, ChampionDetails>();
-  private itemIconPaths?: Record<string, string>;
-  constructor(private readonly client: LcuClient) {}
+  constructor(
+    private readonly client: LcuClient,
+    private readonly staticData: LcuStaticDataProvider = new LcuStaticDataCache()
+  ) {}
 
   async getCatalog(): Promise<ChampionCatalogEntry[]> {
     if (this.catalog) return this.catalog;
@@ -36,14 +38,9 @@ export class ChampionCatalogService {
   }
 
   async getItemIconPaths(itemIds: number[]): Promise<Record<string, string>> {
-    if (!this.itemIconPaths) {
-      const items = rawItemsSchema.parse(await this.client.get('/lol-game-data/assets/v1/items.json', rawItemsSchema));
-      this.itemIconPaths = Object.fromEntries(items
-        .filter((item) => item.iconPath.startsWith('/lol-game-data/assets/') && !item.iconPath.includes('..'))
-        .map((item) => [String(item.id), item.iconPath]));
-    }
+    const itemIconPaths = await this.staticData.getItemIconPaths(this.client);
     return Object.fromEntries(itemIds
-      .map((id) => [String(id), this.itemIconPaths?.[String(id)]])
+      .map((id) => [String(id), itemIconPaths[String(id)]])
       .filter((entry): entry is [string, string] => Boolean(entry[1])));
   }
   async getDetails(championId: number): Promise<ChampionDetails> {
