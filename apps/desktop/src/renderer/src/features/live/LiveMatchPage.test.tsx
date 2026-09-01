@@ -113,7 +113,9 @@ describe('LiveMatchPage', () => {
       players: fixtureLiveMatch.players.map((entry, index) => index === 0 ? { ...entry, championId: 0 } : entry)
     };
     render(<LiveMatchPage match={selecting} />);
-    expect(screen.getByText('英雄选择中')).toBeVisible();
+    const fallback = screen.getByRole('img', { name: '英雄选择中' });
+    expect(fallback).toHaveTextContent('');
+    expect(fallback.querySelector('.player-card__champion-spinner')).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: '当前英雄 0' })).not.toBeInTheDocument();
   });
   it('loads local client champion images even without an external asset version', () => {

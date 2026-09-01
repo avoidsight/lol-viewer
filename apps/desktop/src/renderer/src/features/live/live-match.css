@@ -34,7 +34,10 @@
 .player-card { min-width: 0; min-height: 0; padding: 10px; border: 1px solid #334155; border-radius: 9px; background: rgba(15, 23, 42, .94); box-shadow: 0 8px 20px rgba(0, 0, 0, .18); }
 .player-card__header { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 9px; align-items: center; padding-bottom: 8px; border-bottom: 1px solid #334155; }
 .player-card__champion { width: 48px; height: 48px; border: 1px solid #45617f; border-radius: 8px; object-fit: cover; }
-.player-card__champion--fallback { display: grid; place-items: center; color: #8fa2bb; background: #111d31; font-size: 11px; }
+.player-card__champion--fallback { display: grid; place-items: center; background: radial-gradient(circle, #1d2c43 0, #111d31 68%); }
+.player-card__champion-spinner { width: 22px; height: 22px; border: 2px solid rgb(125 211 252 / 20%); border-top-color: #7dd3fc; border-right-color: #38bdf8; border-radius: 50%; animation: champion-select-spin .85s linear infinite; }
+@keyframes champion-select-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .player-card__champion-spinner { animation: none; border-color: #45617f; border-top-color: #7dd3fc; } }
 .player-card__identity { min-width: 0; display: grid; grid-template-columns: 1fr auto; gap: 2px 6px; align-items: baseline; }
 .player-card__header h3 { grid-column: 1 / -1; overflow: hidden; margin: 0; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .player-card__rank { color: #94a3b8; font-size: 11px; }

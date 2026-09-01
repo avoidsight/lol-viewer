@@ -32,7 +32,7 @@ export default function PlayerCard({ player, historyScope = 'all', displayLane =
     <header className="player-card__header">
       {championIcon
         ? <img className="player-card__champion" src={championIcon} alt={`当前英雄 ${player.championId}`} />
-        : <span className="player-card__champion player-card__champion--fallback" role="img" aria-label="英雄选择中">英雄选择中</span>}
+        : <span className="player-card__champion player-card__champion--fallback" role="img" aria-label="英雄选择中"><span className="player-card__champion-spinner" aria-hidden="true" /></span>}
       <div className="player-card__identity">
         <span className="player-card__lane">{displayLabel ?? laneNames[displayLane]}</span>
         <h3 id={`player-${player.playerId}`}>{player.displayName}</h3>
