@@ -35,7 +35,7 @@ export default function PlayerCard({ player, historyScope = 'all', displayLane =
         : <>
           <dl className="player-card__summary"><div><dt>样本</dt><dd>{visibleMatches.length} 场</dd></div><div><dt>胜率</dt><dd>{percent(visibleMatches.length ? wins / visibleMatches.length : 0)}</dd></div><div><dt>当前英雄</dt><dd>{championMatches.length} 场 / {percent(championMatches.length ? championWins / championMatches.length : 0)}</dd></div></dl>
           {visibleMatches.length < 10 && <p className="player-card__notice">{historyScope === 'ranked' && visibleMatches.length === 0 ? '最近记录中没有排位对局' : `仅获取到 ${visibleMatches.length}/10 场`}</p>}
-          <ol className="player-card__matches" aria-label={`${player.displayName}${historyScope === 'ranked' ? '最近排位对局' : '最近对局'}`}>{visibleMatches.map((match) => <RecentMatch key={match.matchId} match={match} assetVersion={player.assetVersion} />)}</ol>
+          <ol className="player-card__matches" tabIndex={visibleMatches.length > 5 ? 0 : undefined} aria-label={`${player.displayName}${historyScope === 'ranked' ? '最近排位对局' : '最近对局'}`}>{visibleMatches.map((match) => <RecentMatch key={match.matchId} match={match} assetVersion={player.assetVersion} />)}</ol>
         </>}
   </article>;
 }

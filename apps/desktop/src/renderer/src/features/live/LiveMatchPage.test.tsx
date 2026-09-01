@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { Lane, MatchSummary, PlayerSnapshot } from '../../../../shared/domain';
@@ -69,6 +71,11 @@ describe('LiveMatchPage', () => {
     expect(screen.getAllByTestId('player-card')).toHaveLength(10);
     expect(screen.getAllByTestId('recent-match')).toHaveLength(100);
     expect(screen.getAllByText('8/3/4')).toHaveLength(10);
+    const historyLists = screen.getAllByRole('list', { name: /最近排位对局/ });
+    expect(historyLists).toHaveLength(10);
+    expect(historyLists.every((list) => list.tabIndex === 0)).toBe(true);
+    const css = readFileSync(resolve('src/renderer/src/features/live/live-match.css'), 'utf8');
+    expect(css).toMatch(/\.player-card__matches\s*\{[^}]*max-height:\s*150px;[^}]*overflow-y:\s*auto;/s);
 
     const teams = screen.getAllByRole('group', { name: /方队伍/ });
     expect(teams).toHaveLength(2);
@@ -124,6 +131,7 @@ describe('LiveMatchPage', () => {
     expect(screen.getByText('正在加载战绩…')).toBeVisible();
     expect(screen.getByText('战绩受国服隐私保护')).toBeVisible();
     expect(screen.getByText('仅获取到 3/10 场')).toBeVisible();
+    expect(screen.getByRole('list', { name: 'Player 2最近排位对局' })).not.toHaveAttribute('tabindex');
   });
 
   it('defaults to ranked history in solo and flex queues', () => {
