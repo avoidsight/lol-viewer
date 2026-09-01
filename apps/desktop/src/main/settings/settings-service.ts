@@ -4,14 +4,12 @@ import { type AppSettings, appSettingsPatchSchema, appSettingsSchema } from '../
 import type { MatchCache } from '../cache/database';
 
 const DEFAULT_SETTINGS: AppSettings = {
-  queueScope: 'ranked-solo',
   autoOpenLiveMatch: true,
   showLaneDifferences: true,
   autoAcceptReadyCheck: false
 };
 
 const settingsRowSchema = z.object({
-  queue_scope: z.enum(['ranked-solo', 'all']),
   auto_open_live_match: z.union([z.literal(0), z.literal(1)]),
   show_lane_differences: z.union([z.literal(0), z.literal(1)]),
   auto_accept_ready_check: z.union([z.literal(0), z.literal(1)])
@@ -27,13 +25,12 @@ export class SettingsService {
 
   get(): AppSettings {
     const rawRow = this.database.prepare(`
-      SELECT queue_scope, auto_open_live_match, show_lane_differences, auto_accept_ready_check
+      SELECT auto_open_live_match, show_lane_differences, auto_accept_ready_check
       FROM app_settings WHERE id = ?
     `).get(1);
     if (!rawRow) return { ...DEFAULT_SETTINGS };
     const row = settingsRowSchema.parse(rawRow);
     return appSettingsSchema.parse({
-      queueScope: row.queue_scope,
       autoOpenLiveMatch: row.auto_open_live_match === 1,
       showLaneDifferences: row.show_lane_differences === 1,
       autoAcceptReadyCheck: row.auto_accept_ready_check === 1
@@ -45,13 +42,12 @@ export class SettingsService {
     this.database.prepare(`
       INSERT INTO app_settings (
         id, queue_scope, auto_open_live_match, show_lane_differences, auto_accept_ready_check
-      ) VALUES (?, ?, ?, ?, ?)
+      ) VALUES (?, 'all', ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
-        queue_scope = excluded.queue_scope,
         auto_open_live_match = excluded.auto_open_live_match,
         show_lane_differences = excluded.show_lane_differences,
         auto_accept_ready_check = excluded.auto_accept_ready_check
-    `).run(1, next.queueScope, Number(next.autoOpenLiveMatch), Number(next.showLaneDifferences), Number(next.autoAcceptReadyCheck));
+    `).run(1, Number(next.autoOpenLiveMatch), Number(next.showLaneDifferences), Number(next.autoAcceptReadyCheck));
     return next;
   }
 

@@ -10,7 +10,7 @@ import SettingsPage from './features/settings/SettingsPage';
 
 declare global { interface Window { lolViewer?: LolViewerApi } }
 
-const defaults: AppSettings = { queueScope: 'ranked-solo', autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false };
+const defaults: AppSettings = { autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false };
 const activePhases = new Set(['ChampSelect', 'GameStart', 'InProgress', 'Reconnect']);
 const clientRetryDelayMs = 3_000;
 
@@ -41,6 +41,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   const historyNavigation = useRef(0);
   const historyRefreshingRef = useRef(false);
   const liveViewRef = useRef(liveView);
+  const settingsRef = useRef(settings);
   const currentGameIdRef = useRef<string | undefined>(undefined);
   const dispatchLive = useCallback((action: LiveMatchAction): void => {
     liveViewRef.current = liveMatchReducer(liveViewRef.current, action);
@@ -65,6 +66,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   }, [page, historyTarget]);
 
   useEffect(() => { pageRef.current = page; }, [page]);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
 
   useEffect(() => {
     if (page !== 'history' || historyTarget || historyState !== 'unavailable' || !window.lolViewer) return;
@@ -88,7 +90,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   useEffect(() => {
     const api = window.lolViewer;
     if (!api) return;
-    void Promise.resolve(api.getSettings()).then((value) => { if (value) setSettings(value); }).catch(() => undefined);
+    void Promise.resolve(api.getSettings()).then((value) => { if (value) { settingsRef.current = value; setSettings(value); } }).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -182,9 +184,13 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
         if (!active) return;
         const phase = identity.phase;
         const isActive = activePhases.has(phase);
-        const enteredActivePhase = previousPhase !== undefined && isActive && previousPhase !== phase;
+        const enteredActivePhase = isActive && (previousPhase === undefined || !activePhases.has(previousPhase));
         previousPhase = phase;
-        if (enteredActivePhase) setLiveAttention(true);
+        if (enteredActivePhase && settingsRef.current.autoOpenLiveMatch) {
+          pageRef.current = 'live';
+          setPage('live');
+          setLiveAttention(false);
+        } else if (enteredActivePhase) setLiveAttention(true);
         else if (!isActive) setLiveAttention(false);
       } catch {
         // League client is unavailable; keep the current tab state.
@@ -249,10 +255,13 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   };
   const clearCache = async () => { setMessage('Clearing cache…'); try { await window.lolViewer?.clearCache(); setMessage('Cache cleared'); } catch { setMessage('Cache could not be cleared'); } };
   const updateLaneSetting = async (showLaneDifferences: boolean) => {
-    try { const next = await window.lolViewer?.updateSettings({ showLaneDifferences }); if (next) setSettings(next); } catch { setMessage('Settings could not be saved'); }
+    try { const next = await window.lolViewer?.updateSettings({ showLaneDifferences }); if (next) { settingsRef.current = next; setSettings(next); } } catch { setMessage('Settings could not be saved'); }
   };
   const updateAutoAcceptSetting = async (autoAcceptReadyCheck: boolean) => {
-    try { const next = await window.lolViewer?.updateSettings({ autoAcceptReadyCheck }); if (next) setSettings(next); } catch { setMessage('Settings could not be saved'); }
+    try { const next = await window.lolViewer?.updateSettings({ autoAcceptReadyCheck }); if (next) { settingsRef.current = next; setSettings(next); } } catch { setMessage('Settings could not be saved'); }
+  };
+  const updateAutoOpenSetting = async (autoOpenLiveMatch: boolean) => {
+    try { const next = await window.lolViewer?.updateSettings({ autoOpenLiveMatch }); if (next) { settingsRef.current = next; setSettings(next); } } catch { setMessage('Settings could not be saved'); }
   };
   const getChampionGuide = useCallback((id: Parameters<LolViewerApi['getChampionGuide']>[0], lane: Parameters<LolViewerApi['getChampionGuide']>[1]) =>
     window.lolViewer?.getChampionGuide(id, lane) ?? Promise.reject(new Error('unavailable')), []);
@@ -273,7 +282,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     <div hidden={page !== 'history'}><PersonalHistoryPage snapshot={history} state={historyState} onRefresh={() => void refreshHistory()} onPlayerSelect={(target) => void viewPlayerHistory(target)} onBack={historyTarget ? returnToOwnHistory : undefined} refreshing={historyRefreshing} refreshError={historyRefreshError} /></div>
     <div hidden={page !== 'live'}><LiveMatchPage match={liveView.match} players={liveView.match ? undefined : liveView.progress} loadingProgress={liveView.requesting && !liveView.match ? liveView.progress.length : undefined} lifecycleStatus={liveView.status} gameflowPhase={liveView.phase} showLaneDifferences={settings.showLaneDifferences} notice={liveNotice} /></div>
     {page === 'champions' && <ChampionLibraryPage getCatalog={getChampionCatalog} getDetails={getChampionDetails} getGuide={getChampionGuide} />}
-    {page === 'settings' && <SettingsPage settings={settings} message={message} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onLaneDifferencesChange={(checked) => void updateLaneSetting(checked)} onClearCache={() => void clearCache()} />}
+    {page === 'settings' && <SettingsPage settings={settings} message={message} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onLaneDifferencesChange={(checked) => void updateLaneSetting(checked)} onClearCache={() => void clearCache()} />}
   </>;
   return <AppShell active={page} onChange={handleTabChange} liveAttention={liveAttention}>{content}</AppShell>;
 }

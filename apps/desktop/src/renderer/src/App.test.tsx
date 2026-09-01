@@ -28,8 +28,8 @@ function install(getLiveMatch: LolViewerApi['getLiveMatch'] = vi.fn().mockResolv
       { key: 'W', name: '劳伦特心眼刀', description: '', iconPath: '/w.png' }, { key: 'E', name: '夺命连刺', description: '', iconPath: '/e.png' },
       { key: 'R', name: '无双挑战', description: '', iconPath: '/r.png' }
     ] }),
-    getSettings: vi.fn().mockResolvedValue({ queueScope: 'ranked-solo', autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false }),
-    updateSettings: vi.fn().mockImplementation(async (patch) => ({ queueScope: 'ranked-solo', autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false, ...patch })), clearCache: vi.fn()
+    getSettings: vi.fn().mockResolvedValue({ autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false }),
+    updateSettings: vi.fn().mockImplementation(async (patch) => ({ autoOpenLiveMatch: true, showLaneDifferences: true, autoAcceptReadyCheck: false, ...patch })), clearCache: vi.fn()
   } as unknown as LolViewerApi;
   window.lolViewer = api;
   return { api, unsubscribe, emit: (value: PlayerSnapshot, generation?: number) => listener?.(value, generation) };
@@ -249,6 +249,10 @@ describe('App tab lifecycle', () => {
     expect(screen.queryByRole('switch', { name: /自动接受匹配/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Retry live match' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: '设置' }));
+    const autoOpen = await screen.findByRole('switch', { name: /自动打开对战信息/ });
+    expect(autoOpen).toBeChecked();
+    fireEvent.click(autoOpen);
+    await waitFor(() => expect(api.updateSettings).toHaveBeenCalledWith({ autoOpenLiveMatch: false }));
     const toggle = await screen.findByRole('switch', { name: /自动接受匹配/ });
     expect(toggle).not.toBeChecked();
     fireEvent.click(toggle);
@@ -411,6 +415,7 @@ describe('App tab lifecycle', () => {
     vi.useFakeTimers();
     try {
       const { api } = install();
+      vi.mocked(api.getGameflowSessionIdentity).mockResolvedValue({ phase: 'None' });
       vi.mocked(api.getPersonalHistory)
         .mockRejectedValueOnce(new Error('League client is unavailable'))
         .mockResolvedValueOnce(history);
@@ -425,10 +430,30 @@ describe('App tab lifecycle', () => {
     }
   });
 
-  it('highlights the live tab when champion select starts while on the history page', async () => {
+  it('automatically opens live match when champion select starts', async () => {
     vi.useFakeTimers();
     try {
       const { api } = install();
+      vi.mocked(api.getGameflowSessionIdentity)
+        .mockResolvedValueOnce({ phase: 'None' })
+        .mockResolvedValueOnce({ phase: 'ChampSelect', gameId: 'game-1' });
+      render(<App />);
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+      await act(async () => { vi.advanceTimersByTime(6_000); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+
+      expect(screen.getByRole('tab', { name: '对战信息' })).toHaveAttribute('aria-selected', 'true');
+      expect(api.getLiveMatch).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('highlights the live tab instead when automatic opening is disabled', async () => {
+    vi.useFakeTimers();
+    try {
+      const { api } = install();
+      vi.mocked(api.getSettings).mockResolvedValue({ autoOpenLiveMatch: false, showLaneDifferences: true, autoAcceptReadyCheck: false });
       const identityApi = api as unknown as { getGameflowSessionIdentity: ReturnType<typeof vi.fn> };
       identityApi.getGameflowSessionIdentity
         .mockResolvedValueOnce({ phase: 'None' })
