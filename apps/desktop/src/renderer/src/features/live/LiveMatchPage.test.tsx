@@ -78,7 +78,7 @@ describe('LiveMatchPage', () => {
     expect(screen.getByRole('group', { name: '队伍 1' })).toBeVisible();
     expect(screen.getByRole('status', { name: '阵营方向无法确认' })).toHaveTextContent('?');
   });
-  it('renders two side-by-side five-player teams and every compact recent match', () => {
+  it('renders two stacked five-player rows and every scrollable recent match', () => {
     render(<LiveMatchPage match={fixtureLiveMatch} />);
 
     expect(screen.getAllByTestId('player-card')).toHaveLength(10);
@@ -88,9 +88,10 @@ describe('LiveMatchPage', () => {
     expect(historyLists).toHaveLength(10);
     expect(historyLists.every((list) => list.tabIndex === 0)).toBe(true);
     const css = readFileSync(resolve('src/renderer/src/features/live/live-match.css'), 'utf8');
-    expect(css).toMatch(/\.live-match-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s);
-    expect(css).toMatch(/\.team-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/s);
-    expect(css).toMatch(/\.recent-match\s*\{[^}]*width:\s*21px;[^}]*height:\s*21px;/s);
+    expect(css).toMatch(/\.live-match-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/s);
+    expect(css).toMatch(/\.team-row\s*\{[^}]*grid-template-columns:\s*repeat\(5,/s);
+    expect(css).toMatch(/\.player-card__matches\s*\{[^}]*max-height:\s*137px;[^}]*overflow-y:\s*auto;/s);
+    expect(css).toMatch(/\.recent-match\s*\{[^}]*height:\s*25px;/s);
 
     const teams = screen.getAllByRole('group', { name: /方队伍/ });
     expect(teams).toHaveLength(2);
