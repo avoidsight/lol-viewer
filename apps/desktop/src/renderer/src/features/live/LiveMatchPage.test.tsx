@@ -76,19 +76,21 @@ describe('LiveMatchPage', () => {
     rerender(<LiveMatchPage match={{ ...fixtureLiveMatch, localTeamId: null }} />);
     expect(screen.queryByRole('group', { name: '我方队伍' })).not.toBeInTheDocument();
     expect(screen.getByRole('group', { name: '队伍 1' })).toBeVisible();
-    expect(screen.getByText('阵营方向无法确认')).toBeVisible();
+    expect(screen.getByRole('status', { name: '阵营方向无法确认' })).toHaveTextContent('?');
   });
-  it('renders two aligned teams and every available recent match', () => {
+  it('renders two side-by-side five-player teams and every compact recent match', () => {
     render(<LiveMatchPage match={fixtureLiveMatch} />);
 
     expect(screen.getAllByTestId('player-card')).toHaveLength(10);
     expect(screen.getAllByTestId('recent-match')).toHaveLength(100);
-    expect(screen.getAllByText('8/3/4')).toHaveLength(10);
+    expect(screen.getAllByLabelText(/KDA 8\/3\/4$/)).toHaveLength(10);
     const historyLists = screen.getAllByRole('list', { name: /最近排位对局/ });
     expect(historyLists).toHaveLength(10);
     expect(historyLists.every((list) => list.tabIndex === 0)).toBe(true);
     const css = readFileSync(resolve('src/renderer/src/features/live/live-match.css'), 'utf8');
-    expect(css).toMatch(/\.player-card__matches\s*\{[^}]*max-height:\s*150px;[^}]*overflow-y:\s*auto;/s);
+    expect(css).toMatch(/\.live-match-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s);
+    expect(css).toMatch(/\.team-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/s);
+    expect(css).toMatch(/\.recent-match\s*\{[^}]*width:\s*21px;[^}]*height:\s*21px;/s);
 
     const teams = screen.getAllByRole('group', { name: /方队伍/ });
     expect(teams).toHaveLength(2);
@@ -96,11 +98,13 @@ describe('LiveMatchPage', () => {
     expect(within(teams[1]).getAllByTestId('player-card').map((card) => card.dataset.lane)).toEqual(lanes);
   });
 
-  it('labels wins and losses with text and exposes champion image alternatives', () => {
+  it('expresses wins and losses through accessible icon tiles and champion image alternatives', () => {
     render(<LiveMatchPage match={fixtureLiveMatch} />);
 
-    expect(screen.getAllByText('胜')).toHaveLength(50);
-    expect(screen.getAllByText('负')).toHaveLength(50);
+    expect(screen.getAllByLabelText(/^胜利 ·/)).toHaveLength(50);
+    expect(screen.getAllByLabelText(/^失败 ·/)).toHaveLength(50);
+    expect(screen.queryByText('胜')).not.toBeInTheDocument();
+    expect(screen.queryByText('负')).not.toBeInTheDocument();
     expect(screen.getAllByRole('img', { name: /^英雄 \d+$/ })).toHaveLength(100);
     const recentChampion = screen.getAllByRole('img', { name: /^英雄 \d+$/ })[0];
     expect(recentChampion).toHaveAttribute('src', 'lol-asset://champion-icons/1.png');
@@ -145,7 +149,7 @@ describe('LiveMatchPage', () => {
 
     expect(screen.getByText('正在加载战绩…')).toBeVisible();
     expect(screen.getByText('该玩家战绩受隐私保护')).toBeVisible();
-    expect(screen.getByText('最近 3 场中筛出 3 场排位')).toBeVisible();
+    expect(screen.getByRole('group', { name: '战绩样本 3 场，胜率 67%；当前英雄 0 场，胜率 暂无' })).toBeVisible();
     expect(screen.getByRole('list', { name: 'Player 2最近排位对局' })).not.toHaveAttribute('tabindex');
   });
 
@@ -166,17 +170,14 @@ describe('LiveMatchPage', () => {
     }} />);
 
     const firstCard = screen.getAllByTestId('player-card')[0];
-    expect(within(firstCard).getByText('20 场')).toBeVisible();
-    expect(within(firstCard).getByText('2 场 / 100%')).toBeVisible();
+    expect(within(firstCard).getByRole('group', { name: '战绩样本 20 场，胜率 55%；当前英雄 2 场，胜率 100%' })).toBeVisible();
     expect(within(firstCard).getAllByTestId('recent-match')).toHaveLength(10);
-    expect(within(firstCard).getByText('最近 20 场中筛出 20 场排位 · 列表展示 10 场')).toBeVisible();
   });
 
   it('defaults to ranked history in solo and flex queues', () => {
     const { rerender } = render(<LiveMatchPage match={fixtureLiveMatch} />);
     expect(document.querySelector('.live-match-page__mode')).toHaveTextContent('单双排');
     expect(screen.getByRole('button', { name: '排位对局' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText('从最近20场中筛选')).toBeVisible();
 
     rerender(<LiveMatchPage match={{ ...fixtureLiveMatch, queueId: 440, modeName: '灵活排位' }} />);
     expect(screen.getByRole('button', { name: '排位对局' })).toHaveAttribute('aria-pressed', 'true');
@@ -193,15 +194,13 @@ describe('LiveMatchPage', () => {
     render(<LiveMatchPage match={{ ...fixtureLiveMatch, players: mixedPlayers, queueId: 450, modeName: '极地大乱斗' }} />);
 
     expect(screen.getByRole('button', { name: '全部对局' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText('统计最近20场')).toBeVisible();
     expect(screen.getAllByTestId('recent-match')).toHaveLength(100);
     fireEvent.click(screen.getByRole('button', { name: '排位对局' }));
     expect(screen.getByRole('button', { name: '排位对局' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText('从最近20场中筛选')).toBeVisible();
     expect(screen.getAllByTestId('recent-match')).toHaveLength(60);
-    expect(screen.getAllByText('单双排')).toHaveLength(30);
-    expect(screen.getAllByText('灵活排位')).toHaveLength(30);
-    expect(screen.getAllByText('6 场')).toHaveLength(10);
+    expect(screen.getAllByLabelText(/· 单双排 ·/)).toHaveLength(30);
+    expect(screen.getAllByLabelText(/· 灵活排位 ·/)).toHaveLength(30);
+    expect(screen.getAllByRole('group', { name: /战绩样本 6 场/ })).toHaveLength(10);
   });
 
   it('renders exactly five deterministic slots per team for duplicate and unknown lanes', () => {
@@ -215,7 +214,7 @@ describe('LiveMatchPage', () => {
     const teams = screen.getAllByRole('group', { name: /方队伍/ });
     expect(within(teams[0]).getAllByTestId('player-card')).toHaveLength(5);
     expect(within(teams[1]).getAllByTestId('player-card')).toHaveLength(5);
-    expect(screen.getAllByText('位置待确认')).toHaveLength(6);
+    expect(screen.getAllByRole('img', { name: '位置待确认' })).toHaveLength(6);
     expect(new Set(screen.getAllByTestId('player-card').map((card) => card.getAttribute('aria-labelledby'))).size).toBe(10);
   });
 
@@ -244,9 +243,9 @@ describe('LiveMatchPage', () => {
     expect(within(ourTeam).getAllByTestId('player-card').map((card) => card.getAttribute('aria-labelledby')))
       .toEqual(scrambled.map((entry) => `player-${entry.playerId}`));
     for (const label of ['阵容 1', '阵容 2', '阵容 3', '阵容 4', '阵容 5']) {
-      expect(within(ourTeam).getByText(label)).toBeVisible();
+      expect(within(ourTeam).getByLabelText(label)).toBeVisible();
     }
-    expect(screen.queryByText('位置待确认')).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: '位置待确认' })).not.toBeInTheDocument();
   });
 
   it('uses neutral roster order while progressive players arrive before match metadata', () => {
@@ -257,14 +256,17 @@ describe('LiveMatchPage', () => {
     const team = screen.getByRole('group', { name: '队伍 1' });
     expect(within(team).getAllByTestId('player-card').map((card) => card.getAttribute('aria-labelledby')))
       .toEqual(scrambled.map((entry) => `player-${entry.playerId}`));
-    expect(within(team).getAllByText(/阵容 [1-5]/).map((label) => label.textContent))
-      .toEqual(['阵容 1', '阵容 2', '阵容 3', '阵容 4', '阵容 5']);
+    expect(['阵容 1', '阵容 2', '阵容 3', '阵容 4', '阵容 5'].map((label) =>
+      within(team).getByLabelText(label).textContent
+    )).toEqual(['1', '2', '3', '4', '5']);
   });
 
   it('keeps a 1050px grid inside a horizontal scroll container', () => {
     render(<LiveMatchPage match={fixtureLiveMatch} />);
-    expect(getComputedStyle(screen.getByLabelText('双方对局比较')).overflowX).toBe('auto');
-    expect(getComputedStyle(document.querySelector('.live-match-grid')!)).toHaveProperty('minWidth', '1050px');
+    expect(screen.getByLabelText('双方对局比较')).toHaveClass('live-match-page__scroll');
+    const css = readFileSync(resolve('src/renderer/src/features/live/live-match.css'), 'utf8');
+    expect(css).toMatch(/\.live-match-page__scroll\s*\{[^}]*overflow-x:\s*auto;/s);
+    expect(css).toMatch(/\.live-match-grid\s*\{[^}]*min-width:\s*1050px;/s);
   });
 
   it('keeps both five-player rosters useful when every history is private', () => {

@@ -53,17 +53,26 @@ export default function LiveMatchPage({ match, players = [], loadingProgress, no
   const teamIds: (number | undefined)[] = oriented ? [localTeamId, knownTeamIds.find((teamId) => teamId !== localTeamId)] : [knownTeamIds[0], knownTeamIds[1]];
 
   return <main className="live-match-page">
-    <header className="live-match-page__toolbar"><div className="live-match-page__heading"><span>LIVE SCOUT</span><h1>对战信息</h1><p>双方阵容与最近战绩</p></div><div className="live-match-page__meta">{match && <strong className="live-match-page__mode">{match.modeName}</strong>}<span className="live-match-page__status" data-status={lifecycleStatus}><i aria-hidden="true" />{statusLabel(lifecycleStatus, gameflowPhase)}</span></div></header>
-    <div className="live-match-page__filterbar"><div><strong>战绩样本</strong><span className="live-match-page__scope-caption">{historyScope === 'ranked' ? '从最近20场中筛选' : '统计最近20场'}</span></div><div className="live-match-page__scope" role="group" aria-label="战绩范围"><button type="button" aria-pressed={historyScope === 'all'} onClick={() => setHistoryScope('all')}>全部对局</button><button type="button" aria-pressed={historyScope === 'ranked'} onClick={() => setHistoryScope('ranked')}>排位对局</button></div></div>
-    {notice}
-    {loadingProgress !== undefined && <div className="live-match-page__progress" role="status" aria-label={`阵容加载进度 ${loadingProgress}/10`}><div className="live-match-page__progress-copy"><span>正在组装双方阵容</span><strong>{loadingProgress}<small>/10</small></strong></div><div className="live-match-page__loading-slots" aria-hidden="true">{Array.from({ length: 10 }, (_, index) => { const loadedPlayer = players[index]; return <span key={index} className={loadedPlayer ? 'is-loaded' : index === loadingProgress ? 'is-loading' : ''}>{loadedPlayer?.championId ? <img src={`lol-asset://champion-icons/${loadedPlayer.championId}.png`} alt="" /> : loadedPlayer ? <b>✓</b> : <i />}</span>; })}</div><progress max={10} value={loadingProgress} /></div>}
-    {!oriented && visiblePlayers.length > 0 && <p role="status">阵营方向无法确认</p>}
-    {visiblePlayers.length > 0 && <div className="live-match-page__scroll" style={{ overflowX: 'auto' }} tabIndex={0} aria-label="双方对局比较"><div className="live-match-grid" style={{ minWidth: 1050 }}>
+    <header className="live-match-page__toolbar">
+      <h1 className="player-card__sr-only">对战信息</h1>
+      <div className="live-match-page__meta">
+        {match && <strong className="live-match-page__mode">{match.modeName}</strong>}
+        <span className="live-match-page__status" data-status={lifecycleStatus}><i aria-hidden="true" />{statusLabel(lifecycleStatus, gameflowPhase)}</span>
+        {!oriented && visiblePlayers.length > 0 && <span className="live-match-page__orientation" role="status" aria-label="阵营方向无法确认" title="阵营方向无法确认">?</span>}
+      </div>
+      <div className="live-match-page__scope" role="group" aria-label="战绩范围">
+        <button type="button" aria-label="全部对局" title="全部对局" aria-pressed={historyScope === 'all'} onClick={() => setHistoryScope('all')}><i className="is-all" aria-hidden="true" />全部</button>
+        <button type="button" aria-label="排位对局" title="排位对局" aria-pressed={historyScope === 'ranked'} onClick={() => setHistoryScope('ranked')}><i className="is-ranked" aria-hidden="true" />排位</button>
+      </div>
+    </header>
+    {notice && <div className={`live-match-page__notice-wrap${visiblePlayers.length > 0 ? ' is-inline' : ''}`}>{notice}</div>}
+    {loadingProgress !== undefined && <div className="live-match-page__progress" role="status" aria-label={`阵容加载进度 ${loadingProgress}/10`}><strong>{loadingProgress}<small>/10</small></strong><div className="live-match-page__loading-slots" aria-hidden="true">{Array.from({ length: 10 }, (_, index) => { const loadedPlayer = players[index]; return <span key={index} className={loadedPlayer ? 'is-loaded' : index === loadingProgress ? 'is-loading' : ''}>{loadedPlayer?.championId ? <img src={`lol-asset://champion-icons/${loadedPlayer.championId}.png`} alt="" /> : loadedPlayer ? <b>✓</b> : <i />}</span>; })}</div><progress max={10} value={loadingProgress} /></div>}
+    {visiblePlayers.length > 0 && <div className="live-match-page__scroll" tabIndex={0} aria-label="双方对局比较"><div className="live-match-grid">
       {teamIds.map((teamId, teamIndex) => {
         const label = oriented ? (teamIndex === 0 ? '我方队伍' : '敌方队伍') : `队伍 ${teamIndex + 1}`;
         const side = oriented ? (teamIndex === 0 ? 'ally' : 'enemy') : 'neutral';
         return <section key={teamIndex} className={`team-panel team-panel--${side}`} data-testid="team-roster" role="group" aria-label={label}>
-          <header className="team-panel__header"><h2><i aria-hidden="true" />{oriented ? (teamIndex === 0 ? '己方阵容' : '敌方阵容') : label}</h2><span>5 名玩家</span></header>
+          <header className="team-panel__header"><h2><i aria-hidden="true" />{oriented ? (teamIndex === 0 ? '己方' : '敌方') : label}</h2></header>
           <div className="team-row">
             {teamSlots(teamId === undefined ? [] : visiblePlayers.filter((player) => player.teamId === teamId), positionOrderReliable).map((slot) => slot.player
               ? <PlayerCard key={slot.player.playerId} player={slot.player} historyScope={historyScope} displayLane={slot.lane} displayLabel={slot.label} uncertain={positionOrderReliable && showLaneDifferences && slot.uncertain} />
