@@ -79,14 +79,14 @@ describe('PersonalHistoryPage', () => {
   it('renders the rich twenty-match dashboard with spells and team compositions', () => {
     render(<PersonalHistoryPage snapshot={snapshot} state="ready" />);
 
-    expect(screen.getAllByText('最近 20 场')).toHaveLength(2);
+    expect(screen.getByText(/最近 20 场/)).toBeVisible();
     expect(screen.getByText(/未定级/)).toBeVisible();
     expect(screen.getByText('缓存数据')).toBeVisible();
-    expect(screen.getAllByTestId('favorite-champion')).toHaveLength(snapshot.favoriteChampions.length);
+    expect(screen.getAllByTestId('favorite-champion')).toHaveLength(5);
     expect(screen.getAllByTestId('personal-match')).toHaveLength(20);
     expect(screen.getAllByText('极地大乱斗')).toHaveLength(10);
     expect(screen.getAllByLabelText('KDA')).toHaveLength(20);
-    expect(screen.getAllByText('平均 8.3 / 4.7 / 9.0')).toHaveLength(snapshot.favoriteChampions.length);
+    expect(screen.queryByText(/平均 8\.3/)).not.toBeInTheDocument();
     expect(screen.getAllByText('7.00 KDA')).toHaveLength(20);
     expect(screen.queryByText('186 CS')).not.toBeInTheDocument();
     expect(screen.getAllByLabelText('伤害 31.5k，占全队 26%')).toHaveLength(20);
@@ -114,16 +114,17 @@ describe('PersonalHistoryPage', () => {
     expect(screen.getAllByRole('img', { name: /己方英雄/ })).toHaveLength(100);
     expect(screen.getAllByRole('img', { name: /敌方英雄/ })).toHaveLength(100);
     expect(document.querySelectorAll('.personal-history__team-icon.is-local')).toHaveLength(20);
-    expect(screen.queryByLabelText('击杀最高：全场并列最高，8 次')).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '伤害全场最高' })).toBeVisible();
   });
 
-  it('organizes the dashboard into a compact overview and side-by-side content', () => {
+  it('organizes the dashboard into a compact overview, horizontal favorites, and full-width matches', () => {
     const { container } = render(<PersonalHistoryPage snapshot={snapshot} state="ready" />);
     expect(container.querySelector('.personal-history__hero')).toBeInTheDocument();
     expect(container.querySelector('.personal-history__hero-avatar')).toHaveAttribute('src');
-    expect(container.querySelectorAll('.personal-history__metric')).toHaveLength(4);
-    expect(container.querySelector('.personal-history__content')).toBeInTheDocument();
-    expect(container.querySelector('.personal-history__favorites-panel')).toBeInTheDocument();
+    expect(container.querySelector('.personal-history__win-rate')).toHaveTextContent('60.0%');
+    expect(container.querySelector('.personal-history__record')).toHaveAccessibleName('12 胜 8 负');
+    expect(container.querySelector('.personal-history__quickbar')).toBeInTheDocument();
+    expect(container.querySelector('.personal-history__favorites')).toBeInTheDocument();
     expect(container.querySelector('.personal-history__matches-panel')).toBeInTheDocument();
   });
 
@@ -182,22 +183,38 @@ describe('PersonalHistoryPage', () => {
     expect(screen.queryByText('昨天')).not.toBeInTheDocument();
   });
 
+  it('filters the visible history by ranked queue and result', () => {
+    render(<PersonalHistoryPage snapshot={snapshot} state="ready" />);
+    expect(screen.getAllByTestId('personal-match')).toHaveLength(20);
+
+    fireEvent.click(screen.getByRole('button', { name: '排位' }));
+    expect(screen.getAllByTestId('personal-match')).toHaveLength(10);
+    expect(screen.queryByText('极地大乱斗')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '全部' }));
+    fireEvent.change(screen.getByRole('combobox', { name: '胜负筛选' }), { target: { value: 'losses' } });
+    expect(screen.getAllByTestId('personal-match')).toHaveLength(10);
+    expect(screen.getAllByText('失败')).toHaveLength(10);
+    expect(screen.queryByText('胜利')).not.toBeInTheDocument();
+  });
+
   it('uses the deep-sea palette, rich compact rows, and responsive tiers', () => {
     const css = readFileSync(resolve('src/renderer/src/features/history/personal-history.css'), 'utf8');
     expect(css).toMatch(/\.personal-history\s*{[^}]*background:\s*var\(--ui-page-bg\)/i);
-    expect(css).toMatch(/\.personal-history__content\s*{[^}]*grid-template-columns:\s*minmax\(260px,\s*28fr\)\s+minmax\(0,\s*72fr\)/i);
-    expect(css).toMatch(/\.personal-history__matches article\s*{[^}]*min-height:\s*66px/i);
-    expect(css).toMatch(/\.personal-history__items\s*{[^}]*grid-template-columns:\s*repeat\(3,\s*25px\)/i);
+    expect(css).toMatch(/\.personal-history__quickbar\s*{[^}]*display:\s*flex/i);
+    expect(css).toMatch(/\.personal-history__matches article\s*{[^}]*min-height:\s*72px/i);
+    expect(css).toMatch(/\.personal-history__items\s*{[^}]*grid-template-columns:\s*repeat\(3,\s*24px\)/i);
     expect(css).not.toMatch(/personal-history__items img:nth-child\(n\+4\)/i);
-    expect(css).toMatch(/\.personal-history__performance-metrics img\s*{[^}]*width:\s*18px[^}]*height:\s*18px[^}]*object-position:\s*center/i);
-    expect(css).toMatch(/\.personal-history__performance-value\s*{[^}]*margin-right:\s*7px[^}]*color:\s*#dce6f4/i);
+    expect(css).toMatch(/\.personal-history__performance-metrics img\s*{[^}]*width:\s*14px[^}]*height:\s*14px[^}]*object-position:\s*center/i);
+    expect(css).toMatch(/\.personal-history__performance-bar\s*{[^}]*height:\s*4px/i);
     expect(css).toMatch(/\.personal-history__performance-metrics > div:nth-child\(1\)\s*{[^}]*color:\s*#f0a61a/i);
     expect(css).toMatch(/\.personal-history__performance-metrics > div:nth-child\(2\)\s*{[^}]*color:\s*#42c878/i);
     expect(css).toMatch(/\.personal-history__performance-metrics > div:nth-child\(3\)\s*{[^}]*color:\s*#d7a514/i);
-    expect(css).toMatch(/@media\s*\(min-width:\s*1024px\)/i);
-    expect(css).toMatch(/@media\s*\(min-width:\s*720px\)\s+and\s+\(max-width:\s*1023px\)/i);
+    expect(css).toMatch(/@media\s*\(max-width:\s*1023px\)/i);
+    expect(css).toMatch(/@media\s*\(max-width:\s*820px\)/i);
     expect(css).toMatch(/@media\s*\(max-width:\s*719px\)/i);
-    expect(css).toMatch(/@media\s*\(max-width:\s*419px\)/i);
+    expect(css).toMatch(/@media\s*\(max-width:\s*479px\)/i);
+    expect(css).not.toMatch(/\.personal-history__performance-metrics\s*,\s*\.personal-history__teams[^}]*display:\s*none/i);
   });
 
   it('renders loading and unavailable states explicitly', () => {

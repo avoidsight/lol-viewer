@@ -1,14 +1,17 @@
+import { useEffect, useMemo, useState } from 'react';
 import type { MatchParticipantSummary, MatchSummary, PersonalHistorySnapshot } from '../../../../shared/domain';
 import type { PersonalHistoryTarget } from '../../../../shared/ipc';
 import { localizeRank } from '../../../../shared/rank';
 import { isBuildItem } from '../../../../shared/items';
-import { describeQueue } from '../../../../shared/queue';
+import { describeQueue, isRankedQueue } from '../../../../shared/queue';
 import damageIcon from '../../assets/match-damage.png';
 import damageTakenIcon from '../../assets/match-damage-taken.png';
 import goldIcon from '../../assets/match-gold.png';
 import './personal-history.css';
 
 type HistoryState = 'loading' | 'ready' | 'unavailable';
+type HistoryQueueScope = 'all' | 'ranked';
+type HistoryResultScope = 'all' | 'wins' | 'losses';
 
 const championIconUrl = (_version: string | undefined, championId: number) =>
   `lol-asset://champion-icons/${championId}.png`;
@@ -111,35 +114,40 @@ function PerformanceMetrics({ match }: { match: MatchSummary }) {
       label: '伤害',
       icon: damageIcon,
       value: match.totalDamageDealtToChampions,
-      share: match.teamDamageShare
+      share: match.teamDamageShare,
+      achievement: 'MOST_DAMAGE' as const
     },
     {
       label: '承伤',
       icon: damageTakenIcon,
       value: match.totalDamageTaken,
-      share: match.teamDamageTakenShare
+      share: match.teamDamageTakenShare,
+      achievement: 'MOST_DAMAGE_TAKEN' as const
     },
     {
       label: '金币',
       icon: goldIcon,
       value: match.goldEarned,
-      share: match.teamGoldShare
+      share: match.teamGoldShare,
+      achievement: undefined
     }
   ];
   return <div className="personal-history__performance-metrics">
-    {metrics.map(({ label, icon, value, share }) => {
+    {metrics.map(({ label, icon, value, share, achievement }) => {
       const compactValue = value === undefined ? '—' : formatCompactValue(value);
       const percentage = share === undefined ? '—' : `${Math.round(share * 100)}%`;
+      const isHighest = achievement !== undefined && match.achievements?.some((entry) => entry.type === achievement);
       return <div
         key={label}
+        className={isHighest ? 'is-highest' : undefined}
         aria-label={`${label} ${compactValue}，占全队 ${percentage}`}
         title={`${label} ${compactValue}，占全队 ${percentage}`}
       >
         <img src={icon} alt="" aria-hidden="true" />
-        <strong>
-          <span className="personal-history__performance-value">{compactValue}</span>
-          <span className="personal-history__performance-share">{percentage}</span>
-        </strong>
+        <strong className="personal-history__performance-value">{compactValue}</strong>
+        <span className="personal-history__performance-bar" aria-hidden="true"><i style={{ width: `${Math.min(100, Math.max(0, (share ?? 0) * 100))}%` }} /></span>
+        <span className="personal-history__performance-share">{percentage}</span>
+        {isHighest && <span className="personal-history__performance-highest" role="img" aria-label={`${label}全场最高`} title={`${label}全场最高`}>♛</span>}
       </div>;
     })}
   </div>;
@@ -164,35 +172,39 @@ function MatchRow({ match, assetVersion, itemIconPaths, viewerPlayerId, onPlayer
 }) {
   const kda = (match.kills + match.assists) / Math.max(1, match.deaths);
   return <article data-testid="personal-match" className={match.win ? 'is-win' : 'is-loss'}>
-    <img className="personal-history__match-champion" src={championIconUrl(assetVersion, match.championId)} alt={`英雄 ${match.championId}`} loading="lazy" />
-    <div className="personal-history__match-result">
-      <strong>{match.win ? '胜利' : '失败'}</strong>
-      <span>{describeQueue(match.queueId)}</span>
+    <div className="personal-history__match-overview">
+      <img className="personal-history__match-champion" src={championIconUrl(assetVersion, match.championId)} alt={`英雄 ${match.championId}`} loading="lazy" />
+      <div className="personal-history__match-result">
+        <strong>{match.win ? '胜利' : '失败'}</strong>
+        <span>{describeQueue(match.queueId)}</span>
+      </div>
+      <div className="personal-history__match-performance">
+        <span className="personal-history__match-kda" aria-label="KDA">
+          <b>{match.kills}</b><i>/</i><b className="is-death">{match.deaths}</b><i>/</i><b>{match.assists}</b>
+        </span>
+        <small>{kda.toFixed(2)} KDA</small>
+      </div>
     </div>
-    <div className="personal-history__match-performance">
-      <span className="personal-history__match-kda" aria-label="KDA">
-        <b>{match.kills}</b><i>/</i><b className="is-death">{match.deaths}</b><i>/</i><b>{match.assists}</b>
-      </span>
-      <small>{kda.toFixed(2)} KDA</small>
-    </div>
-    <SummonerSpells spellIds={match.summonerSpellIds} assetVersion={assetVersion} />
-    <div className="personal-history__items">
-      {match.itemIds?.filter(isBuildItem).map((itemId, index) => {
-        const iconPath = itemIconPaths?.[String(itemId)];
-        return iconPath
-          ? <img
-              key={`${itemId}-${index}`}
-              src={itemIconUrl(assetVersion, iconPath)}
-              alt={`装备 ${itemId}`}
-              loading="lazy"
-            />
-          : <span
-              key={`${itemId}-${index}`}
-              className="personal-history__item-placeholder"
-              role="img"
-              aria-label={`装备 ${itemId} 图标不可用`}
-            />;
-      })}
+    <div className="personal-history__loadout">
+      <SummonerSpells spellIds={match.summonerSpellIds} assetVersion={assetVersion} />
+      <div className="personal-history__items">
+        {match.itemIds?.filter(isBuildItem).map((itemId, index) => {
+          const iconPath = itemIconPaths?.[String(itemId)];
+          return iconPath
+            ? <img
+                key={`${itemId}-${index}`}
+                src={itemIconUrl(assetVersion, iconPath)}
+                alt={`装备 ${itemId}`}
+                loading="lazy"
+              />
+            : <span
+                key={`${itemId}-${index}`}
+                className="personal-history__item-placeholder"
+                role="img"
+                aria-label={`装备 ${itemId} 图标不可用`}
+              />;
+        })}
+      </div>
     </div>
     <PerformanceMetrics match={match} />
     <TeamComposition match={match} assetVersion={assetVersion} viewerPlayerId={viewerPlayerId} onPlayerSelect={onPlayerSelect} />
@@ -212,6 +224,16 @@ export default function PersonalHistoryPage({ snapshot, state, onRefresh, onPlay
   refreshing?: boolean;
   refreshError?: string;
 }) {
+  const [queueScope, setQueueScope] = useState<HistoryQueueScope>('all');
+  const [resultScope, setResultScope] = useState<HistoryResultScope>('all');
+  useEffect(() => {
+    setQueueScope('all');
+    setResultScope('all');
+  }, [snapshot?.playerId]);
+  const filteredMatches = useMemo(() => (snapshot?.matches ?? []).slice(0, 20)
+    .filter((match) => queueScope === 'all' || isRankedQueue(match.queueId))
+    .filter((match) => resultScope === 'all' || (resultScope === 'wins' ? match.win : !match.win)), [queueScope, resultScope, snapshot?.matches]);
+
   if (state === 'loading') {
     return <main className="personal-history"><div className="personal-history__unavailable">{onBack && <button type="button" onClick={onBack}>返回我的战绩</button>}<p role="status">正在加载个人战绩…</p></div></main>;
   }
@@ -229,42 +251,43 @@ export default function PersonalHistoryPage({ snapshot, state, onRefresh, onPlay
             <h1>{snapshot.displayName}</h1>
             {snapshot.cached && <strong className="personal-history__cached">缓存数据</strong>}
           </div>
-          <p>{localizeRank(snapshot.rank) ?? '未定级'} · <strong>最近 {snapshot.sampleSize} 场</strong></p>
+          <p>{localizeRank(snapshot.rank) ?? '未定级'} · 最近 {snapshot.sampleSize} 场</p>
         </div>
-        <dl className="personal-history__summary">
-          <div className="personal-history__metric"><dt>胜场</dt><dd>{snapshot.wins}</dd></div>
-          <div className="personal-history__metric"><dt>负场</dt><dd>{snapshot.losses}</dd></div>
-          <div className="personal-history__metric personal-history__metric--primary"><dt>胜率</dt><dd>{(snapshot.winRate * 100).toFixed(1)}%</dd></div>
-          <div className="personal-history__metric"><dt>平均 KDA</dt><dd>{snapshot.averageKda.toFixed(2)}</dd></div>
-        </dl>
+        <div className="personal-history__summary">
+          <div className="personal-history__win-rate"><strong>{(snapshot.winRate * 100).toFixed(1)}%</strong><span>胜率</span></div>
+          <div className="personal-history__record" aria-label={`${snapshot.wins} 胜 ${snapshot.losses} 负`}>
+            <div><strong>{snapshot.wins} 胜</strong><strong>{snapshot.losses} 负</strong></div>
+            <span aria-hidden="true"><i style={{ width: `${snapshot.winRate * 100}%` }} /><i style={{ width: `${(1 - snapshot.winRate) * 100}%` }} /></span>
+          </div>
+          <div className="personal-history__average-kda"><strong>{snapshot.averageKda.toFixed(2)}</strong><span>平均 KDA</span></div>
+        </div>
         <div className="personal-history__refresh">
-          <button type="button" onClick={onRefresh} disabled={refreshing}>{refreshing ? '刷新中' : '刷新'}</button>
+          <button type="button" aria-label={refreshing ? '刷新中' : '刷新'} title={refreshing ? '刷新中' : '刷新战绩'} onClick={onRefresh} disabled={refreshing}><span aria-hidden="true">↻</span></button>
           {refreshError && <span aria-live="polite">{refreshError}</span>}
         </div>
       </header>
 
-      <div className="personal-history__content">
-        <section className="personal-history__panel personal-history__favorites-panel" aria-labelledby="favorite-champions">
-          <div className="personal-history__panel-heading"><h2 id="favorite-champions">常用英雄</h2><span>最近 20 场</span></div>
-          <div className="personal-history__favorites">
-            {snapshot.favoriteChampions.map((champion) => <article data-testid="favorite-champion" key={champion.championId}>
-              <img src={championIconUrl(snapshot.assetVersion, champion.championId)} alt={`英雄 ${champion.championId}`} loading="lazy" />
-              <div className="personal-history__favorite-stats">
-                <strong>{champion.games} 场</strong>
-                <p>平均 {(champion.averageKills ?? 0).toFixed(1)} / {(champion.averageDeaths ?? 0).toFixed(1)} / {(champion.averageAssists ?? 0).toFixed(1)}</p>
-              </div>
-              <div className="personal-history__favorite-rate">
-                <b>{(champion.winRate * 100).toFixed(1)}%</b>
-                <span>胜率</span>
-              </div>
-            </article>)}
+      <section className="personal-history__quickbar" aria-labelledby="favorite-champions">
+        <div className="personal-history__favorites">
+          <h2 id="favorite-champions">常用</h2>
+          {snapshot.favoriteChampions.slice(0, 5).map((champion) => <article data-testid="favorite-champion" key={champion.championId}>
+            <img src={championIconUrl(snapshot.assetVersion, champion.championId)} alt={`英雄 ${champion.championId}`} loading="lazy" />
+            <div><strong>{champion.games} 场</strong><span>{(champion.winRate * 100).toFixed(1)}%</span></div>
+          </article>)}
+        </div>
+        <div className="personal-history__filters">
+          <div role="group" aria-label="对局类型">
+            <button type="button" aria-pressed={queueScope === 'all'} onClick={() => setQueueScope('all')}><i className="is-all" aria-hidden="true" />全部</button>
+            <button type="button" aria-pressed={queueScope === 'ranked'} onClick={() => setQueueScope('ranked')}><i className="is-ranked" aria-hidden="true" />排位</button>
           </div>
-        </section>
+          <label><span className="personal-history__sr-only">胜负筛选</span><select aria-label="胜负筛选" value={resultScope} onChange={(event) => setResultScope(event.target.value as HistoryResultScope)}><option value="all">全部结果</option><option value="wins">仅胜利</option><option value="losses">仅失败</option></select></label>
+        </div>
+      </section>
 
-        <section className="personal-history__panel personal-history__matches-panel" aria-labelledby="recent-matches">
-          <div className="personal-history__panel-heading"><h2 id="recent-matches">最近战绩</h2><span>装备、经济与全场最高徽章</span></div>
+      <section className="personal-history__matches-panel" aria-labelledby="recent-matches">
+          <div className="personal-history__panel-heading"><h2 id="recent-matches">最近战绩</h2><span>{filteredMatches.length} 场</span></div>
           <div className="personal-history__matches">
-            {snapshot.matches.slice(0, 20).map((match) => <MatchRow
+            {filteredMatches.map((match) => <MatchRow
               key={match.matchId}
               match={match}
               assetVersion={snapshot.assetVersion}
@@ -272,9 +295,9 @@ export default function PersonalHistoryPage({ snapshot, state, onRefresh, onPlay
               viewerPlayerId={snapshot.playerId}
               onPlayerSelect={onPlayerSelect}
             />)}
+            {filteredMatches.length === 0 && <p className="personal-history__empty-filter" role="status">没有符合当前筛选的对局</p>}
           </div>
-        </section>
-      </div>
+      </section>
     </div>
   </main>;
 }
