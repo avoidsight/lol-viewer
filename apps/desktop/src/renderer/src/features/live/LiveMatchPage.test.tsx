@@ -97,6 +97,7 @@ describe('LiveMatchPage', () => {
     expect(teams).toHaveLength(2);
     expect(within(teams[0]).getAllByTestId('player-card').map((card) => card.dataset.lane)).toEqual(lanes);
     expect(within(teams[1]).getAllByTestId('player-card').map((card) => card.dataset.lane)).toEqual(lanes);
+    expect(document.querySelectorAll('.player-card__lane img')).toHaveLength(10);
   });
 
   it('expresses wins and losses through accessible icon tiles and champion image alternatives', () => {
@@ -246,6 +247,7 @@ describe('LiveMatchPage', () => {
     for (const label of ['阵容 1', '阵容 2', '阵容 3', '阵容 4', '阵容 5']) {
       expect(within(ourTeam).getByLabelText(label)).toBeVisible();
     }
+    expect(ourTeam.querySelectorAll('.player-card__lane img')).toHaveLength(0);
     expect(screen.queryByRole('img', { name: '位置待确认' })).not.toBeInTheDocument();
   });
 
