@@ -96,7 +96,8 @@ describe('adaptMatchHistory', () => {
       achievements: [
         { type: 'MOST_KILLS', value: 12 },
         { type: 'MOST_ASSISTS', value: 18 },
-        { type: 'MOST_DAMAGE', value: 31_500 }
+        { type: 'MOST_DAMAGE', value: 31_500 },
+        { type: 'MOST_GOLD', value: 14_250 }
       ]
     });
     expect(result.teamDamageShare).toBeCloseTo(31_500 / 123_000);

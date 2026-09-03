@@ -12,11 +12,13 @@ import {
   matchHistoryResponseSchema
 } from '../lcu/match-adapter';
 
-const PERSONAL_HISTORY_DATA_VERSION = 6;
+const PERSONAL_HISTORY_DATA_VERSION = 7;
 
 const currentSummonerSchema = z.object({
   summonerId: z.union([z.string(), z.number()]),
-  displayName: z.string(),
+  displayName: z.string().optional(),
+  gameName: z.string().optional(),
+  tagLine: z.string().optional(),
   profileIconId: z.number().int().nonnegative(),
   puuid: z.string().min(1).optional()
 });
@@ -122,7 +124,11 @@ export class PersonalHistoryService {
           await this.client.get('/lol-summoner/v1/current-summoner', currentSummonerSchema)
         );
         playerId = String(summoner.summonerId);
-        displayName = summoner.displayName;
+        const gameName = summoner.gameName?.trim();
+        const tagLine = summoner.tagLine?.trim();
+        displayName = gameName
+          ? `${gameName}${tagLine ? `#${tagLine}` : ''}`
+          : summoner.displayName?.trim() || '我的战绩';
         profileIconId = summoner.profileIconId;
         puuid = summoner.puuid;
       }

@@ -16,7 +16,8 @@ export type MatchAchievementType =
   | 'MOST_KILLS'
   | 'MOST_ASSISTS'
   | 'MOST_DAMAGE'
-  | 'MOST_DAMAGE_TAKEN';
+  | 'MOST_DAMAGE_TAKEN'
+  | 'MOST_GOLD';
 
 export interface MatchAchievement {
   type: MatchAchievementType;

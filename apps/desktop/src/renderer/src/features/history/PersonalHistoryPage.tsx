@@ -108,49 +108,55 @@ function formatCompactValue(value: number): string {
   return `${(value / 1_000).toFixed(1).replace(/\.0$/, '')}k`;
 }
 
+function HighestBadge({ label }: { label: string }) {
+  return <span
+    className="personal-history__performance-highest"
+    role="img"
+    aria-label={`${label}全场最高`}
+    title={`${label}全场最高`}
+  >
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7 4h10v3h3v2c0 3-1.9 5.2-4.8 5.8A5.1 5.1 0 0 1 13 16.7V19h4v2H7v-2h4v-2.3a5.1 5.1 0 0 1-2.2-1.9C5.9 14.2 4 12 4 9V7h3V4Zm0 5H6c0 1.7.8 2.9 2.1 3.5A8.7 8.7 0 0 1 7 9Zm10 0a8.7 8.7 0 0 1-1.1 3.5C17.2 11.9 18 10.7 18 9h-1Z" />
+    </svg>
+  </span>;
+}
+
 function PerformanceMetrics({ match }: { match: MatchSummary }) {
   const metrics = [
     {
       label: '伤害',
       icon: damageIcon,
       value: match.totalDamageDealtToChampions,
-      share: match.teamDamageShare,
       achievement: 'MOST_DAMAGE' as const
     },
     {
       label: '承伤',
       icon: damageTakenIcon,
       value: match.totalDamageTaken,
-      share: match.teamDamageTakenShare,
       achievement: 'MOST_DAMAGE_TAKEN' as const
     },
     {
       label: '金币',
       icon: goldIcon,
       value: match.goldEarned,
-      share: match.teamGoldShare,
-      achievement: undefined
+      achievement: 'MOST_GOLD' as const
     }
   ];
   return <div className="personal-history__performance-metrics">
-    {metrics.map(({ label, icon, value, share, achievement }) => {
+    {metrics.map(({ label, icon, value, achievement }) => {
       const compactValue = value === undefined ? '—' : formatCompactValue(value);
-      const percentage = share === undefined ? '—' : `${Math.round(share * 100)}%`;
-      const isHighest = achievement !== undefined && match.achievements?.some((entry) => entry.type === achievement);
+      const isHighest = match.achievements?.some((entry) => entry.type === achievement);
       return <div
         key={label}
         className={isHighest ? 'is-highest' : undefined}
-        aria-label={`${label} ${compactValue}，占全队 ${percentage}`}
-        title={`${label} ${compactValue}，占全队 ${percentage}`}
+        aria-label={`${label} ${compactValue}${isHighest ? '，全场最高' : ''}`}
       >
         <img src={icon} alt="" aria-hidden="true" />
         <span className="personal-history__performance-copy">
           <small>{label}</small>
           <strong className="personal-history__performance-value">{compactValue}</strong>
         </span>
-        <span className="personal-history__performance-bar" aria-hidden="true"><i style={{ width: `${Math.min(100, Math.max(0, (share ?? 0) * 100))}%` }} /></span>
-        <span className="personal-history__performance-share">{percentage}</span>
-        {isHighest && <span className="personal-history__performance-highest" role="img" aria-label={`${label}全场最高`} title={`${label}全场最高`}>♛</span>}
+        {isHighest && <HighestBadge label={label} />}
       </div>;
     })}
   </div>;
@@ -175,20 +181,20 @@ function MatchRow({ match, assetVersion, itemIconPaths, viewerPlayerId, onPlayer
 }) {
   const kda = (match.kills + match.assists) / Math.max(1, match.deaths);
   return <article data-testid="personal-match" className={match.win ? 'is-win' : 'is-loss'}>
-    <div className="personal-history__match-primary">
-      <div className="personal-history__match-overview">
-        <img className="personal-history__match-champion" src={championIconUrl(assetVersion, match.championId)} alt={`英雄 ${match.championId}`} loading="lazy" />
-        <div className="personal-history__match-result">
-          <strong>{match.win ? '胜利' : '失败'}</strong>
-          <span>{describeQueue(match.queueId)}</span>
-        </div>
-        <div className="personal-history__match-performance">
-          <span className="personal-history__match-kda" aria-label="KDA">
-            <b>{match.kills}</b><i>/</i><b className="is-death">{match.deaths}</b><i>/</i><b>{match.assists}</b>
-          </span>
-          <small>{kda.toFixed(2)} KDA</small>
-        </div>
+    <div className="personal-history__match-overview">
+      <img className="personal-history__match-champion" src={championIconUrl(assetVersion, match.championId)} alt={`英雄 ${match.championId}`} loading="lazy" />
+      <div className="personal-history__match-result">
+        <strong>{match.win ? '胜利' : '失败'}</strong>
+        <span>{describeQueue(match.queueId)}</span>
       </div>
+      <div className="personal-history__match-performance">
+        <span className="personal-history__match-kda" aria-label="KDA">
+          <b>{match.kills}</b><i>/</i><b className="is-death">{match.deaths}</b><i>/</i><b>{match.assists}</b>
+        </span>
+        <small>{kda.toFixed(2)} KDA</small>
+      </div>
+    </div>
+    <div className="personal-history__match-detail">
       <div className="personal-history__loadout">
         <SummonerSpells spellIds={match.summonerSpellIds} assetVersion={assetVersion} />
         <div className="personal-history__items">
@@ -210,15 +216,15 @@ function MatchRow({ match, assetVersion, itemIconPaths, viewerPlayerId, onPlayer
           })}
         </div>
       </div>
+      <PerformanceMetrics match={match} />
+    </div>
+    <aside className="personal-history__match-meta">
       <time dateTime={new Date(match.endedAt).toISOString()}>
         <b>{formatEndedAt(match.endedAt)}</b>
         <span>时长 {Math.round(match.durationSeconds / 60)} 分钟</span>
       </time>
-    </div>
-    <div className="personal-history__match-secondary">
-      <PerformanceMetrics match={match} />
       <TeamComposition match={match} assetVersion={assetVersion} viewerPlayerId={viewerPlayerId} onPlayerSelect={onPlayerSelect} />
-    </div>
+    </aside>
   </article>;
 }
 

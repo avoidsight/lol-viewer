@@ -32,7 +32,7 @@ describe('personalHistorySchema', () => {
         enemyChampionIds: [6, 7, 8, 9, 10],
         totalDamageDealtToChampions: 31_500, totalDamageTaken: 28_100,
         teamDamageShare: 0.26, teamDamageTakenShare: 0.23, teamGoldShare: 0.26,
-        achievements: [{ type: 'MOST_KILLS', value: 12 }]
+        achievements: [{ type: 'MOST_KILLS', value: 12 }, { type: 'MOST_GOLD', value: 14_250 }]
       }],
       sampleSize: 1, wins: 1, losses: 0, winRate: 1, averageKda: 7.5,
       favoriteChampions: [{

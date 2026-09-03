@@ -194,6 +194,11 @@ function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
       type: 'MOST_DAMAGE_TAKEN',
       value: participant.stats.totalDamageTaken,
       values: game.participants.map((entry) => entry.stats.totalDamageTaken)
+    },
+    {
+      type: 'MOST_GOLD',
+      value: participant.stats.goldEarned,
+      values: game.participants.map((entry) => entry.stats.goldEarned)
     }
   ];
   const achievements = achievementMetrics.flatMap<MatchAchievement>(({ type, value, values }) => {

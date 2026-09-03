@@ -18,7 +18,7 @@ export const PERSONAL_HISTORY_GET_CHANNEL = 'history:get-personal' as const;
 
 const laneSchema = z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'UNKNOWN']);
 const matchAchievementSchema = z.object({
-  type: z.enum(['MOST_KILLS', 'MOST_ASSISTS', 'MOST_DAMAGE', 'MOST_DAMAGE_TAKEN']),
+  type: z.enum(['MOST_KILLS', 'MOST_ASSISTS', 'MOST_DAMAGE', 'MOST_DAMAGE_TAKEN', 'MOST_GOLD']),
   value: z.number().nonnegative()
 }).strict();
 const matchParticipantSummarySchema = z.object({
@@ -63,7 +63,7 @@ export const matchSummarySchema = z.object({
   teamDamageShare: z.number().min(0).max(1).optional(),
   teamDamageTakenShare: z.number().min(0).max(1).optional(),
   teamGoldShare: z.number().min(0).max(1).optional(),
-  achievements: z.array(matchAchievementSchema).max(4).optional()
+  achievements: z.array(matchAchievementSchema).max(5).optional()
 }).strict();
 
 const favoriteChampionSchema = z.object({
