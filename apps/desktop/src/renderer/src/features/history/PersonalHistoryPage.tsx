@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { MatchAchievement, MatchParticipantSummary, MatchSummary, PersonalHistorySnapshot } from '../../../../shared/domain';
+import type { MatchAchievementType, MatchParticipantSummary, MatchSummary, PersonalHistorySnapshot } from '../../../../shared/domain';
 import type { PersonalHistoryTarget } from '../../../../shared/ipc';
 import { localizeRank } from '../../../../shared/rank';
 import { isBuildItem } from '../../../../shared/items';
 import { describeQueue, isRankedQueue } from '../../../../shared/queue';
-import damageIcon from '../../assets/match-damage.png';
-import damageTakenIcon from '../../assets/match-damage-taken.png';
-import goldIcon from '../../assets/match-gold.png';
 import './personal-history.css';
 
 type HistoryState = 'loading' | 'ready' | 'unavailable';
@@ -104,22 +101,54 @@ function TeamComposition({ match, assetVersion, viewerPlayerId, onPlayerSelect }
 }
 
 const performanceAchievements: Array<{
-  type: MatchAchievement['type'];
+  type: MatchAchievementType;
   label: string;
-  icon: string;
+  tone: string;
 }> = [
-  { type: 'MOST_DAMAGE', label: '最高伤害', icon: damageIcon },
-  { type: 'MOST_DAMAGE_TAKEN', label: '最高承伤', icon: damageTakenIcon },
-  { type: 'MOST_GOLD', label: '最高经济', icon: goldIcon }
+  { type: 'MOST_KILLS', label: '击杀最多', tone: 'kills' },
+  { type: 'MOST_ASSISTS', label: '助攻最多', tone: 'assists' },
+  { type: 'MOST_DEATHS', label: '死亡最多', tone: 'deaths' },
+  { type: 'MOST_DAMAGE', label: '伤害最高', tone: 'damage' },
+  { type: 'MOST_DAMAGE_TAKEN', label: '承伤最高', tone: 'damage-taken' },
+  { type: 'MOST_GOLD', label: '经济最高', tone: 'gold' },
+  { type: 'MOST_CS', label: '补刀最多', tone: 'cs' }
 ];
+
+function AchievementGlyph({ type }: { type: MatchAchievementType }) {
+  let glyph;
+  switch (type) {
+    case 'MOST_KILLS':
+      glyph = <><path d="m5 4 6 6-2 2-6-6 2-2Zm14 0-6 6 2 2 6-6-2-2ZM8 13l3 3-4 4-3-3 4-4Zm8 0-3 3 4 4 3-3-4-4Z" /></>;
+      break;
+    case 'MOST_ASSISTS':
+      glyph = <><circle cx="8" cy="8" r="3" /><circle cx="16" cy="8" r="3" /><path d="M3.5 19c.5-3.4 2-5 4.5-5 1.9 0 3.2.9 4 2.7.8-1.8 2.1-2.7 4-2.7 2.5 0 4 1.6 4.5 5" /></>;
+      break;
+    case 'MOST_DEATHS':
+      glyph = <><path d="M5 11a7 7 0 1 1 14 0c0 2.8-1.3 4.7-3.3 5.8V20l-2-1.3L12 20l-1.7-1.3L8 20v-3.2C6.1 15.7 5 13.8 5 11Z" /><circle cx="9" cy="11" r="1.2" /><circle cx="15" cy="11" r="1.2" /><path d="m11 15 1-1 1 1" /></>;
+      break;
+    case 'MOST_DAMAGE':
+      glyph = <path d="M13.5 2 5 13h6l-.5 9L19 10h-6l.5-8Z" />;
+      break;
+    case 'MOST_DAMAGE_TAKEN':
+      glyph = <path d="M12 3 5 6v5c0 4.7 2.7 8.2 7 10 4.3-1.8 7-5.3 7-10V6l-7-3Zm0 4v10" />;
+      break;
+    case 'MOST_GOLD':
+      glyph = <><ellipse cx="12" cy="7" rx="7" ry="3" /><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5" /></>;
+      break;
+    case 'MOST_CS':
+      glyph = <><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2.5" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></>;
+      break;
+  }
+  return <svg viewBox="0 0 24 24" aria-hidden="true">{glyph}</svg>;
+}
 
 function PerformanceAchievements({ match }: { match: MatchSummary }) {
   const visible = performanceAchievements.filter(({ type }) =>
     match.achievements?.some((achievement) => achievement.type === type));
   if (visible.length === 0) return null;
   return <span className="personal-history__achievement-icons" aria-label="本场最高数据">
-    {visible.map(({ type, label, icon }) => <span key={type} role="img" aria-label={label} title={label}>
-      <img src={icon} alt="" aria-hidden="true" />
+    {visible.map(({ type, label, tone }) => <span key={type} className={`is-${tone}`} role="img" aria-label={label} title={label}>
+      <AchievementGlyph type={type} />
     </span>)}
   </span>;
 }
@@ -141,7 +170,6 @@ function MatchRow({ match, assetVersion, itemIconPaths, viewerPlayerId, onPlayer
   viewerPlayerId: string;
   onPlayerSelect?: (target: PersonalHistoryTarget) => void;
 }) {
-  const kda = (match.kills + match.assists) / Math.max(1, match.deaths);
   return <article data-testid="personal-match" className={match.win ? 'is-win' : 'is-loss'}>
     <div className="personal-history__match-overview">
       <img className="personal-history__match-champion" src={championIconUrl(assetVersion, match.championId)} alt={`英雄 ${match.championId}`} loading="lazy" />
@@ -150,13 +178,10 @@ function MatchRow({ match, assetVersion, itemIconPaths, viewerPlayerId, onPlayer
         <span>{describeQueue(match.queueId)}</span>
       </div>
       <div className="personal-history__match-performance">
-        <span className="personal-history__match-kda" aria-label="KDA">
+        <span className="personal-history__match-kda" aria-label="击杀、死亡、助攻">
           <b>{match.kills}</b><i>/</i><b className="is-death">{match.deaths}</b><i>/</i><b>{match.assists}</b>
         </span>
-        <span className="personal-history__match-performance-footer">
-          <small>{kda.toFixed(2)} KDA</small>
-          <PerformanceAchievements match={match} />
-        </span>
+        <PerformanceAchievements match={match} />
       </div>
     </div>
     <div className="personal-history__loadout">

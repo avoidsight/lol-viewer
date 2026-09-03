@@ -15,9 +15,11 @@ export type PlayerDataErrorCode =
 export type MatchAchievementType =
   | 'MOST_KILLS'
   | 'MOST_ASSISTS'
+  | 'MOST_DEATHS'
   | 'MOST_DAMAGE'
   | 'MOST_DAMAGE_TAKEN'
-  | 'MOST_GOLD';
+  | 'MOST_GOLD'
+  | 'MOST_CS';
 
 export interface MatchAchievement {
   type: MatchAchievementType;

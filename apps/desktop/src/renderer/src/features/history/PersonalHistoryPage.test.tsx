@@ -48,8 +48,12 @@ const snapshot: PersonalHistorySnapshot = {
     })),
     achievements: index === 0 ? [
       { type: 'MOST_KILLS' as const, value: 8 },
+      { type: 'MOST_ASSISTS' as const, value: 6 },
+      { type: 'MOST_DEATHS' as const, value: 2 },
       { type: 'MOST_DAMAGE' as const, value: 31_500 },
-      { type: 'MOST_GOLD' as const, value: 12_400 }
+      { type: 'MOST_DAMAGE_TAKEN' as const, value: 28_100 },
+      { type: 'MOST_GOLD' as const, value: 12_400 },
+      { type: 'MOST_CS' as const, value: 186 }
     ] : undefined
   })),
   sampleSize: 20,
@@ -86,9 +90,9 @@ describe('PersonalHistoryPage', () => {
     expect(screen.getAllByTestId('favorite-champion')).toHaveLength(5);
     expect(screen.getAllByTestId('personal-match')).toHaveLength(20);
     expect(screen.getAllByText('极地大乱斗')).toHaveLength(10);
-    expect(screen.getAllByLabelText('KDA')).toHaveLength(20);
+    expect(screen.getAllByLabelText('击杀、死亡、助攻')).toHaveLength(20);
     expect(screen.queryByText(/平均 8\.3/)).not.toBeInTheDocument();
-    expect(screen.getAllByText('7.00 KDA')).toHaveLength(20);
+    expect(screen.queryByText('7.00 KDA')).not.toBeInTheDocument();
     expect(screen.queryByText('186 CS')).not.toBeInTheDocument();
     expect(screen.queryByText('31.5k')).not.toBeInTheDocument();
     expect(screen.queryByText('28.1k')).not.toBeInTheDocument();
@@ -107,9 +111,13 @@ describe('PersonalHistoryPage', () => {
     expect(screen.getAllByRole('img', { name: /己方英雄/ })).toHaveLength(100);
     expect(screen.getAllByRole('img', { name: /敌方英雄/ })).toHaveLength(100);
     expect(document.querySelectorAll('.personal-history__team-icon.is-local')).toHaveLength(20);
-    expect(screen.getByRole('img', { name: '最高伤害' })).toBeVisible();
-    expect(screen.getByRole('img', { name: '最高经济' })).toBeVisible();
-    expect(screen.queryByRole('img', { name: '最高承伤' })).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '击杀最多' })).toBeVisible();
+    expect(screen.getByRole('img', { name: '助攻最多' })).toBeVisible();
+    expect(screen.getByRole('img', { name: '死亡最多' })).toBeVisible();
+    expect(screen.getByRole('img', { name: '伤害最高' })).toBeVisible();
+    expect(screen.getByRole('img', { name: '承伤最高' })).toBeVisible();
+    expect(screen.getByRole('img', { name: '经济最高' })).toBeVisible();
+    expect(screen.getByRole('img', { name: '补刀最多' })).toBeVisible();
   });
 
   it('organizes the dashboard into a compact overview, horizontal favorites, and full-width matches', () => {
@@ -201,7 +209,8 @@ describe('PersonalHistoryPage', () => {
     expect(css).toMatch(/\.personal-history__match-champion\s*{[^}]*width:\s*56px[^}]*height:\s*56px/i);
     expect(css).toMatch(/\.personal-history__items\s*{[^}]*display:\s*flex/i);
     expect(css).not.toMatch(/personal-history__items img:nth-child\(n\+4\)/i);
-    expect(css).toMatch(/\.personal-history__achievement-icons > span\s*{[^}]*border:\s*1px solid #c89e37/i);
+    expect(css).toMatch(/\.personal-history__achievement-icons > span\s*{[^}]*border:\s*1px solid currentColor/i);
+    expect(css).toMatch(/\.personal-history__achievement-icons svg\s*{[^}]*stroke:\s*currentColor/i);
     expect(css).not.toMatch(/\.personal-history__performance-metrics/i);
     expect(css).not.toMatch(/\.personal-history__performance-bar/i);
     expect(css).toMatch(/@media\s*\(max-width:\s*1080px\)/i);

@@ -28,6 +28,11 @@ describe('adaptMatchHistory', () => {
     expect(adaptMatchHistory({ games: fixture.games.slice(0, 3) }, { scope: 'all', limit: 10 })).toHaveLength(3);
   });
 
+  it('does not claim a full-game high when only one participant is available', () => {
+    const result = adaptMatchHistory({ games: fixture.games.slice(0, 1) }, { scope: 'all', limit: 10 })[0];
+    expect(result.achievements).toBeUndefined();
+  });
+
   it('returns twenty all-mode matches when requested', () => {
     const queueIds = [420, 430, 440, 450];
     const games = Array.from({ length: 25 }, (_, index) => ({
@@ -96,8 +101,10 @@ describe('adaptMatchHistory', () => {
       achievements: [
         { type: 'MOST_KILLS', value: 12 },
         { type: 'MOST_ASSISTS', value: 18 },
+        { type: 'MOST_DEATHS', value: 6 },
         { type: 'MOST_DAMAGE', value: 31_500 },
-        { type: 'MOST_GOLD', value: 14_250 }
+        { type: 'MOST_GOLD', value: 14_250 },
+        { type: 'MOST_CS', value: 150 }
       ]
     });
     expect(result.teamDamageShare).toBeCloseTo(31_500 / 123_000);

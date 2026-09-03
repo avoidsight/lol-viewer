@@ -89,6 +89,13 @@ function teamShare(
   return total > 0 ? localValue / total : undefined;
 }
 
+function participantCs(participant: z.infer<typeof participantSchema>): number | undefined {
+  const values = [participant.stats.totalMinionsKilled, participant.stats.neutralMinionsKilled];
+  return values.some((value) => value !== undefined)
+    ? values.reduce<number>((total, value) => total + (value ?? 0), 0)
+    : undefined;
+}
+
 function participantSummaries(
   game: z.infer<typeof matchHistoryGameSchema>,
   participants: Array<z.infer<typeof participantSchema>>
@@ -121,10 +128,7 @@ function participantSummaries(
 function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
   const participant = game.participants[0];
   const lane = normalizeLane(participant.timeline?.lane);
-  const csFields = [participant.stats.totalMinionsKilled, participant.stats.neutralMinionsKilled];
-  const cs = csFields.some((value) => value !== undefined)
-    ? csFields.reduce<number>((total, value) => total + (value ?? 0), 0)
-    : undefined;
+  const cs = participantCs(participant);
   const itemIds = [
     participant.stats.item0, participant.stats.item1, participant.stats.item2,
     participant.stats.item3, participant.stats.item4, participant.stats.item5,
@@ -186,6 +190,11 @@ function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
       values: game.participants.map((entry) => entry.stats.assists)
     },
     {
+      type: 'MOST_DEATHS',
+      value: participant.stats.deaths,
+      values: game.participants.map((entry) => entry.stats.deaths)
+    },
+    {
       type: 'MOST_DAMAGE',
       value: participant.stats.totalDamageDealtToChampions,
       values: game.participants.map((entry) => entry.stats.totalDamageDealtToChampions)
@@ -199,12 +208,21 @@ function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
       type: 'MOST_GOLD',
       value: participant.stats.goldEarned,
       values: game.participants.map((entry) => entry.stats.goldEarned)
+    },
+    {
+      type: 'MOST_CS',
+      value: cs,
+      values: game.participants.map(participantCs)
     }
   ];
   const achievements = achievementMetrics.flatMap<MatchAchievement>(({ type, value, values }) => {
-    if (value === undefined || value <= 0) return [];
-    const comparable = values.filter((entry): entry is number => entry !== undefined);
-    return comparable.length > 0 && value === Math.max(...comparable) ? [{ type, value }] : [];
+    if (
+      value === undefined ||
+      value <= 0 ||
+      game.participants.length <= 1 ||
+      values.some((entry) => entry === undefined)
+    ) return [];
+    return value === Math.max(...values as number[]) ? [{ type, value }] : [];
   });
 
   return {

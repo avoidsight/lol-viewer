@@ -12,7 +12,7 @@ import {
   matchHistoryResponseSchema
 } from '../lcu/match-adapter';
 
-const PERSONAL_HISTORY_DATA_VERSION = 7;
+const PERSONAL_HISTORY_DATA_VERSION = 8;
 
 const currentSummonerSchema = z.object({
   summonerId: z.union([z.string(), z.number()]),
