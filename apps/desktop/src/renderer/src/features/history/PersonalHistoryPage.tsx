@@ -98,8 +98,8 @@ function TeamComposition({ match, assetVersion, viewerPlayerId, onPlayerSelect }
     });
 
   return <div className="personal-history__teams" data-testid="team-composition">
-    <div>{teamRow('ally', match.allyChampionIds, match.allyPlayers)}</div>
-    <div>{teamRow('enemy', match.enemyChampionIds, match.enemyPlayers)}</div>
+    <div className="is-ally" aria-label="己方阵容">{teamRow('ally', match.allyChampionIds, match.allyPlayers)}</div>
+    <div className="is-enemy" aria-label="敌方阵容">{teamRow('enemy', match.enemyChampionIds, match.enemyPlayers)}</div>
   </div>;
 }
 
@@ -144,7 +144,10 @@ function PerformanceMetrics({ match }: { match: MatchSummary }) {
         title={`${label} ${compactValue}，占全队 ${percentage}`}
       >
         <img src={icon} alt="" aria-hidden="true" />
-        <strong className="personal-history__performance-value">{compactValue}</strong>
+        <span className="personal-history__performance-copy">
+          <small>{label}</small>
+          <strong className="personal-history__performance-value">{compactValue}</strong>
+        </span>
         <span className="personal-history__performance-bar" aria-hidden="true"><i style={{ width: `${Math.min(100, Math.max(0, (share ?? 0) * 100))}%` }} /></span>
         <span className="personal-history__performance-share">{percentage}</span>
         {isHighest && <span className="personal-history__performance-highest" role="img" aria-label={`${label}全场最高`} title={`${label}全场最高`}>♛</span>}
@@ -172,46 +175,50 @@ function MatchRow({ match, assetVersion, itemIconPaths, viewerPlayerId, onPlayer
 }) {
   const kda = (match.kills + match.assists) / Math.max(1, match.deaths);
   return <article data-testid="personal-match" className={match.win ? 'is-win' : 'is-loss'}>
-    <div className="personal-history__match-overview">
-      <img className="personal-history__match-champion" src={championIconUrl(assetVersion, match.championId)} alt={`英雄 ${match.championId}`} loading="lazy" />
-      <div className="personal-history__match-result">
-        <strong>{match.win ? '胜利' : '失败'}</strong>
-        <span>{describeQueue(match.queueId)}</span>
+    <div className="personal-history__match-primary">
+      <div className="personal-history__match-overview">
+        <img className="personal-history__match-champion" src={championIconUrl(assetVersion, match.championId)} alt={`英雄 ${match.championId}`} loading="lazy" />
+        <div className="personal-history__match-result">
+          <strong>{match.win ? '胜利' : '失败'}</strong>
+          <span>{describeQueue(match.queueId)}</span>
+        </div>
+        <div className="personal-history__match-performance">
+          <span className="personal-history__match-kda" aria-label="KDA">
+            <b>{match.kills}</b><i>/</i><b className="is-death">{match.deaths}</b><i>/</i><b>{match.assists}</b>
+          </span>
+          <small>{kda.toFixed(2)} KDA</small>
+        </div>
       </div>
-      <div className="personal-history__match-performance">
-        <span className="personal-history__match-kda" aria-label="KDA">
-          <b>{match.kills}</b><i>/</i><b className="is-death">{match.deaths}</b><i>/</i><b>{match.assists}</b>
-        </span>
-        <small>{kda.toFixed(2)} KDA</small>
+      <div className="personal-history__loadout">
+        <SummonerSpells spellIds={match.summonerSpellIds} assetVersion={assetVersion} />
+        <div className="personal-history__items">
+          {match.itemIds?.filter(isBuildItem).map((itemId, index) => {
+            const iconPath = itemIconPaths?.[String(itemId)];
+            return iconPath
+              ? <img
+                  key={`${itemId}-${index}`}
+                  src={itemIconUrl(assetVersion, iconPath)}
+                  alt={`装备 ${itemId}`}
+                  loading="lazy"
+                />
+              : <span
+                  key={`${itemId}-${index}`}
+                  className="personal-history__item-placeholder"
+                  role="img"
+                  aria-label={`装备 ${itemId} 图标不可用`}
+                />;
+          })}
+        </div>
       </div>
+      <time dateTime={new Date(match.endedAt).toISOString()}>
+        <b>{formatEndedAt(match.endedAt)}</b>
+        <span>时长 {Math.round(match.durationSeconds / 60)} 分钟</span>
+      </time>
     </div>
-    <div className="personal-history__loadout">
-      <SummonerSpells spellIds={match.summonerSpellIds} assetVersion={assetVersion} />
-      <div className="personal-history__items">
-        {match.itemIds?.filter(isBuildItem).map((itemId, index) => {
-          const iconPath = itemIconPaths?.[String(itemId)];
-          return iconPath
-            ? <img
-                key={`${itemId}-${index}`}
-                src={itemIconUrl(assetVersion, iconPath)}
-                alt={`装备 ${itemId}`}
-                loading="lazy"
-              />
-            : <span
-                key={`${itemId}-${index}`}
-                className="personal-history__item-placeholder"
-                role="img"
-                aria-label={`装备 ${itemId} 图标不可用`}
-              />;
-        })}
-      </div>
+    <div className="personal-history__match-secondary">
+      <PerformanceMetrics match={match} />
+      <TeamComposition match={match} assetVersion={assetVersion} viewerPlayerId={viewerPlayerId} onPlayerSelect={onPlayerSelect} />
     </div>
-    <PerformanceMetrics match={match} />
-    <TeamComposition match={match} assetVersion={assetVersion} viewerPlayerId={viewerPlayerId} onPlayerSelect={onPlayerSelect} />
-    <time dateTime={new Date(match.endedAt).toISOString()}>
-      <b>{formatEndedAt(match.endedAt)}</b>
-      <span>时长 {Math.round(match.durationSeconds / 60)} 分钟</span>
-    </time>
   </article>;
 }
 
@@ -270,9 +277,9 @@ export default function PersonalHistoryPage({ snapshot, state, onRefresh, onPlay
       <section className="personal-history__quickbar" aria-labelledby="favorite-champions">
         <div className="personal-history__favorites">
           <h2 id="favorite-champions">常用</h2>
-          {snapshot.favoriteChampions.slice(0, 5).map((champion) => <article data-testid="favorite-champion" key={champion.championId}>
+          {snapshot.favoriteChampions.slice(0, 5).map((champion) => <article data-testid="favorite-champion" key={champion.championId} title={`${champion.games} 场，胜率 ${(champion.winRate * 100).toFixed(1)}%`}>
             <img src={championIconUrl(snapshot.assetVersion, champion.championId)} alt={`英雄 ${champion.championId}`} loading="lazy" />
-            <div><strong>{champion.games} 场</strong><span>{(champion.winRate * 100).toFixed(1)}%</span></div>
+            <div><strong>{champion.games} 场</strong><span>胜率 {(champion.winRate * 100).toFixed(1)}%</span></div>
           </article>)}
         </div>
         <div className="personal-history__filters">

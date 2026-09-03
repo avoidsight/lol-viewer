@@ -142,7 +142,7 @@ describe('PersonalHistoryPage', () => {
     });
     expect(screen.queryByRole('button', { name: '查看 召唤师 的个人战绩' })).not.toBeInTheDocument();
     const css = readFileSync(resolve('src/renderer/src/features/history/personal-history.css'), 'utf8');
-    expect(css).toMatch(/\.personal-history__team-player\s*\{[^}]*width:\s*28px;[^}]*height:\s*28px;/s);
+    expect(css).toMatch(/\.personal-history__team-player\s*\{[^}]*width:\s*32px;[^}]*height:\s*32px;/s);
     expect(css).toMatch(/\.personal-history__team-player--link:focus-visible\s*\{[^}]*outline:\s*2px solid #fbbf24;/s);
   });
 
@@ -198,22 +198,24 @@ describe('PersonalHistoryPage', () => {
     expect(screen.queryByText('胜利')).not.toBeInTheDocument();
   });
 
-  it('uses the deep-sea palette, rich compact rows, and responsive tiers', () => {
+  it('uses a readable two-tier match layout and responsive breakpoints', () => {
     const css = readFileSync(resolve('src/renderer/src/features/history/personal-history.css'), 'utf8');
     expect(css).toMatch(/\.personal-history\s*{[^}]*background:\s*var\(--ui-page-bg\)/i);
     expect(css).toMatch(/\.personal-history__quickbar\s*{[^}]*display:\s*flex/i);
-    expect(css).toMatch(/\.personal-history__matches article\s*{[^}]*min-height:\s*72px/i);
-    expect(css).toMatch(/\.personal-history__items\s*{[^}]*grid-template-columns:\s*repeat\(3,\s*24px\)/i);
+    expect(css).toMatch(/\.personal-history__match-primary\s*{[^}]*display:\s*grid/i);
+    expect(css).toMatch(/\.personal-history__match-secondary\s*{[^}]*border-top:/i);
+    expect(css).toMatch(/\.personal-history__match-champion\s*{[^}]*width:\s*52px[^}]*height:\s*52px/i);
+    expect(css).toMatch(/\.personal-history__items\s*{[^}]*display:\s*flex/i);
     expect(css).not.toMatch(/personal-history__items img:nth-child\(n\+4\)/i);
-    expect(css).toMatch(/\.personal-history__performance-metrics img\s*{[^}]*width:\s*14px[^}]*height:\s*14px[^}]*object-position:\s*center/i);
-    expect(css).toMatch(/\.personal-history__performance-bar\s*{[^}]*height:\s*4px/i);
+    expect(css).toMatch(/\.personal-history__performance-metrics img\s*{[^}]*width:\s*18px[^}]*height:\s*18px[^}]*object-position:\s*center/i);
+    expect(css).toMatch(/\.personal-history__performance-bar\s*{[^}]*height:\s*5px/i);
     expect(css).toMatch(/\.personal-history__performance-metrics > div:nth-child\(1\)\s*{[^}]*color:\s*#f0a61a/i);
     expect(css).toMatch(/\.personal-history__performance-metrics > div:nth-child\(2\)\s*{[^}]*color:\s*#42c878/i);
     expect(css).toMatch(/\.personal-history__performance-metrics > div:nth-child\(3\)\s*{[^}]*color:\s*#d7a514/i);
-    expect(css).toMatch(/@media\s*\(max-width:\s*1023px\)/i);
-    expect(css).toMatch(/@media\s*\(max-width:\s*820px\)/i);
-    expect(css).toMatch(/@media\s*\(max-width:\s*719px\)/i);
-    expect(css).toMatch(/@media\s*\(max-width:\s*479px\)/i);
+    expect(css).toMatch(/@media\s*\(max-width:\s*1080px\)/i);
+    expect(css).toMatch(/@media\s*\(max-width:\s*900px\)/i);
+    expect(css).toMatch(/@media\s*\(max-width:\s*720px\)/i);
+    expect(css).toMatch(/@media\s*\(max-width:\s*520px\)/i);
     expect(css).not.toMatch(/\.personal-history__performance-metrics\s*,\s*\.personal-history__teams[^}]*display:\s*none/i);
   });
 
