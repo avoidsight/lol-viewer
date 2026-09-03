@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { MatchParticipantSummary, MatchSummary, PersonalHistorySnapshot } from '../../../../shared/domain';
+import type { MatchAchievement, MatchParticipantSummary, MatchSummary, PersonalHistorySnapshot } from '../../../../shared/domain';
 import type { PersonalHistoryTarget } from '../../../../shared/ipc';
 import { localizeRank } from '../../../../shared/rank';
 import { isBuildItem } from '../../../../shared/items';
@@ -103,63 +103,25 @@ function TeamComposition({ match, assetVersion, viewerPlayerId, onPlayerSelect }
   </div>;
 }
 
-function formatCompactValue(value: number): string {
-  if (value < 1_000) return String(value);
-  return `${(value / 1_000).toFixed(1).replace(/\.0$/, '')}k`;
-}
+const performanceAchievements: Array<{
+  type: MatchAchievement['type'];
+  label: string;
+  icon: string;
+}> = [
+  { type: 'MOST_DAMAGE', label: '最高伤害', icon: damageIcon },
+  { type: 'MOST_DAMAGE_TAKEN', label: '最高承伤', icon: damageTakenIcon },
+  { type: 'MOST_GOLD', label: '最高经济', icon: goldIcon }
+];
 
-function HighestBadge({ label }: { label: string }) {
-  return <span
-    className="personal-history__performance-highest"
-    role="img"
-    aria-label={`${label}全场最高`}
-    title={`${label}全场最高`}
-  >
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M7 4h10v3h3v2c0 3-1.9 5.2-4.8 5.8A5.1 5.1 0 0 1 13 16.7V19h4v2H7v-2h4v-2.3a5.1 5.1 0 0 1-2.2-1.9C5.9 14.2 4 12 4 9V7h3V4Zm0 5H6c0 1.7.8 2.9 2.1 3.5A8.7 8.7 0 0 1 7 9Zm10 0a8.7 8.7 0 0 1-1.1 3.5C17.2 11.9 18 10.7 18 9h-1Z" />
-    </svg>
+function PerformanceAchievements({ match }: { match: MatchSummary }) {
+  const visible = performanceAchievements.filter(({ type }) =>
+    match.achievements?.some((achievement) => achievement.type === type));
+  if (visible.length === 0) return null;
+  return <span className="personal-history__achievement-icons" aria-label="本场最高数据">
+    {visible.map(({ type, label, icon }) => <span key={type} role="img" aria-label={label} title={label}>
+      <img src={icon} alt="" aria-hidden="true" />
+    </span>)}
   </span>;
-}
-
-function PerformanceMetrics({ match }: { match: MatchSummary }) {
-  const metrics = [
-    {
-      label: '伤害',
-      icon: damageIcon,
-      value: match.totalDamageDealtToChampions,
-      achievement: 'MOST_DAMAGE' as const
-    },
-    {
-      label: '承伤',
-      icon: damageTakenIcon,
-      value: match.totalDamageTaken,
-      achievement: 'MOST_DAMAGE_TAKEN' as const
-    },
-    {
-      label: '金币',
-      icon: goldIcon,
-      value: match.goldEarned,
-      achievement: 'MOST_GOLD' as const
-    }
-  ];
-  return <div className="personal-history__performance-metrics">
-    {metrics.map(({ label, icon, value, achievement }) => {
-      const compactValue = value === undefined ? '—' : formatCompactValue(value);
-      const isHighest = match.achievements?.some((entry) => entry.type === achievement);
-      return <div
-        key={label}
-        className={isHighest ? 'is-highest' : undefined}
-        aria-label={`${label} ${compactValue}${isHighest ? '，全场最高' : ''}`}
-      >
-        <img src={icon} alt="" aria-hidden="true" />
-        <span className="personal-history__performance-copy">
-          <small>{label}</small>
-          <strong className="personal-history__performance-value">{compactValue}</strong>
-        </span>
-        {isHighest && <HighestBadge label={label} />}
-      </div>;
-    })}
-  </div>;
 }
 
 function formatEndedAt(endedAt: number): string {
@@ -191,40 +153,38 @@ function MatchRow({ match, assetVersion, itemIconPaths, viewerPlayerId, onPlayer
         <span className="personal-history__match-kda" aria-label="KDA">
           <b>{match.kills}</b><i>/</i><b className="is-death">{match.deaths}</b><i>/</i><b>{match.assists}</b>
         </span>
-        <small>{kda.toFixed(2)} KDA</small>
+        <span className="personal-history__match-performance-footer">
+          <small>{kda.toFixed(2)} KDA</small>
+          <PerformanceAchievements match={match} />
+        </span>
       </div>
     </div>
-    <div className="personal-history__match-detail">
-      <div className="personal-history__loadout">
-        <SummonerSpells spellIds={match.summonerSpellIds} assetVersion={assetVersion} />
-        <div className="personal-history__items">
-          {match.itemIds?.filter(isBuildItem).map((itemId, index) => {
-            const iconPath = itemIconPaths?.[String(itemId)];
-            return iconPath
-              ? <img
-                  key={`${itemId}-${index}`}
-                  src={itemIconUrl(assetVersion, iconPath)}
-                  alt={`装备 ${itemId}`}
-                  loading="lazy"
-                />
-              : <span
-                  key={`${itemId}-${index}`}
-                  className="personal-history__item-placeholder"
-                  role="img"
-                  aria-label={`装备 ${itemId} 图标不可用`}
-                />;
-          })}
-        </div>
+    <div className="personal-history__loadout">
+      <SummonerSpells spellIds={match.summonerSpellIds} assetVersion={assetVersion} />
+      <div className="personal-history__items">
+        {match.itemIds?.filter(isBuildItem).map((itemId, index) => {
+          const iconPath = itemIconPaths?.[String(itemId)];
+          return iconPath
+            ? <img
+                key={`${itemId}-${index}`}
+                src={itemIconUrl(assetVersion, iconPath)}
+                alt={`装备 ${itemId}`}
+                loading="lazy"
+              />
+            : <span
+                key={`${itemId}-${index}`}
+                className="personal-history__item-placeholder"
+                role="img"
+                aria-label={`装备 ${itemId} 图标不可用`}
+              />;
+        })}
       </div>
-      <PerformanceMetrics match={match} />
     </div>
-    <aside className="personal-history__match-meta">
-      <time dateTime={new Date(match.endedAt).toISOString()}>
-        <b>{formatEndedAt(match.endedAt)}</b>
-        <span>时长 {Math.round(match.durationSeconds / 60)} 分钟</span>
-      </time>
-      <TeamComposition match={match} assetVersion={assetVersion} viewerPlayerId={viewerPlayerId} onPlayerSelect={onPlayerSelect} />
-    </aside>
+    <TeamComposition match={match} assetVersion={assetVersion} viewerPlayerId={viewerPlayerId} onPlayerSelect={onPlayerSelect} />
+    <time dateTime={new Date(match.endedAt).toISOString()}>
+      <b>{formatEndedAt(match.endedAt)}</b>
+      <span>时长 {Math.round(match.durationSeconds / 60)} 分钟</span>
+    </time>
   </article>;
 }
 
