@@ -85,7 +85,10 @@ export function createLcuClient(
                 return;
               }
               if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
-                finish(() => reject(lcuError('LCU_INVALID_RESPONSE', 'LCU returned an unexpected status')));
+                finish(() => reject(lcuError(
+                  'LCU_INVALID_RESPONSE',
+                  `LCU returned an unexpected status${response.statusCode ? ` (${response.statusCode})` : ''}`
+                )));
                 return;
               }
               if (!schema) {

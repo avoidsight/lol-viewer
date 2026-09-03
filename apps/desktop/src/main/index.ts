@@ -21,6 +21,7 @@ import { PersonalHistoryService } from './history/personal-history-service';
 import { ReadyCheckAutoAcceptor } from './match/ready-check-auto-acceptor';
 import { createSgpClient } from './sgp/sgp-client';
 import { registerLcuAssetProtocol } from './lcu/asset-protocol';
+import { readGameflowSessionIdentity } from './lcu/gameflow-session';
 import type { LiveMatch, LiveRoster } from '../shared/ipc';
 import { LcuStaticDataCache } from './lcu/static-data-cache';
 
@@ -164,13 +165,8 @@ void app.whenReady().then(() => {
     getGameflowSessionIdentity: async () => {
       if (fixtureMode || aramFixtureMode) return { phase: 'InProgress', gameId: 'fixture-game' };
       const connection = await discoverLcuConnection();
-      if (!connection) throw new Error('League client is unavailable');
-      const schema = z.object({
-        phase: z.string().min(1),
-        gameData: z.object({ gameId: z.union([z.string(), z.number()]).optional() })
-      });
-      const session = await createLcuClient(connection).get('/lol-gameflow/v1/session', schema);
-      return { phase: session.phase, ...(session.gameData.gameId !== undefined ? { gameId: String(session.gameData.gameId) } : {}) };
+      if (!connection) return { phase: 'None' };
+      return readGameflowSessionIdentity(createLcuClient(connection));
     }
   });
   createWindow();
