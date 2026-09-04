@@ -20,6 +20,7 @@ describe('SgpClient', () => {
           {
             puuid: 'target', championId: 99, kills: 8, deaths: 4, assists: 12, win: true, teamId: 200,
             summoner1Id: 4, summoner2Id: 12, totalMinionsKilled: 180, neutralMinionsKilled: 20,
+            mvp: true, largestMultiKill: 3, doubleKills: 2, tripleKills: 1,
             goldEarned: 14_250, totalDamageDealtToChampions: 31_500, totalDamageTaken: 28_100,
             item0: 3071, item1: 3053, item6: 3340, teamPosition: 'MIDDLE'
           }
@@ -38,12 +39,14 @@ describe('SgpClient', () => {
     expect((history as { games: Array<{ participants: unknown[] }> }).games[0].participants[0]).toMatchObject(
       {
         championId: 99,
+        mvp: true,
         spell1Id: 4,
         spell2Id: 12,
         timeline: { lane: 'MIDDLE' },
         stats: {
           win: true, kills: 8, deaths: 4, assists: 12,
           totalMinionsKilled: 180, neutralMinionsKilled: 20,
+          largestMultiKill: 3, doubleKills: 2, tripleKills: 1,
           goldEarned: 14_250,
           totalDamageDealtToChampions: 31_500,
           totalDamageTaken: 28_100,

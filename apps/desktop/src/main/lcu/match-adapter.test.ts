@@ -64,9 +64,12 @@ describe('adaptMatchHistory', () => {
       item3: 6333,
       item4: 0,
       item5: 0,
-      item6: 3078
+      item6: 3078,
+      doubleKills: 2,
+      tripleKills: 1,
+      largestMultiKill: 3
     });
-    Object.assign(local, { teamId: 100, spell1Id: 4, spell2Id: 12 });
+    Object.assign(local, { teamId: 100, spell1Id: 4, spell2Id: 12, mvp: true });
     base.participants = [
       local,
       ...Array.from({ length: 9 }, (_, index) => ({
@@ -96,6 +99,8 @@ describe('adaptMatchHistory', () => {
       totalDamageTaken: 28_100,
       itemIds: [3071, 3053, 6333],
       summonerSpellIds: [4, 12],
+      mvp: true,
+      multiKill: 3,
       allyChampionIds: [local.championId, 2, 3, 4, 5],
       enemyChampionIds: [6, 7, 8, 9, 10],
       achievements: [

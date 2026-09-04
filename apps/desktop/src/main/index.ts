@@ -68,9 +68,9 @@ function createWindow(): void {
 }
 
 void app.whenReady().then(() => {
-  registerLcuAssetProtocol(join(app.getPath('userData'), 'asset-cache'));
   const fixtureMode = fixtureModeEnabled(process.argv, app.isPackaged, process.env);
   const aramFixtureMode = fixtureMode && process.argv.includes('--fixture-aram');
+  registerLcuAssetProtocol(join(app.getPath('userData'), 'asset-cache'), fixtureMode);
   database = new Database(join(app.getPath('userData'), 'lol-viewer.sqlite3'));
   migrateDatabase(database);
   const cache = new MatchCache(database);

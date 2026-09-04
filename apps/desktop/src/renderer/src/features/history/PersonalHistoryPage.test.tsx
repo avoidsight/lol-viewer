@@ -20,6 +20,8 @@ const snapshot: PersonalHistorySnapshot = {
     kills: 8,
     deaths: 2,
     assists: 6,
+    mvp: index === 0 ? true : undefined,
+    multiKill: index === 0 ? 3 : undefined,
     cs: 186,
     goldEarned: 12_400,
     totalDamageDealtToChampions: 31_500,
@@ -118,6 +120,10 @@ describe('PersonalHistoryPage', () => {
     expect(screen.getByRole('img', { name: '承伤最高' })).toBeVisible();
     expect(screen.getByRole('img', { name: '经济最高' })).toBeVisible();
     expect(screen.getByRole('img', { name: '补刀最多' })).toBeVisible();
+    expect(screen.getByText('三杀')).toBeVisible();
+    expect(screen.getAllByTestId('multi-kill-badge')).toHaveLength(1);
+    expect(screen.getByText('MVP')).toBeVisible();
+    expect(screen.getAllByTestId('mvp-badge')).toHaveLength(1);
   });
 
   it('organizes the dashboard into a compact overview, horizontal favorites, and full-width matches', () => {
@@ -206,7 +212,9 @@ describe('PersonalHistoryPage', () => {
     expect(css).toMatch(/\.personal-history\s*{[^}]*background:\s*var\(--ui-page-bg\)/i);
     expect(css).toMatch(/\.personal-history__quickbar\s*{[^}]*display:\s*flex/i);
     expect(css).toMatch(/\.personal-history__matches article\s*{[^}]*grid-template-columns:/i);
-    expect(css).toMatch(/\.personal-history__match-champion\s*{[^}]*width:\s*56px[^}]*height:\s*56px/i);
+    expect(css).toMatch(/\.personal-history__match-champion\s*{[^}]*width:\s*60px[^}]*height:\s*60px/i);
+    expect(css).toMatch(/\.personal-history__spells\s*{[^}]*flex-direction:\s*column/i);
+    expect(css).toMatch(/\.personal-history__multi-kill\s*{[^}]*border-radius:\s*999px/i);
     expect(css).toMatch(/\.personal-history__items\s*{[^}]*display:\s*flex/i);
     expect(css).not.toMatch(/personal-history__items img:nth-child\(n\+4\)/i);
     expect(css).toMatch(/\.personal-history__achievement-icons > span\s*{[^}]*border:\s*1px solid currentColor/i);

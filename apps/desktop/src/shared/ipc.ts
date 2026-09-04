@@ -46,6 +46,8 @@ export const matchSummarySchema = z.object({
   kills: z.number().int().nonnegative(),
   deaths: z.number().int().nonnegative(),
   assists: z.number().int().nonnegative(),
+  mvp: z.boolean().optional(),
+  multiKill: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(5)]).optional(),
   cs: z.number().optional(),
   lane: laneSchema.optional(),
   itemIds: z.array(z.number().int().positive()).max(7).optional(),

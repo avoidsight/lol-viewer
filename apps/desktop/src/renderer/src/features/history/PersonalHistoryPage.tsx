@@ -153,6 +153,19 @@ function PerformanceAchievements({ match }: { match: MatchSummary }) {
   </span>;
 }
 
+const multiKillLabels = { 2: '双杀', 3: '三杀', 4: '四杀', 5: '五杀' } as const;
+
+function MatchHighlights({ match }: { match: MatchSummary }) {
+  const hasAchievements = performanceAchievements.some(({ type }) =>
+    match.achievements?.some((achievement) => achievement.type === type));
+  if (!hasAchievements && !match.mvp && match.multiKill === undefined) return null;
+  return <span className="personal-history__match-highlights">
+    <PerformanceAchievements match={match} />
+    {match.mvp && <strong className="personal-history__mvp" data-testid="mvp-badge">MVP</strong>}
+    {match.multiKill !== undefined && <strong className={`personal-history__multi-kill is-${match.multiKill}`} data-testid="multi-kill-badge">{multiKillLabels[match.multiKill]}</strong>}
+  </span>;
+}
+
 function formatEndedAt(endedAt: number): string {
   return new Intl.DateTimeFormat('zh-CN', {
     month: 'numeric',
@@ -173,19 +186,19 @@ function MatchRow({ match, assetVersion, itemIconPaths, viewerPlayerId, onPlayer
   return <article data-testid="personal-match" className={match.win ? 'is-win' : 'is-loss'}>
     <div className="personal-history__match-overview">
       <img className="personal-history__match-champion" src={championIconUrl(assetVersion, match.championId)} alt={`英雄 ${match.championId}`} loading="lazy" />
+      <SummonerSpells spellIds={match.summonerSpellIds} assetVersion={assetVersion} />
       <div className="personal-history__match-result">
         <strong>{match.win ? '胜利' : '失败'}</strong>
         <span>{describeQueue(match.queueId)}</span>
       </div>
       <div className="personal-history__match-performance">
+        <MatchHighlights match={match} />
         <span className="personal-history__match-kda" aria-label="击杀、死亡、助攻">
           <b>{match.kills}</b><i>/</i><b className="is-death">{match.deaths}</b><i>/</i><b>{match.assists}</b>
         </span>
-        <PerformanceAchievements match={match} />
       </div>
     </div>
     <div className="personal-history__loadout">
-      <SummonerSpells spellIds={match.summonerSpellIds} assetVersion={assetVersion} />
       <div className="personal-history__items">
         {match.itemIds?.filter(isBuildItem).map((itemId, index) => {
           const iconPath = itemIconPaths?.[String(itemId)];

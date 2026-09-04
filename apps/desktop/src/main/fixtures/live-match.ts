@@ -17,7 +17,19 @@ function liveMatchesFor(playerIndex: number): MatchSummary[] {
     kills: 2 + ((playerIndex * 3 + matchIndex * 2) % 13),
     deaths: 1 + ((playerIndex + matchIndex * 2) % 9),
     assists: 4 + ((playerIndex * 5 + matchIndex * 3) % 18),
-    cs: 142 + ((playerIndex * 19 + matchIndex * 13) % 116)
+    ...(matchIndex === 0 && playerIndex === 0 ? {
+      mvp: true,
+      achievements: [
+        { type: 'MOST_KILLS' as const, value: 12 },
+        { type: 'MOST_DAMAGE' as const, value: 31_500 }
+      ]
+    } : {}),
+    ...(matchIndex === 1 && playerIndex % 4 === 0 ? { multiKill: 3 as const }
+      : matchIndex === 3 && playerIndex === 3 ? { multiKill: 4 as const }
+        : {}),
+    cs: 142 + ((playerIndex * 19 + matchIndex * 13) % 116),
+    itemIds: [3071, 3053, 3006, 6333, 3156, 3078],
+    summonerSpellIds: [4, matchIndex % 2 === 0 ? 12 : 14] as [number, number]
   }));
 }
 
@@ -88,8 +100,10 @@ export function createFixturePersonalHistory(target?: PersonalHistoryTarget): Pe
     averageKda: (kills + assists) / deaths,
     favoriteChampions: favoriteChampionsFor(matches),
     assetVersion: '26.1.1',
-    itemIconPaths: {},
-    historyDataVersion: 8,
+    itemIconPaths: Object.fromEntries([3071, 3053, 3006, 6333, 3156, 3078].map((itemId) => [
+      String(itemId), `/lol-game-data/assets/ASSETS/Items/Icons2D/${itemId}.png`
+    ])),
+    historyDataVersion: 9,
     cached: false,
     updatedAt: Date.UTC(2026, 0, 1)
   };

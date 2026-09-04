@@ -11,11 +11,20 @@ const participantSchema = z.object({
   teamId: z.number().int().optional(),
   spell1Id: z.number().int().positive().optional(),
   spell2Id: z.number().int().positive().optional(),
+  mvp: z.boolean().optional(),
+  isMvp: z.boolean().optional(),
   stats: z.object({
     win: z.boolean(),
     kills: z.number().int().nonnegative(),
     deaths: z.number().int().nonnegative(),
     assists: z.number().int().nonnegative(),
+    mvp: z.boolean().optional(),
+    isMvp: z.boolean().optional(),
+    largestMultiKill: z.number().int().nonnegative().optional(),
+    doubleKills: z.number().int().nonnegative().optional(),
+    tripleKills: z.number().int().nonnegative().optional(),
+    quadraKills: z.number().int().nonnegative().optional(),
+    pentaKills: z.number().int().nonnegative().optional(),
     totalMinionsKilled: z.number().int().nonnegative().optional(),
     neutralMinionsKilled: z.number().int().nonnegative().optional(),
     goldEarned: z.number().int().nonnegative().optional(),
@@ -96,6 +105,14 @@ function participantCs(participant: z.infer<typeof participantSchema>): number |
     : undefined;
 }
 
+function participantMultiKill(stats: z.infer<typeof participantSchema>['stats']): 2 | 3 | 4 | 5 | undefined {
+  if ((stats.pentaKills ?? 0) > 0 || (stats.largestMultiKill ?? 0) >= 5) return 5;
+  if ((stats.quadraKills ?? 0) > 0 || stats.largestMultiKill === 4) return 4;
+  if ((stats.tripleKills ?? 0) > 0 || stats.largestMultiKill === 3) return 3;
+  if ((stats.doubleKills ?? 0) > 0 || stats.largestMultiKill === 2) return 2;
+  return undefined;
+}
+
 function participantSummaries(
   game: z.infer<typeof matchHistoryGameSchema>,
   participants: Array<z.infer<typeof participantSchema>>
@@ -129,6 +146,8 @@ function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
   const participant = game.participants[0];
   const lane = normalizeLane(participant.timeline?.lane);
   const cs = participantCs(participant);
+  const mvp = participant.mvp ?? participant.isMvp ?? participant.stats.mvp ?? participant.stats.isMvp;
+  const multiKill = participantMultiKill(participant.stats);
   const itemIds = [
     participant.stats.item0, participant.stats.item1, participant.stats.item2,
     participant.stats.item3, participant.stats.item4, participant.stats.item5,
@@ -235,6 +254,8 @@ function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
     kills: participant.stats.kills,
     deaths: participant.stats.deaths,
     assists: participant.stats.assists,
+    ...(mvp === true ? { mvp: true } : {}),
+    ...(multiKill === undefined ? {} : { multiKill }),
     ...(cs === undefined ? {} : { cs }),
     ...(lane === undefined ? {} : { lane }),
     ...(itemIds.length === 0 ? {} : { itemIds }),
