@@ -2,6 +2,9 @@ import type { FavoriteChampion, MatchSummary, PersonalHistorySnapshot, PlayerSna
 import type { LiveMatch, PersonalHistoryTarget } from '../../shared/ipc';
 
 const lanes = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'] as const;
+const fixtureNames = ['夜航星', '峡谷气象员', '青钢影子', '第七只魄罗', '河道守夜人', '不交闪现', '红方打野', '月下回城', '兵线管理员', '最后一块饼干'] as const;
+const fixtureRanks = ['DIAMOND IV 62 LP', 'EMERALD I 18 LP', 'DIAMOND III 41 LP', 'MASTER 286 LP', 'EMERALD II 73 LP', 'DIAMOND IV 12 LP', 'MASTER 104 LP', 'EMERALD I 55 LP', 'DIAMOND II 8 LP', 'DIAMOND IV 88 LP'] as const;
+const fixtureWins = [7, 6, 5, 8, 4, 6, 7, 4, 5, 6] as const;
 
 function liveMatchesFor(playerIndex: number): MatchSummary[] {
   return Array.from({ length: 10 }, (_, matchIndex) => ({
@@ -9,12 +12,12 @@ function liveMatchesFor(playerIndex: number): MatchSummary[] {
     queueId: 420,
     endedAt: Date.UTC(2026, 0, 1) - matchIndex * 1_800_000,
     durationSeconds: 1_800,
-    championId: 1 + ((playerIndex + matchIndex) % 20),
-    win: matchIndex % 2 === 0,
-    kills: 3 + matchIndex,
-    deaths: 2,
-    assists: 5 + matchIndex,
-    cs: 180 + matchIndex
+    championId: matchIndex % 4 === 0 ? playerIndex + 1 : 21 + ((playerIndex * 3 + matchIndex) % 30),
+    win: ((matchIndex * 7 + playerIndex * 3) % 10) < fixtureWins[playerIndex],
+    kills: 2 + ((playerIndex * 3 + matchIndex * 2) % 13),
+    deaths: 1 + ((playerIndex + matchIndex * 2) % 9),
+    assists: 4 + ((playerIndex * 5 + matchIndex * 3) % 18),
+    cs: 142 + ((playerIndex * 19 + matchIndex * 13) % 116)
   }));
 }
 
@@ -98,21 +101,21 @@ export function createFixtureLiveMatch(scope: QueueScope): LiveMatch {
     const wins = matches.filter((match) => match.win).length;
     return {
       playerId: `fixture-player-${index}`,
-      displayName: `Fixture Player ${index + 1}`,
+      displayName: fixtureNames[index],
       teamId: index < 5 ? 100 : 200,
       isLocalTeam: index < 5,
       lane: lanes[index % 5],
       championId: index + 1,
-      rank: 'Fixture',
+      rank: fixtureRanks[index],
       scope,
       matches,
       sampleSize: 10,
       wins,
       losses: 10 - wins,
       winRate: wins / 10,
-      currentChampionGames: 1,
-      currentChampionWins: 1,
-      currentChampionWinRate: 1,
+      currentChampionGames: matches.filter((match) => match.championId === index + 1).length,
+      currentChampionWins: matches.filter((match) => match.championId === index + 1 && match.win).length,
+      currentChampionWinRate: matches.filter((match) => match.championId === index + 1 && match.win).length / matches.filter((match) => match.championId === index + 1).length,
       status: 'ready',
       updatedAt: Date.UTC(2026, 0, 1)
     };

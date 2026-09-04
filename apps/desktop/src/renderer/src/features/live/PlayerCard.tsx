@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { PlayerSnapshot } from '../../../../shared/domain';
 import { localizeRank } from '../../../../shared/rank';
 import { isRankedQueue } from '../../../../shared/queue';
@@ -24,6 +25,7 @@ const unavailableLabels = {
 } as const;
 
 export default function PlayerCard({ player, historyScope = 'all', displayLane = player.lane, displayLabel, uncertain = false }: { player: PlayerSnapshot; historyScope?: LiveHistoryScope; displayLane?: keyof typeof laneNames; displayLabel?: string; uncertain?: boolean }) {
+  const [championImageUnavailable, setChampionImageUnavailable] = useState(false);
   const championIcon = player.championId > 0 ? championIconUrl(player.assetVersion, player.championId) : undefined;
   const scopedMatches = player.matches.filter((match) => historyScope === 'all' || isRankedQueue(match.queueId));
   const visibleMatches = scopedMatches.slice(0, 10);
@@ -37,9 +39,11 @@ export default function PlayerCard({ player, historyScope = 'all', displayLane =
   const championRate = championMatches.length ? championWins / championMatches.length : undefined;
   return <article className="player-card" data-testid="player-card" data-history-state={player.status} data-lane={displayLane} aria-labelledby={`player-${player.playerId}`}>
     <header className="player-card__header">
-      {championIcon
-        ? <img className="player-card__champion" src={championIcon} alt={`当前英雄 ${player.championId}`} />
-        : <span className="player-card__champion player-card__champion--fallback" role="img" aria-label="英雄选择中"><span className="player-card__champion-spinner" aria-hidden="true" /></span>}
+      {championIcon && !championImageUnavailable
+        ? <img className="player-card__champion" src={championIcon} alt={`当前英雄 ${player.championId}`} onError={() => setChampionImageUnavailable(true)} />
+        : championIcon
+          ? <span className="player-card__champion player-card__champion--fallback player-card__champion--unavailable" role="img" aria-label={`当前英雄 ${player.championId}图标不可用`}><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M10 27c1-7 4-11 10-11s9 4 10 11" /><circle cx="20" cy="12" r="6" /><path d="m11 10 4-7 5 5 5-5 4 7" /></svg><b>{player.championId}</b></span>
+          : <span className="player-card__champion player-card__champion--fallback" role="img" aria-label="英雄选择中"><span className="player-card__champion-spinner" aria-hidden="true" /></span>}
       <div className="player-card__identity">
         <span className="player-card__lane" aria-label={laneLabel} title={laneLabel}>{laneIcon ? <img src={laneIcon} alt="" aria-hidden="true" /> : laneGlyph}</span>
         <h3 id={`player-${player.playerId}`}>{player.displayName}</h3>

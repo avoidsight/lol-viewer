@@ -90,8 +90,8 @@ describe('LiveMatchPage', () => {
     const css = readFileSync(resolve('src/renderer/src/features/live/live-match.css'), 'utf8');
     expect(css).toMatch(/\.live-match-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/s);
     expect(css).toMatch(/\.team-row\s*\{[^}]*grid-template-columns:\s*repeat\(5,/s);
-    expect(css).toMatch(/\.player-card__matches\s*\{[^}]*max-height:\s*137px;[^}]*overflow-y:\s*auto;/s);
-    expect(css).toMatch(/\.recent-match\s*\{[^}]*height:\s*25px;/s);
+    expect(css).toMatch(/\.player-card__matches\s*\{[^}]*max-height:\s*177px;[^}]*overflow-y:\s*auto;/s);
+    expect(css).toMatch(/\.recent-match\s*\{[^}]*height:\s*33px;/s);
 
     const teams = screen.getAllByRole('group', { name: /方队伍/ });
     expect(teams).toHaveLength(2);
@@ -125,6 +125,12 @@ describe('LiveMatchPage', () => {
     expect(fallback).toHaveTextContent('');
     expect(fallback.querySelector('.player-card__champion-spinner')).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: '当前英雄 0' })).not.toBeInTheDocument();
+  });
+  it('shows a styled fallback instead of broken current champion alt text', () => {
+    render(<LiveMatchPage match={fixtureLiveMatch} />);
+    fireEvent.error(screen.getByRole('img', { name: '当前英雄 1' }));
+    expect(screen.getByRole('img', { name: '当前英雄 1图标不可用' })).toHaveTextContent('1');
+    expect(screen.queryByRole('img', { name: '当前英雄 1' })).not.toBeInTheDocument();
   });
   it('loads local client champion images even without an external asset version', () => {
     const withoutVersion: LiveMatch = { ...fixtureLiveMatch, players: fixtureLiveMatch.players.map((entry) => ({ ...entry, assetVersion: undefined })) };
