@@ -224,7 +224,7 @@
 .recent-match__badges { display: flex; gap: 3px; }
 .recent-match__badges b { padding: 1px 5px; border-radius: 9px; color: #593605; background: #f2b12d; font-size: 8px; line-height: 1.1; }
 .recent-match__badges .is-multi { color: #fff; background: #e77a79; }
-.recent-match__badges + .recent-match__kda + small { display: none; }
+.recent-match__mode { white-space: nowrap; }
 .recent-match__kda { gap: 3px; color: #243540; font-size: 12px; }
 .recent-match__kda b { min-width: 0; }
 .recent-match__kda b:nth-of-type(2) { color: #d63449; }

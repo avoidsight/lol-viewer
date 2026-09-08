@@ -25,7 +25,7 @@ export default function RecentMatch({ match, itemIconPaths = {} }: { match: Matc
       <span className="recent-match__performance">
         {(match.mvp || match.multiKill) && <span className="recent-match__badges">{match.mvp && <b>MVP</b>}{match.multiKill && <b className="is-multi">{multiKills[match.multiKill]}</b>}</span>}
         <span className="recent-match__kda" aria-hidden="true"><b>{match.kills}</b><i>/</i><b>{match.deaths}</b><i>/</i><b>{match.assists}</b></span>
-        <small>{Math.round(match.durationSeconds / 60)}分钟</small>
+        <small className="recent-match__mode">{describeQueue(match.queueId)}</small>
       </span>
       {itemIds.length > 0 && <span className="recent-match__items">{itemIds.map((id, index) => <OptionalIcon key={index} src={`lol-asset://game-data/${encodeURIComponent(itemIconPaths[String(id)])}`} label={`装备 ${id}`} />)}</span>}
     </li>

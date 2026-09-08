@@ -5,6 +5,10 @@ import RecentMatch from './RecentMatch';
 const match = { matchId: '1', queueId: 420, endedAt: 1, durationSeconds: 1800, championId: 1, win: true, kills: 13, deaths: 5, assists: 11 };
 
 describe('live history detail row', () => {
+  it.each([[420, '单双排'], [440, '灵活排位'], [430, '匹配模式'], [450, '极地大乱斗']] as const)('shows queue %s even when honors are present', (queueId, label) => {
+    render(<ol><RecentMatch match={{ ...match, queueId, mvp: true, multiKill: 3 }} /></ol>);
+    expect(screen.getByText(label)).toBeVisible();
+  });
   it('collapses unavailable loadout and honors instead of guessing from kills', () => {
     const { container } = render(<ol><RecentMatch match={match} /></ol>);
     expect(screen.queryByText('MVP')).not.toBeInTheDocument();
