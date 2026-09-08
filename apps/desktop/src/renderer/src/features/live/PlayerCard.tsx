@@ -46,13 +46,13 @@ export default function PlayerCard({ player, historyScope = 'all', displayLane =
           : <span className="player-card__champion player-card__champion--fallback" role="img" aria-label="英雄选择中"><span className="player-card__champion-spinner" aria-hidden="true" /></span>}
       <div className="player-card__identity">
         <span className="player-card__lane" aria-label={laneLabel} title={laneLabel}>{laneIcon ? <img src={laneIcon} alt="" aria-hidden="true" /> : laneGlyph}</span>
-        <h3 id={`player-${player.playerId}`}>{player.displayName}</h3>
+        <h3 id={`player-${player.playerId}`} title={player.displayName}>{player.displayName}</h3>
         <span className="player-card__rank">{localizeRank(player.rank) ?? '段位未知'}</span>
         {uncertain && <span className="player-card__uncertain" role="img" aria-label="位置待确认" title="位置待确认">?</span>}
       </div>
       {player.status === 'ready' && <div className="player-card__summary" role="group" aria-label={`战绩样本 ${scopedMatches.length} 场，胜率 ${percent(sampleRate)}；当前英雄 ${championMatches.length} 场，胜率 ${championRate === undefined ? '暂无' : percent(championRate)}`}>
-        <div className="player-card__metric player-card__metric--sample" title={`样本胜率 · ${scopedMatches.length} 场`}><i aria-hidden="true" /><strong>{percent(sampleRate)}</strong><small>{scopedMatches.length}场</small></div>
-        <div className="player-card__metric player-card__metric--champion" title={`当前英雄胜率 · ${championMatches.length} 场`}><i aria-hidden="true" /><strong>{championRate === undefined ? '—' : percent(championRate)}</strong><small>{championMatches.length}场</small></div>
+        <div className="player-card__metric player-card__metric--sample" title={`样本胜率 · ${scopedMatches.length} 场`}><strong>{scopedMatches.length ? percent(sampleRate) : '—'}</strong><small>近期 · {scopedMatches.length}场</small></div>
+        <div className="player-card__metric player-card__metric--champion" title={`当前英雄胜率 · ${championMatches.length} 场`}><strong>{championRate === undefined ? '—' : percent(championRate)}</strong><small>本英雄 · {championMatches.length}场</small></div>
       </div>}
     </header>
     {player.status === 'loading'
