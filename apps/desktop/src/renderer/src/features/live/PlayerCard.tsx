@@ -48,11 +48,11 @@ export default function PlayerCard({ player, historyScope = 'all', displayLane =
         <span className="player-card__lane" aria-label={laneLabel} title={laneLabel}>{laneIcon ? <img src={laneIcon} alt="" aria-hidden="true" /> : laneGlyph}</span>
         <h3 id={`player-${player.playerId}`} title={player.displayName}>{player.displayName}</h3>
         <span className="player-card__rank">{localizeRank(player.rank) ?? '段位未知'}</span>
+        {player.status === 'ready' && <span className="player-card__recent-record" role="group" aria-label={`近 ${visibleMatches.length} 场，${wins}胜${visibleMatches.length - wins}负`}>
+          {visibleMatches.length ? `${wins}胜${visibleMatches.length - wins}负` : '暂无战绩'}
+        </span>}
         {uncertain && <span className="player-card__uncertain" role="img" aria-label="位置待确认" title="位置待确认">?</span>}
       </div>
-      {player.status === 'ready' && <div className="player-card__summary" role="group" aria-label={`近 ${visibleMatches.length} 场，${wins}胜${visibleMatches.length - wins}负`}>
-        <span className="player-card__recent-record">{visibleMatches.length ? `近 ${visibleMatches.length} 场 · ${wins}胜${visibleMatches.length - wins}负` : '暂无近期战绩'}</span>
-      </div>}
     </header>
     {player.status === 'loading'
       ? <div className="player-card__state player-card__skeleton" role="status" aria-label="正在加载战绩"><span className="player-card__sr-only">正在加载战绩…</span><i /><i /><i /><i /></div>

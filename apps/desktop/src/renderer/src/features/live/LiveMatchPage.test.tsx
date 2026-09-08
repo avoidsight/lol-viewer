@@ -181,12 +181,14 @@ describe('LiveMatchPage', () => {
     expect(within(firstCard).getByRole('group', { name: '近 10 场，5胜5负' })).toBeVisible();
     expect(within(firstCard).getByRole('img', { name: '当前英雄 1' })).toHaveAttribute('title', '近 10 场排位中使用该英雄 1 场，1胜0负（非赛季统计）');
     expect(firstCard.querySelector('.player-card__metric')).toBeNull();
+    expect(firstCard.querySelector('.player-card__summary')).toBeNull();
+    expect(firstCard.querySelector('.player-card__identity .player-card__recent-record')).toHaveTextContent(/^5胜5负$/);
     expect(within(firstCard).getAllByTestId('recent-match')).toHaveLength(10);
   });
 
   it('shows an empty-history label instead of a percentage and preserves the tooltip when an icon fails', () => {
     render(<LiveMatchPage match={{ ...fixtureLiveMatch, players: [player(0, { matches: [] })] }} />);
-    expect(screen.getByText('暂无近期战绩')).toBeVisible();
+    expect(screen.getByText('暂无战绩')).toBeVisible();
     fireEvent.error(screen.getByRole('img', { name: '当前英雄 1' }));
     expect(screen.getByRole('img', { name: '当前英雄 1图标不可用' })).toHaveAttribute('title', '近 0 场排位中使用该英雄 0 场，0胜0负（非赛季统计）');
   });
