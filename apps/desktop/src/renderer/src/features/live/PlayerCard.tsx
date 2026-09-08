@@ -13,7 +13,6 @@ import RecentMatch from './RecentMatch';
 const laneNames = { TOP: '上路', JUNGLE: '打野', MIDDLE: '中路', BOTTOM: '下路', UTILITY: '辅助', UNKNOWN: '未知位置' } as const;
 const laneGlyphs = { TOP: '↖', JUNGLE: '✦', MIDDLE: '◆', BOTTOM: '↘', UTILITY: '✚', UNKNOWN: '?' } as const;
 const laneIcons = { TOP: topLaneIcon, JUNGLE: jungleLaneIcon, MIDDLE: middleLaneIcon, BOTTOM: bottomLaneIcon, UTILITY: utilityLaneIcon } as const;
-const percent = (value: number): string => `${Math.round(value * 100)}%`;
 const championIconUrl = (_version: string | undefined, championId: number) =>
   `lol-asset://champion-icons/${championId}.png`;
 const unavailableLabels = {
@@ -29,20 +28,21 @@ export default function PlayerCard({ player, historyScope = 'all', displayLane =
   const championIcon = player.championId > 0 ? championIconUrl(player.assetVersion, player.championId) : undefined;
   const scopedMatches = player.matches.filter((match) => historyScope === 'all' || isRankedQueue(match.queueId));
   const visibleMatches = scopedMatches.slice(0, 10);
-  const wins = scopedMatches.filter((match) => match.win).length;
-  const championMatches = scopedMatches.filter((match) => match.championId === player.championId);
+  const wins = visibleMatches.filter((match) => match.win).length;
+  const championMatches = visibleMatches.filter((match) => match.championId === player.championId);
   const championWins = championMatches.filter((match) => match.win).length;
   const laneLabel = displayLabel ?? laneNames[displayLane];
   const laneGlyph = displayLabel?.match(/\d+/)?.[0] ?? laneGlyphs[displayLane];
   const laneIcon = displayLabel || displayLane === 'UNKNOWN' ? undefined : laneIcons[displayLane];
-  const sampleRate = scopedMatches.length ? wins / scopedMatches.length : 0;
-  const championRate = championMatches.length ? championWins / championMatches.length : undefined;
+  const championSummary = player.status === 'ready' && player.championId > 0
+    ? `近 ${visibleMatches.length} 场${historyScope === 'ranked' ? '排位' : ''}中使用该英雄 ${championMatches.length} 场，${championWins}胜${championMatches.length - championWins}负（非赛季统计）`
+    : undefined;
   return <article className="player-card" data-testid="player-card" data-history-state={player.status} data-lane={displayLane} aria-labelledby={`player-${player.playerId}`}>
     <header className="player-card__header">
       {championIcon && !championImageUnavailable
-        ? <img className="player-card__champion" src={championIcon} alt={`当前英雄 ${player.championId}`} onError={() => setChampionImageUnavailable(true)} />
+        ? <img className="player-card__champion" src={championIcon} title={championSummary} alt={`当前英雄 ${player.championId}`} onError={() => setChampionImageUnavailable(true)} />
         : championIcon
-          ? <span className="player-card__champion player-card__champion--fallback player-card__champion--unavailable" role="img" aria-label={`当前英雄 ${player.championId}图标不可用`}><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M10 27c1-7 4-11 10-11s9 4 10 11" /><circle cx="20" cy="12" r="6" /><path d="m11 10 4-7 5 5 5-5 4 7" /></svg><b>{player.championId}</b></span>
+          ? <span className="player-card__champion player-card__champion--fallback player-card__champion--unavailable" role="img" title={championSummary} aria-label={`当前英雄 ${player.championId}图标不可用`}><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M10 27c1-7 4-11 10-11s9 4 10 11" /><circle cx="20" cy="12" r="6" /><path d="m11 10 4-7 5 5 5-5 4 7" /></svg><b>{player.championId}</b></span>
           : <span className="player-card__champion player-card__champion--fallback" role="img" aria-label="英雄选择中"><span className="player-card__champion-spinner" aria-hidden="true" /></span>}
       <div className="player-card__identity">
         <span className="player-card__lane" aria-label={laneLabel} title={laneLabel}>{laneIcon ? <img src={laneIcon} alt="" aria-hidden="true" /> : laneGlyph}</span>
@@ -50,9 +50,8 @@ export default function PlayerCard({ player, historyScope = 'all', displayLane =
         <span className="player-card__rank">{localizeRank(player.rank) ?? '段位未知'}</span>
         {uncertain && <span className="player-card__uncertain" role="img" aria-label="位置待确认" title="位置待确认">?</span>}
       </div>
-      {player.status === 'ready' && <div className="player-card__summary" role="group" aria-label={`战绩样本 ${scopedMatches.length} 场，胜率 ${percent(sampleRate)}；当前英雄 ${championMatches.length} 场，胜率 ${championRate === undefined ? '暂无' : percent(championRate)}`}>
-        <div className="player-card__metric player-card__metric--sample" title={`样本胜率 · ${scopedMatches.length} 场`}><strong>{scopedMatches.length ? percent(sampleRate) : '—'}</strong><small>近期 · {scopedMatches.length}场</small></div>
-        <div className="player-card__metric player-card__metric--champion" title={`当前英雄胜率 · ${championMatches.length} 场`}><strong>{championRate === undefined ? '—' : percent(championRate)}</strong><small>本英雄 · {championMatches.length}场</small></div>
+      {player.status === 'ready' && <div className="player-card__summary" role="group" aria-label={`近 ${visibleMatches.length} 场，${wins}胜${visibleMatches.length - wins}负`}>
+        <span className="player-card__recent-record">{visibleMatches.length ? `近 ${visibleMatches.length} 场 · ${wins}胜${visibleMatches.length - wins}负` : '暂无近期战绩'}</span>
       </div>}
     </header>
     {player.status === 'loading'

@@ -157,7 +157,7 @@ describe('LiveMatchPage', () => {
 
     expect(screen.getByText('正在加载战绩…')).toBeVisible();
     expect(screen.getByText('该玩家战绩受隐私保护')).toBeVisible();
-    expect(screen.getByRole('group', { name: '战绩样本 3 场，胜率 67%；当前英雄 0 场，胜率 暂无' })).toBeVisible();
+    expect(screen.getByRole('group', { name: '近 3 场，2胜1负' })).toBeVisible();
     expect(screen.getByRole('list', { name: 'Player 2最近排位对局' })).not.toHaveAttribute('tabindex');
   });
 
@@ -170,7 +170,7 @@ describe('LiveMatchPage', () => {
     expect(document.querySelectorAll('.live-match-page__loading-slots > .is-loaded')).toHaveLength(4);
   });
 
-  it('calculates selected-champion stats from the full recent-20 sample while listing ten', () => {
+  it('describes only the visible ten games and puts champion counts in the portrait tooltip', () => {
     const twenty = matches(0, 20).map((entry, index) => index === 19 ? { ...entry, championId: 1, win: true } : entry);
     render(<LiveMatchPage match={{
       ...fixtureLiveMatch,
@@ -178,8 +178,17 @@ describe('LiveMatchPage', () => {
     }} />);
 
     const firstCard = screen.getAllByTestId('player-card')[0];
-    expect(within(firstCard).getByRole('group', { name: '战绩样本 20 场，胜率 55%；当前英雄 2 场，胜率 100%' })).toBeVisible();
+    expect(within(firstCard).getByRole('group', { name: '近 10 场，5胜5负' })).toBeVisible();
+    expect(within(firstCard).getByRole('img', { name: '当前英雄 1' })).toHaveAttribute('title', '近 10 场排位中使用该英雄 1 场，1胜0负（非赛季统计）');
+    expect(firstCard.querySelector('.player-card__metric')).toBeNull();
     expect(within(firstCard).getAllByTestId('recent-match')).toHaveLength(10);
+  });
+
+  it('shows an empty-history label instead of a percentage and preserves the tooltip when an icon fails', () => {
+    render(<LiveMatchPage match={{ ...fixtureLiveMatch, players: [player(0, { matches: [] })] }} />);
+    expect(screen.getByText('暂无近期战绩')).toBeVisible();
+    fireEvent.error(screen.getByRole('img', { name: '当前英雄 1' }));
+    expect(screen.getByRole('img', { name: '当前英雄 1图标不可用' })).toHaveAttribute('title', '近 0 场排位中使用该英雄 0 场，0胜0负（非赛季统计）');
   });
 
   it('defaults to ranked history in solo and flex queues', () => {
@@ -208,7 +217,7 @@ describe('LiveMatchPage', () => {
     expect(screen.getAllByTestId('recent-match')).toHaveLength(60);
     expect(screen.getAllByLabelText(/· 单双排 ·/)).toHaveLength(30);
     expect(screen.getAllByLabelText(/· 灵活排位 ·/)).toHaveLength(30);
-    expect(screen.getAllByRole('group', { name: /战绩样本 6 场/ })).toHaveLength(10);
+    expect(screen.getAllByRole('group', { name: '近 6 场，3胜3负' })).toHaveLength(10);
   });
 
   it('renders exactly five deterministic slots per team for duplicate and unknown lanes', () => {

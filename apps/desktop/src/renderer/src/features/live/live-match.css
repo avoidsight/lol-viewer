@@ -177,7 +177,8 @@
 .player-card__rank { grid-column: 1; grid-row: 2; font-size: 10px; color: #9caabb; }
 .player-card__lane { grid-column: 2; grid-row: 2; width: 16px; height: 16px; border: 0; border-radius: 0; background: none; color: #bdc8d7; }
 .player-card__uncertain { position: absolute; right: 0; top: -10px; }
-.player-card__summary { grid-column: 1 / -1; gap: 0; padding-bottom: 9px; border-bottom: 1px solid #303947; }
+.player-card__summary { grid-column: 1 / -1; justify-content: flex-end; gap: 0; padding-bottom: 5px; }
+.player-card__recent-record { color: #96a5b7; font-size: 10px; line-height: 1.4; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .player-card__metric { display: flex; min-height: 0; align-items: baseline; gap: 5px; flex-wrap: wrap; padding: 0; border: 0; border-radius: 0; background: none; }
 .player-card__metric + .player-card__metric { justify-content: flex-end; }
 .player-card__metric strong { font-size: 17px; font-weight: 650; line-height: 1.2; }
