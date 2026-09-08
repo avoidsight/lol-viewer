@@ -106,6 +106,7 @@ export const personalHistoryTargetSchema = z.object({
 export type PersonalHistoryTarget = z.infer<typeof personalHistoryTargetSchema>;
 
 export const playerSnapshotSchema: z.ZodType<PlayerSnapshot> = z.object({
+  itemIconPaths: z.record(z.string(), z.string().min(1)).optional(),
   playerId: z.string(),
   displayName: z.string(),
   teamId: z.number().int(),

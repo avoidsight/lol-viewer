@@ -93,6 +93,7 @@ export interface PersonalHistorySnapshot {
 }
 
 export interface PlayerSnapshot {
+  itemIconPaths?: Record<string, string>;
   playerId: string;
   displayName: string;
   teamId: number;

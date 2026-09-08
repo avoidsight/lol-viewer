@@ -116,6 +116,7 @@ export function createFixtureLiveMatch(scope: QueueScope): LiveMatch {
     return {
       playerId: `fixture-player-${index}`,
       displayName: fixtureNames[index],
+      itemIconPaths: Object.fromEntries([3071, 3053, 3006, 6333, 3156, 3078].map((id) => [String(id), `/lol-game-data/assets/ASSETS/Items/Icons2D/${id}.png`])),
       teamId: index < 5 ? 100 : 200,
       isLocalTeam: index < 5,
       lane: lanes[index % 5],

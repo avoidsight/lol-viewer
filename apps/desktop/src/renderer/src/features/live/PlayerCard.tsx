@@ -60,7 +60,7 @@ export default function PlayerCard({ player, historyScope = 'all', displayLane =
       : player.status === 'unavailable'
         ? <p className="player-card__state player-card__state--private" role="status">{player.errorCode ? unavailableLabels[player.errorCode] : '战绩暂时无法读取'}</p>
         : <>
-          <ol className="player-card__matches" tabIndex={visibleMatches.length > 5 ? 0 : undefined} aria-label={`${player.displayName}${historyScope === 'ranked' ? '最近排位对局' : '最近对局'}`}>{visibleMatches.map((match) => <RecentMatch key={match.matchId} match={match} assetVersion={player.assetVersion} />)}</ol>
+          <ol className="player-card__matches" tabIndex={visibleMatches.length > 4 ? 0 : undefined} aria-label={`${player.displayName}${historyScope === 'ranked' ? '最近排位对局' : '最近对局'}`}>{visibleMatches.map((match) => <RecentMatch key={match.matchId} match={match} assetVersion={player.assetVersion} itemIconPaths={player.itemIconPaths} />)}</ol>
         </>}
   </article>;
 }

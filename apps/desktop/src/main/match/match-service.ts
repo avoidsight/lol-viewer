@@ -202,6 +202,8 @@ export class MatchService {
       assetVersion = undefined;
     }
     checkCancelled(signal);
+    const itemIconPaths = await this.staticData.getItemIconPaths(this.client).catch(() => ({} as Record<string, string>));
+    checkCancelled(signal);
     const players = await mapLimit(participants, 4, async (participant) => {
       checkCancelled(signal);
       const isLocalPlayer = participant === local;
@@ -297,6 +299,9 @@ export class MatchService {
       const currentChampionWins = championMatches.filter((match) => match.win).length;
       const player: PlayerSnapshot = {
         ...base,
+        itemIconPaths: Object.fromEntries(recentMatches.flatMap((match) => (match.itemIds ?? [])
+          .filter((id) => itemIconPaths[String(id)])
+          .map((id) => [String(id), itemIconPaths[String(id)]]))),
         ...(rank === undefined ? {} : { rank }),
         matches: recentMatches,
         sampleSize: recentMatches.length,
