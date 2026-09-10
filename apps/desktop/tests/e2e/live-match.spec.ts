@@ -20,6 +20,30 @@ test('three tabs load personal history first and live comparison on demand', asy
     const modeHeading = page.locator('.live-match-page__mode');
     await expect(modeHeading).toBeVisible();
     await expect(modeHeading).toHaveText('单双排');
+    for (const viewport of [{ width: 1184, height: 735 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
+      await page.setViewportSize(viewport);
+      const layout = await page.evaluate(() => {
+        const cards = [...document.querySelectorAll('.player-card')];
+        const lists = [...document.querySelectorAll<HTMLElement>('.player-card__matches')];
+        return {
+          bottom: cards.at(-1)!.getBoundingClientRect().bottom,
+          right: cards.at(-1)!.getBoundingClientRect().right,
+          pageHeight: document.documentElement.scrollHeight,
+          visibleRows: lists.map(list => [...list.children].filter(row => row.getBoundingClientRect().bottom <= list.getBoundingClientRect().bottom + 1).length)
+        };
+      });
+      expect(layout.pageHeight).toBeLessThanOrEqual(viewport.height + 1);
+      expect(viewport.height - layout.bottom).toBeLessThan(25);
+      expect(viewport.width - layout.right).toBeLessThan(25);
+      expect(layout.visibleRows.every(count => count >= 5)).toBe(true);
+    }
+    await page.setViewportSize({ width: 1184, height: 735 });
+    const scrollPositions = await page.locator('.player-card__matches').evaluateAll(lists => {
+      lists[0].scrollTop = 80;
+      return lists.map(list => list.scrollTop);
+    });
+    expect(scrollPositions[0]).toBeGreaterThan(0);
+    expect(scrollPositions.slice(1).every(top => top === 0)).toBe(true);
     await page.getByRole('tab', { name: '设置' }).click();
     await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
     expect(Date.now() - startedAt).toBeLessThan(15_000);

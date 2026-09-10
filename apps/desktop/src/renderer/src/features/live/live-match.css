@@ -248,3 +248,23 @@
   .player-card__skeleton i,
   .player-card--placeholder > div i { animation: none; }
 }
+
+/* Share the available window between both teams; only player histories scroll. */
+.live-match-page { display: flex; flex-direction: column; height: calc(100dvh - 58px); min-height: 0; }
+.live-match-page__toolbar,
+.live-match-page__notice-wrap,
+.live-match-page__progress { flex-shrink: 0; width: 100%; max-width: none; box-sizing: border-box; }
+.live-match-page__scroll { flex: 1; min-height: 0; width: 100%; max-width: none; box-sizing: border-box; }
+.live-match-grid { height: 100%; grid-template-rows: repeat(2, minmax(0, 1fr)); }
+.team-panel { display: flex; min-height: 0; flex-direction: column; }
+.team-panel__header { flex-shrink: 0; }
+.team-row { flex: 1; min-height: 0; }
+.player-card:not(.player-card--placeholder) { display: flex; flex-direction: column; }
+.player-card__header { flex-shrink: 0; }
+.player-card__matches,
+.player-card__state { flex: 1; min-height: 0; max-height: none; }
+.player-card--placeholder { min-height: 0; }
+@media (max-height: 880px) {
+  .live-match-grid { gap: 8px; }
+  .player-card { padding: 8px 10px 5px; }
+}
