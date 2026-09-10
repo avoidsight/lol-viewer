@@ -59,12 +59,12 @@ describe('LiveMatchPage', () => {
   it('switches display modes without resetting history filters or inventing missing games', () => {
     render(<LiveMatchPage match={{ ...fixtureLiveMatch, players: [player(0, { matches: matches(0, 3) })] }} />);
     fireEvent.click(screen.getByRole('button', { name: '全部对局' }));
-    fireEvent.click(screen.getByRole('button', { name: '总览', exact: true }));
-    expect(screen.getByRole('button', { name: '总览', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: '总览' }));
+    expect(screen.getByRole('button', { name: '总览' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: '全部对局' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getAllByTestId('recent-match')).toHaveLength(3);
     expect(screen.getAllByTestId('recent-match')[0]).toHaveClass('recent-match--compact');
-    fireEvent.click(screen.getByRole('button', { name: '详细', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: '详细' }));
     expect(screen.getAllByTestId('recent-match')[0]).not.toHaveClass('recent-match--compact');
   });
 
