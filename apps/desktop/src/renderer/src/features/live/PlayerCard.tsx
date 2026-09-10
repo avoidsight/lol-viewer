@@ -23,7 +23,7 @@ const unavailableLabels = {
   UNKNOWN: '战绩暂时无法读取'
 } as const;
 
-export default function PlayerCard({ player, historyScope = 'all', displayLane = player.lane, displayLabel, uncertain = false }: { player: PlayerSnapshot; historyScope?: LiveHistoryScope; displayLane?: keyof typeof laneNames; displayLabel?: string; uncertain?: boolean }) {
+export default function PlayerCard({ player, overview = false, historyScope = 'all', displayLane = player.lane, displayLabel, uncertain = false }: { player: PlayerSnapshot; overview?: boolean; historyScope?: LiveHistoryScope; displayLane?: keyof typeof laneNames; displayLabel?: string; uncertain?: boolean }) {
   const [championImageUnavailable, setChampionImageUnavailable] = useState(false);
   const championIcon = player.championId > 0 ? championIconUrl(player.assetVersion, player.championId) : undefined;
   const scopedMatches = player.matches.filter((match) => historyScope === 'all' || isRankedQueue(match.queueId));
@@ -59,7 +59,7 @@ export default function PlayerCard({ player, historyScope = 'all', displayLane =
       : player.status === 'unavailable'
         ? <p className="player-card__state player-card__state--private" role="status">{player.errorCode ? unavailableLabels[player.errorCode] : '战绩暂时无法读取'}</p>
         : <>
-          <ol className="player-card__matches" tabIndex={visibleMatches.length > 4 ? 0 : undefined} aria-label={`${player.displayName}${historyScope === 'ranked' ? '最近排位对局' : '最近对局'}`}>{visibleMatches.map((match) => <RecentMatch key={match.matchId} match={match} assetVersion={player.assetVersion} itemIconPaths={player.itemIconPaths} />)}</ol>
+          <ol className="player-card__matches" tabIndex={!overview && visibleMatches.length > 4 ? 0 : undefined} aria-label={`${player.displayName}${historyScope === 'ranked' ? '最近排位对局' : '最近对局'}`}>{visibleMatches.map((match) => <RecentMatch key={match.matchId} compact={overview} match={match} assetVersion={player.assetVersion} itemIconPaths={player.itemIconPaths} />)}</ol>
         </>}
   </article>;
 }

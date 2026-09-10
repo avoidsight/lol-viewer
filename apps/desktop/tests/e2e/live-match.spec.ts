@@ -44,6 +44,20 @@ test('three tabs load personal history first and live comparison on demand', asy
     });
     expect(scrollPositions[0]).toBeGreaterThan(0);
     expect(scrollPositions.slice(1).every(top => top === 0)).toBe(true);
+    await page.getByRole('button', { name: '总览', exact: true }).click();
+    await expect(page.getByRole('button', { name: '总览', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    const overview = await page.locator('.player-card__matches').evaluateAll(lists => lists.map(list => {
+      const box = list.getBoundingClientRect();
+      const rows = [...list.children].map(row => row.getBoundingClientRect());
+      return { fits: rows.every(row => row.top >= box.top && row.bottom <= box.bottom + 1 && row.right <= box.right + 1), count: rows.length, columnOrder: rows[0].left === rows[4].left && rows[5].left > rows[0].left && rows[0].top === rows[5].top };
+    }));
+    expect(overview.every(list => list.fits && list.count === 10 && list.columnOrder)).toBe(true);
+    await page.locator('.recent-match--compact').first().hover();
+    await expect(page.getByRole('tooltip')).toBeVisible();
+    await expect(page.getByRole('tooltip').locator('.recent-match__items')).toBeVisible();
+    await page.getByRole('button', { name: '详细', exact: true }).click();
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
+    await expect(page.getByTestId('recent-match')).toHaveCount(100);
     await page.getByRole('tab', { name: '设置' }).click();
     await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
     expect(Date.now() - startedAt).toBeLessThan(15_000);

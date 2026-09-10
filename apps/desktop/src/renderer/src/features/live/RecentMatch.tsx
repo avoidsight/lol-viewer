@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { MatchSummary } from '../../../../shared/domain';
 import { describeQueue } from '../../../../shared/queue';
 import { isBuildItem } from '../../../../shared/items';
@@ -10,15 +11,21 @@ function OptionalIcon({ src, label }: { src: string; label: string }) {
   return failed ? null : <img src={src} alt={label} loading="lazy" onError={() => setFailed(true)} />;
 }
 
-export default function RecentMatch({ match, itemIconPaths = {} }: { match: MatchSummary; assetVersion?: string; itemIconPaths?: Record<string, string> }) {
+export default function RecentMatch({ match, itemIconPaths = {}, compact = false }: { match: MatchSummary; compact?: boolean; assetVersion?: string; itemIconPaths?: Record<string, string> }) {
   const [imageUnavailable, setImageUnavailable] = useState(false);
+  const [preview, setPreview] = useState<{ left: number; top: number }>();
+  const showPreview = (element: HTMLElement) => {
+    if (!compact) return;
+    const rect = element.getBoundingClientRect();
+    setPreview({ left: Math.max(8, Math.min(rect.left, window.innerWidth - 328)), top: rect.bottom + 120 < window.innerHeight ? rect.bottom + 6 : rect.top - 114 });
+  };
   const championLabel = `英雄 ${match.championId}`;
   const matchLabel = `${match.win ? '胜利' : '失败'} · ${describeQueue(match.queueId)} · KDA ${match.kills}/${match.deaths}/${match.assists}`;
   const date = new Date(match.endedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
   const spellIds = (match.summonerSpellIds ?? []).filter((id) => spells[id]);
   const itemIds = (match.itemIds ?? []).filter((id) => isBuildItem(id) && itemIconPaths[String(id)]).slice(0, 6);
   return (
-    <li className={`recent-match ${match.win ? 'recent-match--win' : 'recent-match--loss'}`} data-testid="recent-match" aria-label={matchLabel} title={`${matchLabel} · ${date} · ${Math.round(match.durationSeconds / 60)}分钟`}>
+    <li className={`recent-match ${match.win ? 'recent-match--win' : 'recent-match--loss'}${compact ? ' recent-match--compact' : ''}`} data-testid="recent-match" aria-label={matchLabel} tabIndex={compact ? 0 : undefined} onMouseEnter={event => showPreview(event.currentTarget)} onMouseLeave={() => setPreview(undefined)} onFocus={event => showPreview(event.currentTarget)} onBlur={() => setPreview(undefined)} onKeyDown={event => { if (event.key === 'Escape') setPreview(undefined); }} title={compact ? undefined : `${matchLabel} · ${date} · ${Math.round(match.durationSeconds / 60)}分钟`}>
       {imageUnavailable ? <span className="recent-match__fallback" role="img" aria-label={`${championLabel}图标不可用`}><b>{match.championId}</b></span> :
         <img className="recent-match__champion" src={`lol-asset://champion-icons/${match.championId}.png`} alt={championLabel} loading="lazy" onError={() => setImageUnavailable(true)} />}
       {spellIds.length > 0 && <span className="recent-match__spells">{spellIds.map((id, index) => <OptionalIcon key={index} src={`lol-asset://spell-icons/${spells[id]}`} label={`召唤师技能 ${id}`} />)}</span>}
@@ -28,6 +35,11 @@ export default function RecentMatch({ match, itemIconPaths = {} }: { match: Matc
         <small className="recent-match__mode">{describeQueue(match.queueId)}</small>
       </span>
       {itemIds.length > 0 && <span className="recent-match__items">{itemIds.map((id, index) => <OptionalIcon key={index} src={`lol-asset://game-data/${encodeURIComponent(itemIconPaths[String(id)])}`} label={`装备 ${id}`} />)}</span>}
+      {compact && preview && createPortal(<div className="recent-match-preview" role="tooltip" style={preview}>
+        <div>{match.win ? '胜利' : '失败'} · {describeQueue(match.queueId)}</div>
+        <small>{date} · {Math.round(match.durationSeconds / 60)}分钟</small>
+        <ol><RecentMatch match={match} itemIconPaths={itemIconPaths} /></ol>
+      </div>, document.body)}
     </li>
   );
 }

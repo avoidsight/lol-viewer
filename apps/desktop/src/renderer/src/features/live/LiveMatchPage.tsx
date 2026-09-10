@@ -39,6 +39,7 @@ function statusLabel(status: LiveMatchStatus, phase: string | undefined): string
 }
 
 export default function LiveMatchPage({ match, players = [], loadingProgress, notice, showLaneDifferences = true, lifecycleStatus = match ? 'current' : 'waiting', gameflowPhase }: Props) {
+  const [viewMode, setViewMode] = useState<'detail' | 'overview'>('detail');
   const [historyScope, setHistoryScope] = useState<LiveHistoryScope>(() =>
     match && isRankedQueue(match.queueId) ? 'ranked' : 'all');
   useEffect(() => {
@@ -52,7 +53,7 @@ export default function LiveMatchPage({ match, players = [], loadingProgress, no
   const positionOrderReliable = match?.positionOrderReliable ?? false;
   const teamIds: (number | undefined)[] = oriented ? [localTeamId, knownTeamIds.find((teamId) => teamId !== localTeamId)] : [knownTeamIds[0], knownTeamIds[1]];
 
-  return <main className="live-match-page">
+  return <main className="live-match-page" data-view-mode={viewMode}>
     <header className="live-match-page__toolbar">
       <h1 className="player-card__sr-only">对战信息</h1>
       <div className="live-match-page__meta">
@@ -60,9 +61,15 @@ export default function LiveMatchPage({ match, players = [], loadingProgress, no
         <span className="live-match-page__status" data-status={lifecycleStatus}><i aria-hidden="true" />{statusLabel(lifecycleStatus, gameflowPhase)}</span>
         {!oriented && visiblePlayers.length > 0 && <span className="live-match-page__orientation" role="status" aria-label="阵营方向无法确认" title="阵营方向无法确认">?</span>}
       </div>
+      <div className="live-match-page__controls">
+      <div className="live-match-page__scope" role="group" aria-label="显示方式">
+        <button type="button" aria-pressed={viewMode === 'detail'} onClick={() => setViewMode('detail')}>详细</button>
+        <button type="button" title="左列最近第 1–5 场，右列第 6–10 场；悬停查看详情" aria-pressed={viewMode === 'overview'} onClick={() => setViewMode('overview')}>总览</button>
+      </div>
       <div className="live-match-page__scope" role="group" aria-label="战绩范围">
         <button type="button" aria-label="全部对局" title="全部对局" aria-pressed={historyScope === 'all'} onClick={() => setHistoryScope('all')}><i className="is-all" aria-hidden="true" />全部</button>
         <button type="button" aria-label="排位对局" title="排位对局" aria-pressed={historyScope === 'ranked'} onClick={() => setHistoryScope('ranked')}><i className="is-ranked" aria-hidden="true" />排位</button>
+      </div>
       </div>
     </header>
     {notice && <div className={`live-match-page__notice-wrap${visiblePlayers.length > 0 ? ' is-inline' : ''}`}>{notice}</div>}
@@ -75,7 +82,7 @@ export default function LiveMatchPage({ match, players = [], loadingProgress, no
           <header className="team-panel__header"><h2><i aria-hidden="true" />{oriented ? (teamIndex === 0 ? '己方' : '敌方') : label}</h2></header>
           <div className="team-row">
             {teamSlots(teamId === undefined ? [] : visiblePlayers.filter((player) => player.teamId === teamId), positionOrderReliable).map((slot) => slot.player
-              ? <PlayerCard key={slot.player.playerId} player={slot.player} historyScope={historyScope} displayLane={slot.lane} displayLabel={slot.label} uncertain={positionOrderReliable && showLaneDifferences && slot.uncertain} />
+              ? <PlayerCard key={`${slot.player.playerId}-${viewMode}`} player={slot.player} overview={viewMode === 'overview'} historyScope={historyScope} displayLane={slot.lane} displayLabel={slot.label} uncertain={positionOrderReliable && showLaneDifferences && slot.uncertain} />
               : <article key={slot.lane} className="player-card player-card--placeholder" data-testid="player-slot" data-lane={slot.lane} aria-label={`${slot.label ?? slot.lane} 玩家加载中`}><span className="player-card__placeholder-icon"><i /></span><strong>{slot.label ?? slot.lane}</strong><div><i /><i /><i /></div><span className="player-card__sr-only">玩家加载中…</span></article>)}
           </div>
         </section>;
