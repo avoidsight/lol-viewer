@@ -297,11 +297,17 @@
 .player-card__skeleton-row > i { width: 24px; height: 26px; flex-shrink: 0; }
 .player-card__skeleton-row > span { display: grid; flex: 1; gap: 5px; }
 .player-card__skeleton-row > span i:last-child { width: 65%; }
-.recent-match--compact.recent-match--win { background: #9fbaca; }
-.recent-match--compact.recent-match--loss { background: #bfa7a7; }
+.recent-match--compact.recent-match--win,
+.recent-match--compact.recent-match--loss { background: #222d3a; }
+.recent-match--compact::before { display: block; inset: 0 auto 0 0; width: 3px; background: #45b5a3; }
+.recent-match--compact.recent-match--loss::before { background: #ad6474; }
+.recent-match--compact:hover,
+.recent-match--compact:focus-visible { background: #2d3c4d; filter: none; }
 .recent-match--compact .recent-match__champion,
 .recent-match--compact .recent-match__fallback { flex-basis: 21px; width: 21px; }
-.recent-match--compact .recent-match__kda { font-size: 11px; gap: 2px; }
+.recent-match--compact .recent-match__kda { font-size: 11px; gap: 2px; color: #dce5ee; }
+.recent-match--compact .recent-match__kda b:nth-of-type(2) { color: #dc93a0; }
+.recent-match--compact .recent-match__kda i { color: #8797aa; }
 @media (max-height: 880px) {
   .player-card__placeholder-header { min-height: 38px; }
   .live-match-grid { gap: 8px; }
