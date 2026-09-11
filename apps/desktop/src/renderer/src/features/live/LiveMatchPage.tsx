@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import type { Lane, PlayerSnapshot } from '../../../../shared/domain';
 import type { LiveMatch } from '../../../../shared/ipc';
 import { isRankedQueue } from '../../../../shared/queue';
-import PlayerCard from './PlayerCard';
+import PlayerCard, { HistorySkeleton, unavailableLabels } from './PlayerCard';
 import type { LiveMatchStatus } from './live-match-state';
 import './live-match.css';
 
@@ -78,13 +78,16 @@ export default function LiveMatchPage({ match, players = [], loadingProgress, no
       {teamIds.map((teamId, teamIndex) => {
         const label = oriented ? (teamIndex === 0 ? '我方队伍' : '敌方队伍') : `队伍 ${teamIndex + 1}`;
         const side = oriented ? (teamIndex === 0 ? 'ally' : 'enemy') : 'neutral';
+        const slots = teamSlots(teamId === undefined ? [] : visiblePlayers.filter((player) => player.teamId === teamId), positionOrderReliable);
+        const failed = slots.filter(slot => slot.player?.status === 'unavailable');
+        const groupedError = failed.length > 1 && failed.every(slot => slot.player?.errorCode === failed[0].player?.errorCode);
         return <section key={teamIndex} className={`team-panel team-panel--${side}`} data-testid="team-roster" role="group" aria-label={label}>
-          <header className="team-panel__header"><h2><i aria-hidden="true" />{oriented ? (teamIndex === 0 ? '己方' : '敌方') : label}</h2></header>
+          <header className="team-panel__header"><h2><i aria-hidden="true" />{oriented ? (teamIndex === 0 ? '己方' : '敌方') : label}</h2>{groupedError && <span className="team-panel__error" role="status" title={unavailableLabels[failed[0].player?.errorCode ?? 'UNKNOWN']}>战绩暂不可用 · {failed.length}人</span>}</header>
           <div className="team-row">
             {/* LCU may repeat a player ID; include the unique roster slot to avoid orphaned cards on mode changes. */}
-            {teamSlots(teamId === undefined ? [] : visiblePlayers.filter((player) => player.teamId === teamId), positionOrderReliable).map((slot) => slot.player
-              ? <PlayerCard key={`${slot.lane}-${slot.player.playerId}-${viewMode}`} player={slot.player} overview={viewMode === 'overview'} historyScope={historyScope} displayLane={slot.lane} displayLabel={slot.label} uncertain={positionOrderReliable && showLaneDifferences && slot.uncertain} />
-              : <article key={slot.lane} className="player-card player-card--placeholder" data-testid="player-slot" data-lane={slot.lane} aria-label={`${slot.label ?? slot.lane} 玩家加载中`}><span className="player-card__placeholder-icon"><i /></span><strong>{slot.label ?? slot.lane}</strong><div><i /><i /><i /></div><span className="player-card__sr-only">玩家加载中…</span></article>)}
+            {slots.map((slot) => slot.player
+              ? <PlayerCard key={slot.lane} player={slot.player} overview={viewMode === 'overview'} groupedError={groupedError} historyScope={historyScope} displayLane={slot.lane} displayLabel={slot.label} uncertain={positionOrderReliable && showLaneDifferences && slot.uncertain} />
+              : <article key={slot.lane} className="player-card player-card--placeholder" data-testid="player-slot" data-lane={slot.lane} aria-label="玩家加载中"><header className="player-card__placeholder-header"><span className="player-card__champion-static" aria-hidden="true">◇</span><strong>等待玩家信息</strong></header><HistorySkeleton overview={viewMode === 'overview'} /></article>)}
           </div>
         </section>;
       })}

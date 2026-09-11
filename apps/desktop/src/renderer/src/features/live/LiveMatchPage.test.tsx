@@ -56,6 +56,23 @@ const fixtureLiveMatch: LiveMatch = {
 };
 
 describe('LiveMatchPage', () => {
+  it('keeps fixed slots through placeholder, loading, failed and ready transitions', () => {
+    const { rerender } = render(<LiveMatchPage players={[player(0)]} />);
+    fireEvent.click(screen.getByRole('button', { name: '总览' }));
+    expect(document.querySelectorAll('.player-card')).toHaveLength(10);
+    expect(document.querySelectorAll('.player-card__skeleton-row')).toHaveLength(90);
+    for (const status of ['loading', 'unavailable', 'ready', 'unavailable'] as const) {
+      rerender(<LiveMatchPage match={{ ...fixtureLiveMatch, positionOrderReliable: false, players: fixtureLiveMatch.players.map(entry => ({ ...entry, playerId: '0', championId: 0, status, errorCode: 'INVALID_RESPONSE' })) }} />);
+      for (const mode of ['详细', '总览']) {
+        fireEvent.click(screen.getByRole('button', { name: mode }));
+        expect(document.querySelectorAll('.player-card')).toHaveLength(10);
+        expect(new Set([...document.querySelectorAll('.player-card h3')].map(node => node.id)).size).toBe(10);
+        expect(document.querySelectorAll('.player-card__skeleton-row')).toHaveLength(status === 'loading' ? (mode === '总览' ? 100 : 50) : 0);
+        expect(document.querySelectorAll('.player-card__champion-spinner')).toHaveLength(0);
+      }
+    }
+  });
+
   it('never accumulates cards when repeated player identities switch display modes', () => {
     const repeated = { ...fixtureLiveMatch, positionOrderReliable: false, players: fixtureLiveMatch.players.map((entry, index) => index === 3 ? fixtureLiveMatch.players[0] : entry) };
     render(<LiveMatchPage match={repeated} />);
@@ -147,8 +164,8 @@ describe('LiveMatchPage', () => {
     };
     render(<LiveMatchPage match={selecting} />);
     const fallback = screen.getByRole('img', { name: '英雄选择中' });
-    expect(fallback).toHaveTextContent('');
-    expect(fallback.querySelector('.player-card__champion-spinner')).toBeInTheDocument();
+    expect(fallback.querySelector('.player-card__champion-static')).toBeInTheDocument();
+    expect(fallback.querySelector('.player-card__champion-spinner')).toBeNull();
     expect(screen.queryByRole('img', { name: '当前英雄 0' })).not.toBeInTheDocument();
   });
   it('shows a styled fallback instead of broken current champion alt text', () => {
@@ -284,10 +301,10 @@ describe('LiveMatchPage', () => {
       players: [...scrambled, ...fixtureLiveMatch.players.slice(5)]
     }} />);
     const ourTeam = screen.getByRole('group', { name: '我方队伍' });
-    expect(within(ourTeam).getAllByTestId('player-card').map((card) => card.getAttribute('aria-labelledby')))
-      .toEqual(scrambled.map((entry) => `player-${entry.playerId}`));
+    expect(within(ourTeam).getAllByRole('heading', { level: 3 }).map(card => card.textContent))
+      .toEqual(scrambled.map(entry => entry.displayName));
     for (const label of ['阵容 1', '阵容 2', '阵容 3', '阵容 4', '阵容 5']) {
-      expect(within(ourTeam).getByLabelText(label)).toBeVisible();
+      expect(within(ourTeam).queryByLabelText(label)).toBeNull();
     }
     expect(ourTeam.querySelectorAll('.player-card__lane img')).toHaveLength(0);
     expect(screen.queryByRole('img', { name: '位置待确认' })).not.toBeInTheDocument();
@@ -299,11 +316,9 @@ describe('LiveMatchPage', () => {
     render(<LiveMatchPage players={scrambled} />);
 
     const team = screen.getByRole('group', { name: '队伍 1' });
-    expect(within(team).getAllByTestId('player-card').map((card) => card.getAttribute('aria-labelledby')))
-      .toEqual(scrambled.map((entry) => `player-${entry.playerId}`));
-    expect(['阵容 1', '阵容 2', '阵容 3', '阵容 4', '阵容 5'].map((label) =>
-      within(team).getByLabelText(label).textContent
-    )).toEqual(['1', '2', '3', '4', '5']);
+    expect(within(team).getAllByRole('heading', { level: 3 }).map(card => card.textContent))
+      .toEqual(scrambled.map(entry => entry.displayName));
+    expect(team.querySelectorAll('.player-card__lane')).toHaveLength(0);
   });
 
   it('keeps a 1050px grid inside a horizontal scroll container', () => {
@@ -322,7 +337,7 @@ describe('LiveMatchPage', () => {
 
     expect(screen.getAllByTestId('team-roster')).toHaveLength(2);
     expect(screen.getAllByTestId('player-card')).toHaveLength(10);
-    expect(screen.getAllByText('该玩家战绩受隐私保护')).toHaveLength(10);
+    expect(screen.getAllByText('战绩暂不可用 · 5人')).toHaveLength(2);
     expect(screen.getAllByRole('img', { name: /当前英雄 \d+/ })).toHaveLength(10);
   });
 });

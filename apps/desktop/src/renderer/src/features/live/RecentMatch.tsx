@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { MatchSummary } from '../../../../shared/domain';
 import { describeQueue } from '../../../../shared/queue';
@@ -14,6 +14,7 @@ function OptionalIcon({ src, label }: { src: string; label: string }) {
 export default function RecentMatch({ match, itemIconPaths = {}, compact = false }: { match: MatchSummary; compact?: boolean; assetVersion?: string; itemIconPaths?: Record<string, string> }) {
   const [imageUnavailable, setImageUnavailable] = useState(false);
   const [preview, setPreview] = useState<{ left: number; top: number }>();
+  useEffect(() => setPreview(undefined), [compact]);
   const showPreview = (element: HTMLElement) => {
     if (!compact) return;
     const rect = element.getBoundingClientRect();

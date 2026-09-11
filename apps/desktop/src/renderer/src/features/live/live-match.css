@@ -277,12 +277,33 @@
 .team-panel { display: flex; min-height: 0; flex-direction: column; }
 .team-panel__header { flex-shrink: 0; }
 .team-row { flex: 1; min-height: 0; }
+.team-row { grid-template-rows: minmax(0, 1fr); }
 .player-card:not(.player-card--placeholder) { display: flex; flex-direction: column; }
 .player-card__header { flex-shrink: 0; }
 .player-card__matches,
 .player-card__state { flex: 1; min-height: 0; max-height: none; }
 .player-card--placeholder { min-height: 0; }
+.player-card--placeholder { display: flex; flex-direction: column; gap: 0; }
+.player-card__placeholder-header { display: flex; align-items: center; gap: 8px; min-height: 48px; flex-shrink: 0; }
+.player-card__champion-static { color: #768698; font-size: 25px; }
+.player-card__state--private { flex-direction: column; gap: 8px; padding: 12px; box-sizing: border-box; }
+.player-card__empty-icon { color: #546273; font-size: 28px; }
+.team-panel__error { color: #a8a1a6; font-size: 10px; margin-left: 12px; white-space: nowrap; }
+.player-card__skeleton,
+.player-card--placeholder > .player-card__skeleton { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(5, minmax(0, 1fr)); gap: 4px; overflow: hidden; }
+[data-view-mode="overview"] .player-card__skeleton,
+[data-view-mode="overview"] .player-card--placeholder > .player-card__skeleton { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: column; }
+.player-card__skeleton-row { display: flex; align-items: center; gap: 6px; height: 100%; padding: 5px; box-sizing: border-box; background: #202a36; border-radius: 5px; }
+.player-card__skeleton-row > i { width: 24px; height: 26px; flex-shrink: 0; }
+.player-card__skeleton-row > span { display: grid; flex: 1; gap: 5px; }
+.player-card__skeleton-row > span i:last-child { width: 65%; }
+.recent-match--compact.recent-match--win { background: #9fbaca; }
+.recent-match--compact.recent-match--loss { background: #bfa7a7; }
+.recent-match--compact .recent-match__champion,
+.recent-match--compact .recent-match__fallback { flex-basis: 21px; width: 21px; }
+.recent-match--compact .recent-match__kda { font-size: 11px; gap: 2px; }
 @media (max-height: 880px) {
+  .player-card__placeholder-header { min-height: 38px; }
   .live-match-grid { gap: 8px; }
   .player-card { padding: 8px 10px 5px; }
 }
