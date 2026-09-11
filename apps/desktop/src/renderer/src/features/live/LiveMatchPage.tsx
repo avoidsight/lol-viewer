@@ -81,8 +81,9 @@ export default function LiveMatchPage({ match, players = [], loadingProgress, no
         return <section key={teamIndex} className={`team-panel team-panel--${side}`} data-testid="team-roster" role="group" aria-label={label}>
           <header className="team-panel__header"><h2><i aria-hidden="true" />{oriented ? (teamIndex === 0 ? '己方' : '敌方') : label}</h2></header>
           <div className="team-row">
+            {/* LCU may repeat a player ID; include the unique roster slot to avoid orphaned cards on mode changes. */}
             {teamSlots(teamId === undefined ? [] : visiblePlayers.filter((player) => player.teamId === teamId), positionOrderReliable).map((slot) => slot.player
-              ? <PlayerCard key={`${slot.player.playerId}-${viewMode}`} player={slot.player} overview={viewMode === 'overview'} historyScope={historyScope} displayLane={slot.lane} displayLabel={slot.label} uncertain={positionOrderReliable && showLaneDifferences && slot.uncertain} />
+              ? <PlayerCard key={`${slot.lane}-${slot.player.playerId}-${viewMode}`} player={slot.player} overview={viewMode === 'overview'} historyScope={historyScope} displayLane={slot.lane} displayLabel={slot.label} uncertain={positionOrderReliable && showLaneDifferences && slot.uncertain} />
               : <article key={slot.lane} className="player-card player-card--placeholder" data-testid="player-slot" data-lane={slot.lane} aria-label={`${slot.label ?? slot.lane} 玩家加载中`}><span className="player-card__placeholder-icon"><i /></span><strong>{slot.label ?? slot.lane}</strong><div><i /><i /><i /></div><span className="player-card__sr-only">玩家加载中…</span></article>)}
           </div>
         </section>;

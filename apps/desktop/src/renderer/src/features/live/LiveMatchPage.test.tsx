@@ -56,6 +56,19 @@ const fixtureLiveMatch: LiveMatch = {
 };
 
 describe('LiveMatchPage', () => {
+  it('never accumulates cards when repeated player identities switch display modes', () => {
+    const repeated = { ...fixtureLiveMatch, positionOrderReliable: false, players: fixtureLiveMatch.players.map((entry, index) => index === 3 ? fixtureLiveMatch.players[0] : entry) };
+    render(<LiveMatchPage match={repeated} />);
+    for (let index = 0; index < 8; index++) {
+      fireEvent.click(screen.getByRole('button', { name: index % 2 === 0 ? '总览' : '详细' }));
+      expect(screen.getAllByTestId('player-card')).toHaveLength(10);
+      for (const roster of screen.getAllByTestId('team-roster')) {
+        expect(within(roster).getAllByTestId('player-card')).toHaveLength(5);
+      }
+      expect(screen.getAllByTestId('recent-match')).toHaveLength(100);
+    }
+  });
+
   it('switches display modes without resetting history filters or inventing missing games', () => {
     render(<LiveMatchPage match={{ ...fixtureLiveMatch, players: [player(0, { matches: matches(0, 3) })] }} />);
     fireEvent.click(screen.getByRole('button', { name: '全部对局' }));
