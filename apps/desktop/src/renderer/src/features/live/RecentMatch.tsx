@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { MatchSummary } from '../../../../shared/domain';
 import { describeQueue } from '../../../../shared/queue';
 import { isBuildItem } from '../../../../shared/items';
+import { rankedMatchForm } from './ranked-form';
 
 const spells: Record<number, string> = { 1: 'summoner_boost.png', 3: 'summoner_exhaust.png', 4: 'summoner_flash.png', 6: 'summoner_haste.png', 7: 'summoner_heal.png', 11: 'summoner_smite.png', 12: 'summoner_teleport_new.png', 13: 'summonermana.png', 14: 'summonerignite.png', 21: 'summonerbarrier.png', 32: 'summoner_mark.png' };
 const multiKills = { 2: '双杀', 3: '三杀', 4: '四杀', 5: '五杀' };
@@ -18,9 +19,10 @@ export default function RecentMatch({ match, itemIconPaths = {}, compact = false
   const showPreview = (element: HTMLElement) => {
     if (!compact) return;
     const rect = element.getBoundingClientRect();
-    setPreview({ left: Math.max(8, Math.min(rect.left, window.innerWidth - 328)), top: rect.bottom + 120 < window.innerHeight ? rect.bottom + 6 : rect.top - 114 });
+    setPreview({ left: Math.max(8, Math.min(rect.left, window.innerWidth - 328)), top: rect.bottom + 150 < window.innerHeight ? rect.bottom + 6 : Math.max(8, rect.top - 144) });
   };
   const championLabel = `英雄 ${match.championId}`;
+  const form = rankedMatchForm(match);
   const matchLabel = `${match.win ? '胜利' : '失败'} · ${describeQueue(match.queueId)} · KDA ${match.kills}/${match.deaths}/${match.assists}`;
   const date = new Date(match.endedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
   const spellIds = (match.summonerSpellIds ?? []).filter((id) => spells[id]);
@@ -34,11 +36,13 @@ export default function RecentMatch({ match, itemIconPaths = {}, compact = false
         {(match.mvp || match.multiKill) && <span className="recent-match__badges">{match.mvp && <b>MVP</b>}{match.multiKill && <b className="is-multi">{multiKills[match.multiKill]}</b>}</span>}
         <span className="recent-match__kda" aria-hidden="true"><b>{match.kills}</b><i>/</i><b>{match.deaths}</b><i>/</i><b>{match.assists}</b></span>
         <small className="recent-match__mode">{describeQueue(match.queueId)}</small>
+        {compact && form && form.tier !== 'normal' && <small className={`recent-match__form recent-match__form--${form.tier}`}>{form.label}</small>}
       </span>
       {itemIds.length > 0 && <span className="recent-match__items">{itemIds.map((id, index) => <OptionalIcon key={index} src={`lol-asset://game-data/${encodeURIComponent(itemIconPaths[String(id)])}`} label={`装备 ${id}`} />)}</span>}
       {compact && preview && createPortal(<div className="recent-match-preview" role="tooltip" style={preview}>
         <div>{match.win ? '胜利' : '失败'} · {describeQueue(match.queueId)}</div>
         <small>{date} · {Math.round(match.durationSeconds / 60)}分钟</small>
+        {form && <div className="recent-match-preview__form">{form.description}</div>}
         <ol><RecentMatch match={match} itemIconPaths={itemIconPaths} /></ol>
       </div>, document.body)}
     </li>

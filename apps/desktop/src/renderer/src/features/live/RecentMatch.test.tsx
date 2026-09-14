@@ -5,6 +5,18 @@ import RecentMatch from './RecentMatch';
 const match = { matchId: '1', queueId: 420, endedAt: 1, durationSeconds: 1800, championId: 1, win: true, kills: 13, deaths: 5, assists: 11 };
 
 describe('live history detail row', () => {
+  it('only shows carry and rough ranked labels in overview', () => {
+    const { rerender, container } = render(<ol><RecentMatch compact match={{ ...match, killParticipation: .6 }} /></ol>);
+    expect(screen.getByText('Carry局')).toBeVisible();
+    rerender(<ol><RecentMatch compact match={{ ...match, kills: 1, assists: 2, deaths: 10, killParticipation: .2 }} /></ol>);
+    expect(screen.getByText('吃力局')).toBeVisible();
+    for (const data of [{ ...match, killParticipation: .4 }, { ...match, queueId: 450, killParticipation: .6 }, match, { ...match, remake: true, killParticipation: .6 }]) {
+      rerender(<ol><RecentMatch compact match={data} /></ol>);
+      expect(container.querySelector('.recent-match__form')).toBeNull();
+    }
+    rerender(<ol><RecentMatch match={{ ...match, killParticipation: .6 }} /></ol>);
+    expect(container.querySelector('.recent-match__form')).toBeNull();
+  });
   it.each([[420, '单双排'], [440, '灵活排位'], [430, '匹配模式'], [450, '极地大乱斗']] as const)('shows queue %s even when honors are present', (queueId, label) => {
     render(<ol><RecentMatch match={{ ...match, queueId, mvp: true, multiKill: 3 }} /></ol>);
     expect(screen.getByText(label)).toBeVisible();

@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import type { MatchSummary } from '../../../../shared/domain';
-import { rankedForm } from './ranked-form';
+import { rankedForm, rankedMatchForm } from './ranked-form';
 
 const games = (count: number, overrides: Partial<MatchSummary> = {}): MatchSummary[] => Array.from({ length: count }, (_, i) => ({ matchId: String(i), queueId: i % 2 ? 440 : 420, endedAt: 10000 - i, durationSeconds: 1800, championId: 1, win: false, kills: 4, deaths: 5, assists: 6, killParticipation: .45, ...overrides }));
 describe('rankedForm', () => {
+  it('uses the same carry tier for match labels and the elite aggregate', () => {
+    const carry = games(10, { kills: 3, assists: 9, deaths: 4, killParticipation: .55 });
+    expect(rankedMatchForm(carry[0])?.label).toBe('Carry局');
+    const mixed = carry.map((m, i) => i < 8 ? m : { ...m, killParticipation: .4 });
+    expect(rankedForm(mixed)?.label).toBe('通天代');
+    expect(rankedForm(mixed)?.description).toContain('8场Carry局、2场正常局、0场吃力局');
+    expect(rankedForm(mixed.map((m, i) => i === 7 ? { ...m, killParticipation: .4 } : m))?.label).toBe('小代');
+    expect(rankedMatchForm({ ...carry[0], killParticipation: .54 })?.label).toBe('正常局');
+  });
   it('requires five complete ranked samples and ignores normals and duplicate games', () => {
     expect(rankedForm(games(4))).toBeUndefined();
     expect(rankedForm(games(10, { queueId: 450 }))).toBeUndefined();
