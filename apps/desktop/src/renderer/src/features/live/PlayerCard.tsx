@@ -29,7 +29,8 @@ export function HistorySkeleton({ overview = false }: { overview?: boolean }) {
 
 export default function PlayerCard({ player, overview = false, groupedError = false, historyScope = 'all', displayLane = player.lane, displayLabel, uncertain = false }: { player: PlayerSnapshot; overview?: boolean; groupedError?: boolean; historyScope?: LiveHistoryScope; displayLane?: keyof typeof laneNames; displayLabel?: string; uncertain?: boolean }) {
   const identityId = useId();
-  const form = player.status === 'ready' ? rankedForm(player.matches) : undefined;
+  const analyzedForm = player.status === 'ready' ? rankedForm(player.matches) : undefined;
+  const form = analyzedForm?.tier === 'regular' ? undefined : analyzedForm;
   const [championImageUnavailable, setChampionImageUnavailable] = useState(false);
   useEffect(() => setChampionImageUnavailable(false), [player.championId]);
   const championIcon = player.championId > 0 ? championIconUrl(player.assetVersion, player.championId) : undefined;

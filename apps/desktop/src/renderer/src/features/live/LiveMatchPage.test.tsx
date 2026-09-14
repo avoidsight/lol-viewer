@@ -56,6 +56,11 @@ const fixtureLiveMatch: LiveMatch = {
 };
 
 describe('LiveMatchPage', () => {
+  it('hides the regular player label even with enough complete ranked history', () => {
+    render(<LiveMatchPage match={{ ...fixtureLiveMatch, players: [player(0, { matches: matches(0).map(m => ({ ...m, killParticipation: .45 })) })] }} />);
+    expect(screen.queryByText('本地人')).toBeNull();
+    expect(document.querySelector('.player-form')).toBeNull();
+  });
   it('keeps ranked labels in all and ranked views but hides labels for unavailable histories', () => {
     const rated = { ...fixtureLiveMatch, players: [player(0, { matches: matches(0).map(m => ({ ...m, kills: 2, assists: 20, deaths: 3, killParticipation: .7 })) })] };
     const { rerender } = render(<LiveMatchPage match={rated} />);

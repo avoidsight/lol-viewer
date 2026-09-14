@@ -7,9 +7,10 @@ const match = { matchId: '1', queueId: 420, endedAt: 1, durationSeconds: 1800, c
 describe('live history detail row', () => {
   it('only shows carry and rough ranked labels in overview', () => {
     const { rerender, container } = render(<ol><RecentMatch compact match={{ ...match, killParticipation: .6 }} /></ol>);
-    expect(screen.getByText('Carry局')).toBeVisible();
+    expect(screen.getByRole('img', { name: 'Carry局' })).toBeVisible();
+    expect(screen.queryByText('Carry局')).toBeNull();
     rerender(<ol><RecentMatch compact match={{ ...match, kills: 1, assists: 2, deaths: 10, killParticipation: .2 }} /></ol>);
-    expect(screen.getByText('吃力局')).toBeVisible();
+    expect(screen.getByRole('img', { name: '吃力局' })).toBeVisible();
     for (const data of [{ ...match, killParticipation: .4 }, { ...match, queueId: 450, killParticipation: .6 }, match, { ...match, remake: true, killParticipation: .6 }]) {
       rerender(<ol><RecentMatch compact match={data} /></ol>);
       expect(container.querySelector('.recent-match__form')).toBeNull();
