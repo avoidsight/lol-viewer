@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { app, BrowserWindow, protocol } from 'electron';
 import { is } from '@electron-toolkit/utils';
+import appIcon from '../../resources/icon.png?asset';
 import { discoverLcuConnection } from './lcu/discovery';
 import { createLcuClient } from './lcu/http-client';
 import { registerMatchIpc } from './ipc/register-match-ipc';
@@ -52,6 +53,7 @@ function createWindow(): void {
   const window = new BrowserWindow({
     width: 1200,
     height: 800,
+    icon: appIcon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,

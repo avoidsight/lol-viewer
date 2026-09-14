@@ -48,17 +48,23 @@
     "appId": "cn.lolviewer.desktop",
     "productName": "LOL Viewer",
     "directories": { "output": "dist" },
-    "files": ["out/**/*", "package.json"],
+    "files": ["out/**/*", "resources/icon.png", "package.json"],
     "asar": true,
     "asarUnpack": ["node_modules/better-sqlite3/**/*"],
     "npmRebuild": false,
     "win": {
+      "icon": "resources/icon.ico",
       "target": [{ "target": "nsis", "arch": ["x64"] }],
       "requestedExecutionLevel": "requireAdministrator",
       "signAndEditExecutable": true,
       "signExecutable": false,
       "artifactName": "lol-viewer-${version}-windows-${arch}-setup.${ext}"
     },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "resources/icon.ico",
+      "uninstallerIcon": "resources/icon.ico"
+    }
   }
 }
