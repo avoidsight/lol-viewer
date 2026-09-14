@@ -5,12 +5,14 @@ import RecentMatch from './RecentMatch';
 const match = { matchId: '1', queueId: 420, endedAt: 1, durationSeconds: 1800, championId: 1, win: true, kills: 13, deaths: 5, assists: 11 };
 
 describe('live history detail row', () => {
-  it('only shows carry and rough ranked labels in overview', () => {
+  it('only shows carry above KDA and keeps queue below in overview', () => {
     const { rerender, container } = render(<ol><RecentMatch compact match={{ ...match, killParticipation: .6 }} /></ol>);
-    expect(screen.getByRole('img', { name: 'Carry局' })).toBeVisible();
-    expect(screen.queryByText('Carry局')).toBeNull();
+    expect(screen.getByText('Carry局')).toBeVisible();
+    const performance = container.querySelector('.recent-match__performance')!;
+    expect([...performance.children].map(node => node.className)).toEqual(['recent-match__form', 'recent-match__kda', 'recent-match__mode']);
+    expect(screen.getByText('单双排')).toBeVisible();
     rerender(<ol><RecentMatch compact match={{ ...match, kills: 1, assists: 2, deaths: 10, killParticipation: .2 }} /></ol>);
-    expect(screen.getByRole('img', { name: '吃力局' })).toBeVisible();
+    expect(container.querySelector('.recent-match__form')).toBeNull();
     for (const data of [{ ...match, killParticipation: .4 }, { ...match, queueId: 450, killParticipation: .6 }, match, { ...match, remake: true, killParticipation: .6 }]) {
       rerender(<ol><RecentMatch compact match={data} /></ol>);
       expect(container.querySelector('.recent-match__form')).toBeNull();

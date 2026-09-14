@@ -270,8 +270,7 @@
 .recent-match--compact .recent-match__kda { font-size: 10px; gap: 1px; }
 .recent-match--compact .recent-match__spells,
 .recent-match--compact .recent-match__items,
-.recent-match--compact .recent-match__badges,
-.recent-match--compact .recent-match__mode { display: none; }
+.recent-match--compact .recent-match__badges { display: none; }
 .recent-match--compact:focus-visible { outline: 2px solid #fbbf24; outline-offset: -2px; }
 .recent-match-preview { position: fixed; z-index: 1000; width: 320px; box-sizing: border-box; padding: 10px; border: 1px solid #536073; border-radius: 8px; background: #1a222e; color: #e4ebf3; box-shadow: 0 8px 24px #0008; pointer-events: none; font-size: 12px; }
 .recent-match-preview > small { color: #96a5b7; }
@@ -316,11 +315,9 @@
 .recent-match--compact .recent-match__kda { font-size: 11px; gap: 2px; color: #dce5ee; }
 .recent-match--compact .recent-match__kda b:nth-of-type(2) { color: #dc93a0; }
 .recent-match--compact .recent-match__kda i { color: #8797aa; }
-.recent-match--compact .recent-match__form { position: absolute; left: 16px; top: calc(50% + 3px); display: grid; place-items: center; width: 12px; height: 12px; box-sizing: border-box; border-radius: 4px; border: 1px solid #222d3a; background: #14232e; }
-.recent-match__form svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.recent-match__form--carry svg { fill: currentColor; stroke-width: .5; }
-.recent-match__form--carry { color: #7ec6bd; }
-.recent-match__form--rough { color: #cd9ba5; }
+.recent-match--compact .recent-match__form { padding: 0 4px; border-radius: 3px; background: #294d46; color: #a3e0ce; font-size: 8px; line-height: 10px; white-space: nowrap; }
+.recent-match--compact .recent-match__kda { line-height: 12px; }
+.recent-match--compact .recent-match__mode { color: #9aaabd; opacity: 1; font-size: 8px; line-height: 9px; }
 .recent-match-preview__form { margin-top: 3px; font-size: 10px; color: #b8c7d8; }
 @media (max-height: 880px) {
   .player-card__placeholder-header { min-height: 38px; }

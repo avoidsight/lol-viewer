@@ -33,11 +33,11 @@ export default function RecentMatch({ match, itemIconPaths = {}, compact = false
         <img className="recent-match__champion" src={`lol-asset://champion-icons/${match.championId}.png`} alt={championLabel} loading="lazy" onError={() => setImageUnavailable(true)} />}
       {spellIds.length > 0 && <span className="recent-match__spells">{spellIds.map((id, index) => <OptionalIcon key={index} src={`lol-asset://spell-icons/${spells[id]}`} label={`召唤师技能 ${id}`} />)}</span>}
       <span className="recent-match__performance">
+        {compact && form?.tier === 'carry' && <span className="recent-match__form">Carry局</span>}
         {(match.mvp || match.multiKill) && <span className="recent-match__badges">{match.mvp && <b>MVP</b>}{match.multiKill && <b className="is-multi">{multiKills[match.multiKill]}</b>}</span>}
         <span className="recent-match__kda" aria-hidden="true"><b>{match.kills}</b><i>/</i><b>{match.deaths}</b><i>/</i><b>{match.assists}</b></span>
         <small className="recent-match__mode">{describeQueue(match.queueId)}</small>
       </span>
-      {compact && form && form.tier !== 'normal' && <span className={`recent-match__form recent-match__form--${form.tier}`} role="img" aria-label={form.label}><svg viewBox="0 0 16 16" aria-hidden="true"><path d={form.tier === 'carry' ? 'M9 1 3 9h4l-1 6 7-9H9Z' : 'm3 5 5 5 5-5'} /></svg></span>}
       {itemIds.length > 0 && <span className="recent-match__items">{itemIds.map((id, index) => <OptionalIcon key={index} src={`lol-asset://game-data/${encodeURIComponent(itemIconPaths[String(id)])}`} label={`装备 ${id}`} />)}</span>}
       {compact && preview && createPortal(<div className="recent-match-preview" role="tooltip" style={preview}>
         <div>{match.win ? '胜利' : '失败'} · {describeQueue(match.queueId)}</div>
