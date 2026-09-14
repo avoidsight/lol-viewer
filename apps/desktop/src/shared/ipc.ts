@@ -63,6 +63,8 @@ export const matchSummarySchema = z.object({
   totalDamageDealtToChampions: z.number().int().nonnegative().optional(),
   totalDamageTaken: z.number().int().nonnegative().optional(),
   teamDamageShare: z.number().min(0).max(1).optional(),
+  killParticipation: z.number().min(0).max(1).optional(),
+  remake: z.boolean().optional(),
   teamDamageTakenShare: z.number().min(0).max(1).optional(),
   teamGoldShare: z.number().min(0).max(1).optional(),
   achievements: z.array(matchAchievementSchema).max(7).optional()

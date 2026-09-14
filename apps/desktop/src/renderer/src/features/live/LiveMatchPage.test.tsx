@@ -56,6 +56,17 @@ const fixtureLiveMatch: LiveMatch = {
 };
 
 describe('LiveMatchPage', () => {
+  it('keeps ranked labels in all and ranked views but hides labels for unavailable histories', () => {
+    const rated = { ...fixtureLiveMatch, players: [player(0, { matches: matches(0).map(m => ({ ...m, kills: 2, assists: 20, deaths: 3, killParticipation: .7 })) })] };
+    const { rerender } = render(<LiveMatchPage match={rated} />);
+    expect(screen.getByText('通天代')).toHaveAttribute('title', expect.stringContaining('不代表实际段位或代练判断'));
+    fireEvent.click(screen.getByRole('button', { name: '全部对局' }));
+    fireEvent.click(screen.getByRole('button', { name: '总览' }));
+    expect(screen.getByText('通天代')).toBeVisible();
+    rerender(<LiveMatchPage match={{ ...rated, players: rated.players.map(p => ({ ...p, status: 'unavailable' })) }} />);
+    expect(screen.queryByText('通天代')).toBeNull();
+  });
+
   it('keeps fixed slots through placeholder, loading, failed and ready transitions', () => {
     const { rerender } = render(<LiveMatchPage players={[player(0)]} />);
     fireEvent.click(screen.getByRole('button', { name: '总览' }));

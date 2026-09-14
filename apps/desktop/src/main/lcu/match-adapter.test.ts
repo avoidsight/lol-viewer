@@ -3,6 +3,15 @@ import fixture from '../../../tests/fixtures/match-history.json';
 import { adaptMatchHistory, describeQueue } from './match-adapter';
 
 describe('adaptMatchHistory', () => {
+  it('only derives participation from a complete team and preserves remake flags', () => {
+    const base = structuredClone(fixture.games[0]);
+    const participants = Array.from({ length: 5 }, (_, i) => ({ ...base.participants[0], teamId: 100, participantId: i + 1, stats: { ...base.participants[0].stats, kills: 4, assists: 6, gameEndedInEarlySurrender: true } }));
+    const adapt = (roster: typeof participants) => adaptMatchHistory({ games: [{ ...base, participants: roster }] }, { scope: 'all', limit: 10 })[0];
+    expect(adapt(participants)).toMatchObject({ killParticipation: .5, remake: true });
+    expect(adapt(participants.slice(0, 4)).killParticipation).toBeUndefined();
+    expect(adapt(participants.map(p => ({ ...p, stats: { ...p.stats, kills: 0, assists: 0 } }))).killParticipation).toBeUndefined();
+  });
+
   it('keeps the newest ten solo ranked games and maps KDA', () => {
     const result = adaptMatchHistory(fixture, { scope: 'ranked-solo', limit: 10 });
     expect(result).toHaveLength(10);

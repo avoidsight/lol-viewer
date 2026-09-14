@@ -9,6 +9,7 @@ import topLaneIcon from '../../assets/positions/position-top-light.svg';
 import utilityLaneIcon from '../../assets/positions/position-utility-light.svg';
 import type { LiveHistoryScope } from './LiveMatchPage';
 import RecentMatch from './RecentMatch';
+import { rankedForm } from './ranked-form';
 
 const laneNames = { TOP: '上路', JUNGLE: '打野', MIDDLE: '中路', BOTTOM: '下路', UTILITY: '辅助', UNKNOWN: '未知位置' } as const;
 const laneIcons = { TOP: topLaneIcon, JUNGLE: jungleLaneIcon, MIDDLE: middleLaneIcon, BOTTOM: bottomLaneIcon, UTILITY: utilityLaneIcon } as const;
@@ -28,6 +29,7 @@ export function HistorySkeleton({ overview = false }: { overview?: boolean }) {
 
 export default function PlayerCard({ player, overview = false, groupedError = false, historyScope = 'all', displayLane = player.lane, displayLabel, uncertain = false }: { player: PlayerSnapshot; overview?: boolean; groupedError?: boolean; historyScope?: LiveHistoryScope; displayLane?: keyof typeof laneNames; displayLabel?: string; uncertain?: boolean }) {
   const identityId = useId();
+  const form = player.status === 'ready' ? rankedForm(player.matches) : undefined;
   const [championImageUnavailable, setChampionImageUnavailable] = useState(false);
   useEffect(() => setChampionImageUnavailable(false), [player.championId]);
   const championIcon = player.championId > 0 ? championIconUrl(player.assetVersion, player.championId) : undefined;
@@ -48,9 +50,10 @@ export default function PlayerCard({ player, overview = false, groupedError = fa
         : championIcon
           ? <span className="player-card__champion player-card__champion--fallback player-card__champion--unavailable" role="img" title={championSummary} aria-label={`当前英雄 ${player.championId}图标不可用`}><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M10 27c1-7 4-11 10-11s9 4 10 11" /><circle cx="20" cy="12" r="6" /><path d="m11 10 4-7 5 5 5-5 4 7" /></svg><b>{player.championId}</b></span>
           : <span className="player-card__champion player-card__champion--fallback" role="img" aria-label={player.status === 'unavailable' ? '英雄信息暂不可用' : '英雄选择中'}><span className="player-card__champion-static" aria-hidden="true">◇</span></span>}
-      <div className="player-card__identity">
+      <div className={`player-card__identity${form ? ' player-card__identity--rated' : ''}`}>
         {laneIcon && <span className="player-card__lane" aria-label={laneLabel} title={laneLabel}><img src={laneIcon} alt="" aria-hidden="true" /></span>}
         <h3 id={identityId} title={player.displayName}>{player.displayName}</h3>
+        {form && <span className={`player-form player-form--${form.tier}`} tabIndex={0} title={form.description} aria-label={`${form.label}：${form.description}`}><svg viewBox="0 0 16 16" aria-hidden="true"><path d={form.tier === 'elite' ? 'M2 5l3 2 3-5 3 5 3-2-2 8H4Z' : form.tier === 'strong' ? 'M9 1 3 9h4l-1 6 7-9H9Z' : form.tier === 'rough' ? 'm3 5 5 5 5-5M3 12h10' : 'm8 2 6 6-6 6-6-6Z'} /></svg>{form.label}</span>}
         <span className="player-card__rank">{localizeRank(player.rank) ?? '段位未知'}</span>
         {player.status === 'ready' && <span className="player-card__recent-record" role="group" aria-label={`近 ${visibleMatches.length} 场，${wins}胜${visibleMatches.length - wins}负`}>
           {visibleMatches.length ? `${wins}胜${visibleMatches.length - wins}负` : '暂无战绩'}

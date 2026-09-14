@@ -44,6 +44,8 @@ export interface MatchSummary {
   kills: number;
   deaths: number;
   assists: number;
+  killParticipation?: number;
+  remake?: boolean;
   mvp?: boolean;
   multiKill?: 2 | 3 | 4 | 5;
   cs?: number;

@@ -18,6 +18,7 @@ const participantSchema = z.object({
     kills: z.number().int().nonnegative(),
     deaths: z.number().int().nonnegative(),
     assists: z.number().int().nonnegative(),
+    gameEndedInEarlySurrender: z.boolean().optional(),
     mvp: z.boolean().optional(),
     isMvp: z.boolean().optional(),
     largestMultiKill: z.number().int().nonnegative().optional(),
@@ -185,6 +186,10 @@ function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
     participant.stats.totalDamageDealtToChampions,
     teamParticipants.map((entry) => entry.stats.totalDamageDealtToChampions)
   );
+  const teamKills = teamParticipants.reduce((total, entry) => total + entry.stats.kills, 0);
+  const involvement = participant.stats.kills + participant.stats.assists;
+  const killParticipation = teamParticipants.length === 5 && teamKills > 0 && involvement <= teamKills
+    ? involvement / teamKills : undefined;
   const teamDamageTakenShare = teamShare(
     participant.stats.totalDamageTaken,
     teamParticipants.map((entry) => entry.stats.totalDamageTaken)
@@ -254,6 +259,8 @@ function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
     kills: participant.stats.kills,
     deaths: participant.stats.deaths,
     assists: participant.stats.assists,
+    ...(killParticipation === undefined ? {} : { killParticipation }),
+    ...(participant.stats.gameEndedInEarlySurrender === undefined ? {} : { remake: participant.stats.gameEndedInEarlySurrender }),
     ...(mvp === true ? { mvp: true } : {}),
     ...(multiKill === undefined ? {} : { multiKill }),
     ...(cs === undefined ? {} : { cs }),
