@@ -7,6 +7,7 @@ import PersonalHistoryPage from './features/history/PersonalHistoryPage';
 import LiveMatchPage from './features/live/LiveMatchPage';
 import { initialLiveMatchState, liveMatchReducer, type LiveMatchAction, type LiveMatchErrorReason } from './features/live/live-match-state';
 import SettingsPage from './features/settings/SettingsPage';
+import FeedbackDialog from './features/feedback/FeedbackDialog';
 
 declare global { interface Window { lolViewer?: LolViewerApi } }
 
@@ -38,6 +39,7 @@ function LiveStateNotice({
 
 export default function App({ initialTab = 'history' }: { initialTab?: AppTab } = {}) {
   const [page, setPage] = useState<AppTab>(initialTab);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [history, setHistory] = useState<PersonalHistorySnapshot>();
   const [historyTarget, setHistoryTarget] = useState<PersonalHistoryTarget>();
   const [historyState, setHistoryState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
@@ -333,5 +335,5 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     {page === 'champions' && <ChampionLibraryPage getCatalog={getChampionCatalog} getDetails={getChampionDetails} getGuide={getChampionGuide} />}
     {page === 'settings' && <SettingsPage settings={settings} message={message} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onLaneDifferencesChange={(checked) => void updateLaneSetting(checked)} onClearCache={() => void clearCache()} />}
   </>;
-  return <AppShell active={page} onChange={handleTabChange} liveAttention={liveAttention}>{content}</AppShell>;
+  return <><AppShell active={page} onChange={handleTabChange} liveAttention={liveAttention} onFeedback={() => setFeedbackOpen(true)}>{content}</AppShell><FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} api={window.lolViewer} /></>;
 }

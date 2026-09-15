@@ -213,6 +213,8 @@ export type LiveRosterPlayer = z.infer<typeof liveRosterPlayerSchema>;
 export type LiveRoster = z.infer<typeof liveRosterSchema>;
 
 export interface LolViewerApi {
+  getFeedbackContext?: import('./feedback').FeedbackApi['getFeedbackContext'];
+  submitFeedback?: import('./feedback').FeedbackApi['submitFeedback'];
   getPersonalHistory(target?: PersonalHistoryTarget): Promise<PersonalHistorySnapshot>;
   getLiveMatch(scope: QueueScope, generation?: number): Promise<LiveMatch>;
   getLiveRoster(): Promise<LiveRoster>;

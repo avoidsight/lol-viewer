@@ -1,4 +1,9 @@
 import { join } from 'node:path';
+import { release } from 'node:os';
+import { readFileSync } from 'node:fs';
+import { registerFeedbackIpc } from './ipc/register-feedback-ipc';
+import { createDeviceIdProvider } from './feedback/device-id';
+import { FeedbackService, feedbackEndpoint } from './feedback/feedback-service';
 import Database from 'better-sqlite3';
 import { app, BrowserWindow, protocol } from 'electron';
 import { is } from '@electron-toolkit/utils';
@@ -115,6 +120,17 @@ void app.whenReady().then(() => {
   });
   const settingsService = new SettingsService(database, cache, guideCache, personalHistoryCache);
   registerSettingsIpc(settingsService);
+  const getDeviceId = createDeviceIdProvider(join(app.getPath('appData'), 'lol-viewer-identity'));
+  const feedback = new FeedbackService(async () => ({
+    deviceId: fixtureMode ? 'f'.repeat(64) : await getDeviceId(),
+    clientVersion: app.isPackaged ? app.getVersion() : (JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf8')) as { version: string }).version,
+    systemInfo: `${process.platform} ${release()} / ${process.arch}`
+  }), feedbackEndpoint(app.isPackaged, process.env.LOL_VIEWER_FEEDBACK_URL));
+  registerFeedbackIpc({
+    getFeedbackContext: () => feedback.getContext(),
+    submitFeedback: (input) => fixtureMode && !process.env.LOL_VIEWER_FEEDBACK_URL
+      ? Promise.resolve({ ok: false as const, error: '预览模式不会向线上提交反馈。' }) : feedback.submit(input)
+  });
   if (!fixtureMode) {
     readyCheckAutoAcceptor = new ReadyCheckAutoAcceptor({
       getSettings: () => settingsService.get(),

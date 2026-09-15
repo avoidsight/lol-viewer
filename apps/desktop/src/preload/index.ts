@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { z } from 'zod';
+import { FEEDBACK_CONTEXT_CHANNEL, FEEDBACK_SUBMIT_CHANNEL, feedbackContextSchema, feedbackInputSchema, feedbackResultSchema, type FeedbackInput } from '../shared/feedback';
 import type { PersonalHistorySnapshot, PlayerSnapshot, QueueScope } from '../shared/domain';
 import {
   MATCH_GET_CHANNEL,
@@ -42,6 +43,8 @@ import {
 } from '../shared/ipc';
 
 const api: LolViewerApi = Object.freeze({
+  getFeedbackContext: async () => feedbackContextSchema.parse(await ipcRenderer.invoke(FEEDBACK_CONTEXT_CHANNEL)),
+  submitFeedback: async (input: FeedbackInput) => feedbackResultSchema.parse(await ipcRenderer.invoke(FEEDBACK_SUBMIT_CHANNEL, feedbackInputSchema.parse(input))),
   getPersonalHistory: async (target?: PersonalHistoryTarget): Promise<PersonalHistorySnapshot> => {
     const input = personalHistoryTargetSchema.optional().parse(target);
     return personalHistorySchema.parse(await (input === undefined
