@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { feedbackInputSchema, feedbackContextSchema, MAX_SCREENSHOT_BYTES, type FeedbackInput, type FeedbackContext, type FeedbackResult, type FeedbackScreenshot } from '../../shared/feedback';
 
-export const FEEDBACK_ENDPOINT = 'https://19950919.me/lol-admin/api/feedback';
+export const FEEDBACK_ENDPOINT = 'https://lol.19950919.me/api/feedback';
 export function validateScreenshot(screenshot: FeedbackScreenshot): Buffer {
   const bytes = Buffer.from(screenshot.data, 'base64');
   const mime = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ? 'image/png'

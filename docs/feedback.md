@@ -24,7 +24,7 @@
 
 ## 接口契约与上线前提
 
-生产地址固定为 `https://19950919.me/lol-admin/api/feedback`，保留域名根目录已有的授权服务。
+生产地址固定为 `https://lol.19950919.me/api/feedback`，后台独立使用 `lol.19950919.me` 子域，不带 `/lol-admin` 前缀，保留原域名已有的授权服务。
 后台须先实现并部署以下扩展后，客户端才能端到端使用；不能直接对接旧版仅接收 JSON 的反馈接口。
 
 `POST multipart/form-data`：
