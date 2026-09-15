@@ -51,7 +51,16 @@ async function requestJson(url, options, stage) {
   } catch {
     throw new Error(`${stage}：网络失败或超时`);
   }
-  if (!response.ok) throw new Error(`${stage}：HTTP ${response.status}`);
+  if (!response.ok) {
+    // Only expose numeric platform error codes, never raw response bodies or credentials.
+    const body = await response.json().catch(() => null);
+    const code = String(body?.code ?? body?.errcode ?? '');
+    const suffix = /^\d{1,12}$/.test(code) ? `，QQ 错误码 ${code}` : '';
+    if (body?.message === '接口访问源IP不在白名单') {
+      throw new Error(`${stage}：HTTP ${response.status}${suffix}，接口访问源 IP 不在白名单`);
+    }
+    throw new Error(`${stage}：HTTP ${response.status}${suffix}`);
+  }
   try { return await response.json(); }
   catch { throw new Error(`${stage}：响应不是有效 JSON`); }
 }
