@@ -90,10 +90,10 @@ describe('createLcuClient', () => {
   });
 
   it.each([
-    [401, 'LCU_AUTH'],
-    [500, 'LCU_INVALID_RESPONSE'],
-    [200, 'LCU_INVALID_RESPONSE']
-  ] as const)('maps status/body case %s to %s', async (statusCode, code) => {
+    [401, 'LCU_AUTH', 'LCU authentication failed'],
+    [500, 'LCU_INVALID_RESPONSE', 'LCU returned an unexpected status (500)'],
+    [200, 'LCU_INVALID_RESPONSE', 'LCU returned invalid JSON']
+  ] as const)('maps status/body case %s to %s', async (statusCode, code, message) => {
     const body = statusCode === 200 ? 'not-json' : '{}';
     const transport = requestDouble({ statusCode, body });
     const client = createLcuClient(
@@ -101,7 +101,7 @@ describe('createLcuClient', () => {
       transport.request
     );
 
-    await expect(client.get('/endpoint', unknownSchema)).rejects.toMatchObject({ code });
+    await expect(client.get('/endpoint', unknownSchema)).rejects.toMatchObject({ code, message });
   });
 
   it('rejects valid JSON that does not match the caller schema without exposing the body', async () => {

@@ -13,8 +13,17 @@ describe('SgpClient', () => {
       json: {
         gameId: 7, queueId: 440, gameCreation: 1000, gameDuration: 900,
         participants: [
-          { puuid: 'other', championId: 2, kills: 1, deaths: 2, assists: 3, win: false, teamId: 100 },
-          { puuid: 'target', championId: 99, kills: 8, deaths: 4, assists: 12, win: true, teamId: 200 }
+          {
+            puuid: 'other', championId: 2, kills: 1, deaths: 2, assists: 3, win: false, teamId: 100,
+            goldEarned: 9_000, totalDamageDealtToChampions: 10_000, totalDamageTaken: 11_000
+          },
+          {
+            puuid: 'target', championId: 99, kills: 8, deaths: 4, assists: 12, win: true, teamId: 200,
+            summoner1Id: 4, summoner2Id: 12, totalMinionsKilled: 180, neutralMinionsKilled: 20,
+            mvp: true, largestMultiKill: 3, doubleKills: 2, tripleKills: 1,
+            goldEarned: 14_250, totalDamageDealtToChampions: 31_500, totalDamageTaken: 28_100,
+            item0: 3071, item1: 3053, item6: 3340, teamPosition: 'MIDDLE'
+          }
         ]
       }
     }] }), { status: 200 }));
@@ -28,7 +37,24 @@ describe('SgpClient', () => {
     );
     expect(history).toMatchObject({ games: [{ gameId: 7, queueId: 440 }] });
     expect((history as { games: Array<{ participants: unknown[] }> }).games[0].participants[0]).toMatchObject(
-      { championId: 99, stats: { win: true, kills: 8, deaths: 4, assists: 12 } }
+      {
+        championId: 99,
+        mvp: true,
+        spell1Id: 4,
+        spell2Id: 12,
+        timeline: { lane: 'MIDDLE' },
+        stats: {
+          win: true, kills: 8, deaths: 4, assists: 12,
+          totalMinionsKilled: 180, neutralMinionsKilled: 20,
+          largestMultiKill: 3, doubleKills: 2, tripleKills: 1,
+          goldEarned: 14_250,
+          totalDamageDealtToChampions: 31_500,
+          totalDamageTaken: 28_100,
+          item0: 3071,
+          item1: 3053,
+          item6: 3340
+        }
+      }
     );
   });
 

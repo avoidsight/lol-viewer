@@ -5,15 +5,20 @@ import { personalHistorySchema, type PersonalHistoryTarget } from '../../shared/
 import type { PersonalHistoryCache } from '../cache/database';
 import type { LcuClient } from '../lcu/http-client';
 import type { SgpClient } from '../sgp/sgp-client';
+import { LcuStaticDataCache, type LcuStaticDataProvider } from '../lcu/static-data-cache';
 import {
   adaptMatchHistory,
   matchHistoryGameSchema,
   matchHistoryResponseSchema
 } from '../lcu/match-adapter';
 
+const PERSONAL_HISTORY_DATA_VERSION = 9;
+
 const currentSummonerSchema = z.object({
   summonerId: z.union([z.string(), z.number()]),
-  displayName: z.string(),
+  displayName: z.string().optional(),
+  gameName: z.string().optional(),
+  tagLine: z.string().optional(),
   profileIconId: z.number().int().nonnegative(),
   puuid: z.string().min(1).optional()
 });
@@ -30,11 +35,6 @@ const rankedStatsSchema = z.object({
     queueType: z.string(), tier: z.string(), division: z.string(), leaguePoints: z.number().int()
   }))
 });
-const assetVersionSchema = z.string().regex(/^\d+\.\d+(?:\.\d+){0,2}$/);
-const itemMetadataSchema = z.array(z.object({
-  id: z.number().int().positive(),
-  iconPath: z.string().min(1)
-}).passthrough());
 
 function unavailable(): Error & { code: 'HISTORY_UNAVAILABLE' } {
   return Object.assign(new Error('Personal history is unavailable'), { code: 'HISTORY_UNAVAILABLE' as const });
@@ -89,7 +89,8 @@ export class PersonalHistoryService {
   constructor(
     private readonly client: LcuClient,
     private readonly cache: Pick<PersonalHistoryCache, 'getFresh' | 'getLatest' | 'put'>,
-    private readonly sgp?: SgpClient
+    private readonly sgp?: SgpClient,
+    private readonly staticData: LcuStaticDataProvider = new LcuStaticDataCache()
   ) {}
 
   async load(target?: PersonalHistoryTarget): Promise<PersonalHistorySnapshot> {
@@ -123,7 +124,11 @@ export class PersonalHistoryService {
           await this.client.get('/lol-summoner/v1/current-summoner', currentSummonerSchema)
         );
         playerId = String(summoner.summonerId);
-        displayName = summoner.displayName;
+        const gameName = summoner.gameName?.trim();
+        const tagLine = summoner.tagLine?.trim();
+        displayName = gameName
+          ? `${gameName}${tagLine ? `#${tagLine}` : ''}`
+          : summoner.displayName?.trim() || '我的战绩';
         profileIconId = summoner.profileIconId;
         puuid = summoner.puuid;
       }
@@ -136,7 +141,7 @@ export class PersonalHistoryService {
             match.enemyChampionIds !== undefined &&
             match.allyChampionIds.length + match.enemyChampionIds.length > 1);
         if (
-          fresh?.historyDataVersion === 5 &&
+          fresh?.historyDataVersion === PERSONAL_HISTORY_DATA_VERSION &&
           fresh.itemIconPaths !== undefined &&
           supportsRichMatchRows
         ) return fresh;
@@ -156,13 +161,26 @@ export class PersonalHistoryService {
         .sort((left, right) => right.gameCreation - left.gameCreation)
         .slice(0, 20);
       const enrichedGames = await mapLimit(listedGames, 4, async (game) => {
-        if (game.participants.length > 1 && (game.participantIdentities?.length ?? 0) > 1) return game;
+        const hasCompleteTeamMetrics = game.participants.length > 1 && game.participants.every((participant) =>
+          participant.stats.totalDamageDealtToChampions !== undefined &&
+          participant.stats.totalDamageTaken !== undefined &&
+          participant.stats.goldEarned !== undefined
+        );
+        if (
+          game.participants.length > 1 &&
+          (game.participantIdentities?.length ?? 0) > 1 &&
+          hasCompleteTeamMetrics
+        ) return game;
         try {
           const detailedGame = await this.client.get(
             `/lol-match-history/v1/games/${encodeURIComponent(String(game.gameId))}`,
             matchHistoryGameSchema
           );
-          const localParticipantId = game.participants[0]?.participantId;
+          const targetIdentity = detailedGame.participantIdentities?.find((identity) =>
+            (puuid !== undefined && identity.player.puuid === puuid) ||
+            (identity.player.summonerId !== undefined && String(identity.player.summonerId) === playerId)
+          );
+          const localParticipantId = targetIdentity?.participantId ?? game.participants[0]?.participantId;
           const localIndex = localParticipantId === undefined
             ? -1
             : detailedGame.participants.findIndex(
@@ -186,8 +204,8 @@ export class PersonalHistoryService {
         : this.client.get(`/lol-ranked/v1/ranked-stats/${encodeURIComponent(playerId)}`, rankedStatsSchema);
       const [rankResult, patchResult, itemsResult] = await Promise.allSettled([
         rankRequest,
-        this.client.get('/lol-patch/v1/game-version', assetVersionSchema),
-        this.client.get('/lol-game-data/assets/v1/items.json', itemMetadataSchema)
+        this.staticData.getAssetVersion(this.client),
+        this.staticData.getItemIconPaths(this.client)
       ]);
       let rank: string | undefined;
       if (rankResult.status === 'fulfilled') {
@@ -203,12 +221,8 @@ export class PersonalHistoryService {
       const usedItemIds = new Set(history.flatMap((match) => match.itemIds ?? []));
       const itemIconPaths = Object.fromEntries(
         itemsResult.status === 'fulfilled'
-          ? itemsResult.value
-            .filter((item) =>
-              usedItemIds.has(item.id)
-              && item.iconPath.startsWith('/lol-game-data/assets/')
-              && !item.iconPath.includes('..'))
-            .map((item) => [String(item.id), item.iconPath])
+          ? Object.entries(itemsResult.value)
+            .filter(([itemId]) => usedItemIds.has(Number(itemId)))
           : []
       );
       const snapshot = personalHistorySchema.parse({
@@ -225,7 +239,7 @@ export class PersonalHistoryService {
         favoriteChampions: favoriteChampions(history),
         ...(patchResult.status === 'fulfilled' ? { assetVersion: patchResult.value } : {}),
         itemIconPaths,
-        historyDataVersion: 5,
+        historyDataVersion: PERSONAL_HISTORY_DATA_VERSION,
         cached: false,
         updatedAt: Date.now()
       });

@@ -22,6 +22,20 @@ function liveErrorReason(error: unknown): LiveMatchErrorReason {
   return 'data-unavailable';
 }
 
+function LiveStateNotice({
+  kind,
+  title,
+  detail,
+  alert = false
+}: {
+  kind: 'waiting' | 'loading' | 'paused' | 'error';
+  title: string;
+  detail: string;
+  alert?: boolean;
+}) {
+  return <div role={alert ? 'alert' : 'status'} className={`live-match-page__notice live-match-page__notice--${kind}`}><span className="live-match-page__notice-icon" aria-hidden="true"><i /></span><div><strong>{title}</strong><p>{detail}</p></div></div>;
+}
+
 export default function App({ initialTab = 'history' }: { initialTab?: AppTab } = {}) {
   const [page, setPage] = useState<AppTab>(initialTab);
   const [history, setHistory] = useState<PersonalHistorySnapshot>();
@@ -44,6 +58,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   const liveViewRef = useRef(liveView);
   const settingsRef = useRef(settings);
   const currentGameIdRef = useRef<string | undefined>(undefined);
+  const loadedGameIdRef = useRef<string | undefined>(undefined);
   const dispatchLive = useCallback((action: LiveMatchAction): void => {
     liveViewRef.current = liveMatchReducer(liveViewRef.current, action);
     dispatchLiveView(action);
@@ -96,6 +111,15 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
 
   useEffect(() => {
     if (page !== 'live') return;
+    if (
+      liveViewRef.current.match &&
+      loadedGameIdRef.current !== undefined &&
+      loadedGameIdRef.current === currentGameIdRef.current
+    ) return;
+    if (
+      liveViewRef.current.status === 'paused' &&
+      (liveViewRef.current.phase === 'GameStart' || liveViewRef.current.phase === 'InProgress')
+    ) return;
     let active = true;
     const api = window.lolViewer;
     if (!api) { dispatchLive({ type: 'request-failed', reason: 'client-unavailable' }); return; }
@@ -107,6 +131,10 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     });
     void api.getLiveMatch('all', currentGeneration).then((next) => {
       if (!active || currentGeneration !== generation.current) return;
+      if (next.gameId) {
+        loadedGameIdRef.current = next.gameId;
+        currentGameIdRef.current = next.gameId;
+      }
       dispatchLive({ type: 'request-succeeded', match: next });
     }).catch((error: unknown) => {
       if (active && currentGeneration === generation.current) dispatchLive({ type: 'request-failed', reason: liveErrorReason(error) });
@@ -146,13 +174,29 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
         if (isActive && identity.gameId !== undefined) currentGameIdRef.current = identity.gameId;
 
         if (pageRef.current === 'live') {
-          if ((gameIdChanged || enteredChampionSelect) && liveViewRef.current.match && !liveViewRef.current.requesting) {
+          if (gameIdChanged || enteredChampionSelect) {
             generation.current += 1;
+            loadedGameIdRef.current = undefined;
+            if (liveViewRef.current.requesting) {
+              void Promise.resolve(api.cancelLiveMatch?.()).catch(() => undefined);
+            }
             dispatchLive({ type: 'new-match-detected', phase });
             setRetryNonce((value) => value + 1);
+          } else if (
+            liveViewRef.current.requesting &&
+            (phase === 'GameStart' || phase === 'InProgress')
+          ) {
+            generation.current += 1;
+            void Promise.resolve(api.cancelLiveMatch?.()).catch(() => undefined);
+            dispatchLive({ type: 'enrichment-paused', phase });
           } else {
             dispatchLive({ type: 'phase-observed', phase, active: isActive });
-            if (isActive && !liveViewRef.current.match && !liveViewRef.current.requesting) {
+            if (
+              isActive &&
+              !liveViewRef.current.match &&
+              !liveViewRef.current.requesting &&
+              liveViewRef.current.status !== 'paused'
+            ) {
               setRetryNonce((value) => value + 1);
             }
           }
@@ -276,9 +320,11 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     'data-unavailable': '对战数据暂时无法读取，正在自动重试'
   };
   const liveNotice = liveView.status === 'error'
-      ? <p role="alert" className="live-match-page__notice live-match-page__notice--error">{liveErrorMessages[liveView.errorReason ?? 'data-unavailable']}</p>
+      ? <LiveStateNotice kind="error" alert title={liveErrorMessages[liveView.errorReason ?? 'data-unavailable']} detail={liveView.errorReason === 'client-unavailable' ? '启动客户端后会自动重新连接，无需手动刷新。' : 'LOL Viewer 会在后台低频重试，已有数据不会被清空。'} />
+      : liveView.status === 'paused'
+        ? <LiveStateNotice kind="paused" title="游戏已经开始，已停止后台补全战绩，避免影响游戏性能" detail="已读取的玩家数据会继续保留，下一局将自动恢复加载。" />
       : !liveView.match && liveView.progress.length === 0 && (liveView.status === 'waiting' || liveView.status === 'new-match-loading')
-        ? <p role="status" className="live-match-page__notice">{liveView.status === 'new-match-loading' ? '检测到新对局，正在加载阵容' : '等待进入英雄选择或游戏'}</p>
+        ? <LiveStateNotice kind={liveView.status === 'new-match-loading' ? 'loading' : 'waiting'} title={liveView.status === 'new-match-loading' ? '检测到新对局，正在加载阵容' : '等待进入英雄选择或游戏'} detail={liveView.status === 'new-match-loading' ? '正在识别双方玩家与英雄选择。' : '进入英雄选择后，这里会自动展示双方阵容。'} />
         : null;
 
   const content = <>

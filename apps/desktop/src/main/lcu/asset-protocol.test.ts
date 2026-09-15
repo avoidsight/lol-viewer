@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createLcuAssetHandler, lcuAssetPath } from './asset-protocol';
+import { createLcuAssetHandler, fixtureAssetResponse, lcuAssetPath } from './asset-protocol';
 
 const temporaryDirectories: string[] = [];
 afterEach(async () => {
@@ -30,6 +30,17 @@ describe('lcuAssetPath', () => {
     expect(lcuAssetPath('lol-asset://spell-icons/summoner_flash.png')).toBe('/lol-game-data/assets/DATA/Spells/Icons2D/summoner_flash.png');
     expect(lcuAssetPath('lol-asset://game-data/%2Flol-game-data%2Fassets%2FASSETS%2FItems%2FIcons2D%2F3071.png')).toBe('/lol-game-data/assets/ASSETS/Items/Icons2D/3071.png');
     expect(lcuAssetPath('lol-asset://game-data/%2Flol-game-data%2Fassets%2F..%2Fsecrets.txt')).toBeNull();
+  });
+});
+
+describe('fixtureAssetResponse', () => {
+  it('serves uncached SVG artwork only for valid local asset URLs', async () => {
+    const response = fixtureAssetResponse('lol-asset://champion-icons/99.png');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('image/svg+xml');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.text()).toContain('>99</text>');
+    expect(fixtureAssetResponse('lol-asset://champion-icons/not-an-id.png').status).toBe(404);
   });
 });
 

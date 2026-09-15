@@ -3,6 +3,15 @@ import fixture from '../../../tests/fixtures/match-history.json';
 import { adaptMatchHistory, describeQueue } from './match-adapter';
 
 describe('adaptMatchHistory', () => {
+  it('only derives participation from a complete team and preserves remake flags', () => {
+    const base = structuredClone(fixture.games[0]);
+    const participants = Array.from({ length: 5 }, (_, i) => ({ ...base.participants[0], teamId: 100, participantId: i + 1, stats: { ...base.participants[0].stats, kills: 4, assists: 6, gameEndedInEarlySurrender: true } }));
+    const adapt = (roster: typeof participants) => adaptMatchHistory({ games: [{ ...base, participants: roster }] }, { scope: 'all', limit: 10 })[0];
+    expect(adapt(participants)).toMatchObject({ killParticipation: .5, remake: true });
+    expect(adapt(participants.slice(0, 4)).killParticipation).toBeUndefined();
+    expect(adapt(participants.map(p => ({ ...p, stats: { ...p.stats, kills: 0, assists: 0 } }))).killParticipation).toBeUndefined();
+  });
+
   it('keeps the newest ten solo ranked games and maps KDA', () => {
     const result = adaptMatchHistory(fixture, { scope: 'ranked-solo', limit: 10 });
     expect(result).toHaveLength(10);
@@ -26,6 +35,11 @@ describe('adaptMatchHistory', () => {
 
   it('returns the actual sample when fewer than ten matches exist', () => {
     expect(adaptMatchHistory({ games: fixture.games.slice(0, 3) }, { scope: 'all', limit: 10 })).toHaveLength(3);
+  });
+
+  it('does not claim a full-game high when only one participant is available', () => {
+    const result = adaptMatchHistory({ games: fixture.games.slice(0, 1) }, { scope: 'all', limit: 10 })[0];
+    expect(result.achievements).toBeUndefined();
   });
 
   it('returns twenty all-mode matches when requested', () => {
@@ -59,9 +73,12 @@ describe('adaptMatchHistory', () => {
       item3: 6333,
       item4: 0,
       item5: 0,
-      item6: 3078
+      item6: 3078,
+      doubleKills: 2,
+      tripleKills: 1,
+      largestMultiKill: 3
     });
-    Object.assign(local, { teamId: 100, spell1Id: 4, spell2Id: 12 });
+    Object.assign(local, { teamId: 100, spell1Id: 4, spell2Id: 12, mvp: true });
     base.participants = [
       local,
       ...Array.from({ length: 9 }, (_, index) => ({
@@ -91,12 +108,17 @@ describe('adaptMatchHistory', () => {
       totalDamageTaken: 28_100,
       itemIds: [3071, 3053, 6333],
       summonerSpellIds: [4, 12],
+      mvp: true,
+      multiKill: 3,
       allyChampionIds: [local.championId, 2, 3, 4, 5],
       enemyChampionIds: [6, 7, 8, 9, 10],
       achievements: [
         { type: 'MOST_KILLS', value: 12 },
         { type: 'MOST_ASSISTS', value: 18 },
-        { type: 'MOST_DAMAGE', value: 31_500 }
+        { type: 'MOST_DEATHS', value: 6 },
+        { type: 'MOST_DAMAGE', value: 31_500 },
+        { type: 'MOST_GOLD', value: 14_250 },
+        { type: 'MOST_CS', value: 150 }
       ]
     });
     expect(result.teamDamageShare).toBeCloseTo(31_500 / 123_000);

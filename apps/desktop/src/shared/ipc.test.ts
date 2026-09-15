@@ -25,14 +25,22 @@ describe('personalHistorySchema', () => {
       playerId: '7', displayName: 'Player', profileIconId: 29,
       matches: [{
         matchId: '1', queueId: 420, endedAt: 1, durationSeconds: 1200,
-        championId: 1, win: true, kills: 12, deaths: 4, assists: 18,
+        championId: 1, win: true, kills: 12, deaths: 4, assists: 18, mvp: true, multiKill: 3,
         itemIds: [3071, 3053], goldEarned: 14_250,
         summonerSpellIds: [4, 12],
         allyChampionIds: [1, 2, 3, 4, 5],
         enemyChampionIds: [6, 7, 8, 9, 10],
         totalDamageDealtToChampions: 31_500, totalDamageTaken: 28_100,
         teamDamageShare: 0.26, teamDamageTakenShare: 0.23, teamGoldShare: 0.26,
-        achievements: [{ type: 'MOST_KILLS', value: 12 }]
+        achievements: [
+          { type: 'MOST_KILLS', value: 12 },
+          { type: 'MOST_ASSISTS', value: 18 },
+          { type: 'MOST_DEATHS', value: 9 },
+          { type: 'MOST_DAMAGE', value: 31_500 },
+          { type: 'MOST_DAMAGE_TAKEN', value: 28_100 },
+          { type: 'MOST_GOLD', value: 14_250 },
+          { type: 'MOST_CS', value: 226 }
+        ]
       }],
       sampleSize: 1, wins: 1, losses: 0, winRate: 1, averageKda: 7.5,
       favoriteChampions: [{

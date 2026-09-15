@@ -5,6 +5,7 @@ import { formatRank } from '../../shared/rank';
 import type { LcuClient, LcuError } from '../lcu/http-client';
 import { adaptMatchHistory, describeQueue } from '../lcu/match-adapter';
 import type { SgpClient } from '../sgp/sgp-client';
+import { LcuStaticDataCache, type LcuStaticDataProvider } from '../lcu/static-data-cache';
 
 const participantSchema = z.object({
   summonerId: z.union([z.string(), z.number()]),
@@ -29,6 +30,7 @@ const championSelectionSchema = z.object({
 const sessionSchema = z.object({
   phase: z.string().optional(),
   gameData: z.object({
+    gameId: z.union([z.string(), z.number()]).optional(),
     teamOne: gameflowTeamSchema,
     teamTwo: gameflowTeamSchema,
     queue: z.object({ id: z.number().int().nonnegative() }).optional(),
@@ -67,7 +69,6 @@ const summonerIdentitySchema = z.object({
 });
 
 const matchHistorySchema = z.object({ games: z.array(z.unknown()) });
-const assetVersionSchema = z.string().regex(/^\d+\.\d+(?:\.\d+){0,2}$/);
 const retryDelays = [250, 750] as const;
 const lanes = new Set<Lane>(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'UNKNOWN']);
 const standardPositions = new Set(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']);
@@ -76,6 +77,7 @@ type CurrentSummoner = z.infer<typeof currentSummonerSchema>;
 
 interface LoadedRoster {
   participants: Participant[];
+  gameId?: string;
   local?: Participant;
   localTeamId: number | null;
   queueId: number;
@@ -89,6 +91,7 @@ export interface MatchServiceOptions {
   sleep?: (milliseconds: number) => Promise<void>;
   cache?: MatchSnapshotCache;
   sgp?: SgpClient;
+  staticData?: LcuStaticDataProvider;
 }
 
 export interface MatchSnapshotCache {
@@ -147,11 +150,13 @@ export class MatchService {
   private readonly sleep: (milliseconds: number) => Promise<void>;
   private readonly cache: MatchSnapshotCache | undefined;
   private readonly sgp: SgpClient | undefined;
+  private readonly staticData: LcuStaticDataProvider;
 
   constructor(private readonly client: LcuClient, options: MatchServiceOptions = {}) {
     this.sleep = options.sleep ?? ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
     this.cache = options.cache;
     this.sgp = options.sgp;
+    this.staticData = options.staticData ?? new LcuStaticDataCache();
   }
 
   async loadLiveRoster(signal?: AbortSignal): Promise<LiveRoster> {
@@ -168,6 +173,7 @@ export class MatchService {
           championId: participant.championId
         };
       }),
+      ...(roster.gameId ? { gameId: roster.gameId } : {}),
       localTeamId: roster.localTeamId,
       queueId: roster.queueId,
       modeName: roster.modeName,
@@ -190,13 +196,13 @@ export class MatchService {
     checkCancelled(signal);
     let assetVersion: string | undefined;
     try {
-      assetVersion = assetVersionSchema.parse(
-        await this.client.get('/lol-patch/v1/game-version', assetVersionSchema)
-      );
+      assetVersion = await this.staticData.getAssetVersion(this.client);
     } catch {
       checkCancelled(signal);
       assetVersion = undefined;
     }
+    checkCancelled(signal);
+    const itemIconPaths = await this.staticData.getItemIconPaths(this.client).catch(() => ({} as Record<string, string>));
     checkCancelled(signal);
     const players = await mapLimit(participants, 4, async (participant) => {
       checkCancelled(signal);
@@ -243,19 +249,21 @@ export class MatchService {
       checkCancelled(signal);
       let matches: MatchSummary[] | null = cached?.matches ?? null;
       let historyErrorCode: PlayerDataErrorCode | undefined;
-      let rank: string | undefined;
-      try {
-        const ranked = rankedStatsSchema.parse(playerPuuid && this.sgp
-          ? await this.sgp.getRankedStats(playerPuuid)
-          : await this.client.get(
-            `/lol-ranked/v1/ranked-stats/${encodeURIComponent(lookupId)}`, rankedStatsSchema
-          ));
-        const rankQueueType = queueId === 440 ? 'RANKED_FLEX_SR' : 'RANKED_SOLO_5x5';
-        const selectedRank = ranked.queues.find((queue) => queue.queueType === rankQueueType);
-        if (selectedRank) rank = formatRank(selectedRank.tier, selectedRank.division, selectedRank.leaguePoints);
-      } catch {
-        checkCancelled(signal);
-        rank = undefined;
+      let rank = cached?.rank;
+      if (!cached) {
+        try {
+          const ranked = rankedStatsSchema.parse(playerPuuid && this.sgp
+            ? await this.sgp.getRankedStats(playerPuuid)
+            : await this.client.get(
+              `/lol-ranked/v1/ranked-stats/${encodeURIComponent(lookupId)}`, rankedStatsSchema
+            ));
+          const rankQueueType = queueId === 440 ? 'RANKED_FLEX_SR' : 'RANKED_SOLO_5x5';
+          const selectedRank = ranked.queues.find((queue) => queue.queueType === rankQueueType);
+          if (selectedRank) rank = formatRank(selectedRank.tier, selectedRank.division, selectedRank.leaguePoints);
+        } catch {
+          checkCancelled(signal);
+          rank = undefined;
+        }
       }
       checkCancelled(signal);
       if (!cached) {
@@ -291,6 +299,9 @@ export class MatchService {
       const currentChampionWins = championMatches.filter((match) => match.win).length;
       const player: PlayerSnapshot = {
         ...base,
+        itemIconPaths: Object.fromEntries(recentMatches.flatMap((match) => (match.itemIds ?? [])
+          .filter((id) => itemIconPaths[String(id)])
+          .map((id) => [String(id), itemIconPaths[String(id)]]))),
         ...(rank === undefined ? {} : { rank }),
         matches: recentMatches,
         sampleSize: recentMatches.length,
@@ -321,7 +332,7 @@ export class MatchService {
       return player;
     }, signal);
     checkCancelled(signal);
-    return { players, localTeamId, queueId, modeName, positionOrderReliable };
+    return { players, ...(roster.gameId ? { gameId: roster.gameId } : {}), localTeamId, queueId, modeName, positionOrderReliable };
   }
 
   private async loadRoster(signal?: AbortSignal): Promise<LoadedRoster> {
@@ -401,7 +412,10 @@ export class MatchService {
       ...allParticipants.filter((participant) => participant.teamId !== localTeamId)
     ] : allParticipants;
     checkCancelled(signal);
-    return { participants, ...(local ? { local } : {}), localTeamId, queueId, modeName, positionOrderReliable, ...(currentSummoner ? { currentSummoner } : {}), champSelectFallback };
+    const gameId = gameflowSession.gameData.gameId === undefined
+      ? undefined
+      : String(gameflowSession.gameData.gameId);
+    return { participants, ...(gameId ? { gameId } : {}), ...(local ? { local } : {}), localTeamId, queueId, modeName, positionOrderReliable, ...(currentSummoner ? { currentSummoner } : {}), champSelectFallback };
   }
 
   private async getHistoryWithRetry(playerId: string, useCurrentSummonerRoute = false, signal?: AbortSignal): Promise<unknown> {

@@ -7,7 +7,7 @@ import App from './App';
 
 const history: PersonalHistorySnapshot = { playerId: 'me', displayName: '召唤师', profileIconId: 1, matches: [], sampleSize: 0, wins: 0, losses: 0, winRate: 0, averageKda: 0, favoriteChampions: [], cached: false, updatedAt: 1 };
 const player: PlayerSnapshot = { playerId: 'one', displayName: 'Player One', teamId: 100, isLocalTeam: true, lane: 'TOP', championId: 1, scope: 'all', matches: [], sampleSize: 0, wins: 0, losses: 0, winRate: 0, currentChampionGames: 0, currentChampionWins: 0, currentChampionWinRate: 0, status: 'ready', updatedAt: 1 };
-const match: LiveMatch = { players: [player], queueId: 450, modeName: '极地大乱斗', positionOrderReliable: false };
+const match: LiveMatch = { players: [player], gameId: 'game-1', queueId: 450, modeName: '极地大乱斗', positionOrderReliable: false };
 
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (reason?: unknown) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; }
 
@@ -206,9 +206,8 @@ describe('App tab lifecycle', () => {
     expect(screen.getByText('Player One')).toBeVisible();
   });
 
-  it('keeps the previous match visible while a tab re-entry refresh is pending', async () => {
-    const refresh = deferred<LiveMatch>();
-    const { api } = install(vi.fn().mockResolvedValueOnce(match).mockImplementationOnce(() => refresh.promise));
+  it('reuses the loaded match when re-entering the live tab during the same game', async () => {
+    const { api } = install();
     render(<App initialTab="live" />);
     expect(await screen.findByText('Player One')).toBeVisible();
 
@@ -216,7 +215,8 @@ describe('App tab lifecycle', () => {
     fireEvent.click(tabs[0]);
     fireEvent.click(tabs[1]);
 
-    await waitFor(() => expect(api.getLiveMatch).toHaveBeenCalledTimes(2));
+    await act(async () => { await Promise.resolve(); });
+    expect(api.getLiveMatch).toHaveBeenCalledOnce();
     expect(screen.getByText('Player One')).toBeVisible();
   });
   it('shows retryable error only when the request rejects', async () => {
@@ -260,11 +260,12 @@ describe('App tab lifecycle', () => {
     expect(toggle).toBeChecked();
   });
 
-  it('does not cancel a slow live request and slows retries after the game starts', async () => {
+  it('does not cancel a slow live request during champion select and retries after it fails', async () => {
     vi.useFakeTimers();
     try {
       const first = deferred<LiveMatch>();
       const { api } = install(vi.fn().mockImplementationOnce(() => first.promise).mockResolvedValueOnce(match));
+      vi.mocked(api.getGameflowSessionIdentity).mockResolvedValue({ phase: 'ChampSelect', gameId: 'game-1' });
       render(<App initialTab="live" />);
       await act(async () => { await Promise.resolve(); });
       expect(api.getLiveMatch).toHaveBeenCalledOnce();
@@ -274,11 +275,34 @@ describe('App tab lifecycle', () => {
       expect(api.cancelLiveMatch).not.toHaveBeenCalled();
 
       await act(async () => first.reject(new Error('not in game')));
-      await act(async () => { vi.advanceTimersByTime(14_999); await Promise.resolve(); });
+      await act(async () => { vi.advanceTimersByTime(2_999); await Promise.resolve(); });
       expect(api.getLiveMatch).toHaveBeenCalledOnce();
       await act(async () => { vi.advanceTimersByTime(1); await Promise.resolve(); });
       expect(api.getLiveMatch).toHaveBeenCalledTimes(2);
       expect(api.cancelLiveMatch).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops unfinished player enrichment when the game starts and keeps completed players', async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = deferred<LiveMatch>();
+      const { api, emit } = install(vi.fn(() => pending.promise));
+      vi.mocked(api.getGameflowSessionIdentity).mockResolvedValue({ phase: 'GameStart', gameId: 'game-1' });
+      render(<App initialTab="live" />);
+      await act(async () => { await Promise.resolve(); });
+      const requestGeneration = vi.mocked(api.getLiveMatch).mock.calls[0][1];
+      act(() => emit(player, requestGeneration));
+
+      await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
+
+      expect(api.cancelLiveMatch).toHaveBeenCalledOnce();
+      expect(screen.getByText('Player One')).toBeVisible();
+      expect(screen.getByText('游戏已经开始，已停止后台补全战绩，避免影响游戏性能')).toBeVisible();
+      await act(async () => { vi.advanceTimersByTime(30_000); await Promise.resolve(); });
+      expect(api.getLiveMatch).toHaveBeenCalledOnce();
     } finally {
       vi.useRealTimers();
     }

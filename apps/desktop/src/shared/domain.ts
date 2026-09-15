@@ -15,8 +15,11 @@ export type PlayerDataErrorCode =
 export type MatchAchievementType =
   | 'MOST_KILLS'
   | 'MOST_ASSISTS'
+  | 'MOST_DEATHS'
   | 'MOST_DAMAGE'
-  | 'MOST_DAMAGE_TAKEN';
+  | 'MOST_DAMAGE_TAKEN'
+  | 'MOST_GOLD'
+  | 'MOST_CS';
 
 export interface MatchAchievement {
   type: MatchAchievementType;
@@ -41,6 +44,10 @@ export interface MatchSummary {
   kills: number;
   deaths: number;
   assists: number;
+  killParticipation?: number;
+  remake?: boolean;
+  mvp?: boolean;
+  multiKill?: 2 | 3 | 4 | 5;
   cs?: number;
   lane?: Lane;
   itemIds?: number[];
@@ -88,6 +95,7 @@ export interface PersonalHistorySnapshot {
 }
 
 export interface PlayerSnapshot {
+  itemIconPaths?: Record<string, string>;
   playerId: string;
   displayName: string;
   teamId: number;

@@ -574,6 +574,29 @@ describe('MatchService', () => {
     expect(cache.put.mock.calls.every(([player]) => player.status === 'ready' && player.scope === 'all')).toBe(true);
   });
 
+  it('reuses the cached rank and skips its ranked lookup while the player cache is fresh', async () => {
+    const cached: PlayerSnapshot = {
+      playerId: '1', displayName: 'Cached', teamId: 100, lane: 'TOP', championId: 1,
+      scope: 'all', rank: '缓存段位', matches: [], sampleSize: 0, wins: 0, losses: 0, winRate: 0,
+      currentChampionGames: 0, currentChampionWins: 0, currentChampionWinRate: 0,
+      status: 'ready', updatedAt: 1
+    };
+    const cache = { get: vi.fn((id: string) => id === '1' ? cached : null), put: vi.fn() };
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') return {
+        gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queueId: 420 }
+      };
+      if (path.includes('/ranked-stats/')) return { queues: [] };
+      return history;
+    });
+
+    const result = await new MatchService({ get } as LcuClient, { cache }).loadLiveMatch('all', vi.fn());
+
+    expect(result.players[0].rank).toBe('缓存段位');
+    expect(get.mock.calls.some(([path]) => path === '/lol-ranked/v1/ranked-stats/1')).toBe(false);
+    expect(get.mock.calls.filter(([path]) => String(path).includes('/ranked-stats/'))).toHaveLength(9);
+  });
+
   it('keeps twenty recent matches so the renderer can switch between all and ranked history', async () => {
     const twentyGameHistory = {
       games: Array.from({ length: 20 }, (_, index) => ({

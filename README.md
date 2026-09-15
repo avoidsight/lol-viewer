@@ -23,7 +23,7 @@ docs           设计文档
 - Node.js >= 22（推荐 24）
 - pnpm 10.13.1（仓库通过 packageManager 字段固定版本）
 - 英雄联盟客户端已登录（对战信息依赖本机 LCU 端口；未进入游戏或英雄选择时无实时数据）
-- 首次安装依赖时允许构建原生模块 better-sqlite3（已在 pnpm-workspace.yaml 中配置 allowBuilds）
+- 首次安装依赖时允许构建原生模块 better-sqlite3（已在 pnpm-workspace.yaml 中配置 onlyBuiltDependencies）
 
 ## 安装与运行
 
@@ -44,17 +44,34 @@ pnpm verify
 
 ## 打包
 
-在 `apps/desktop` 下执行：
+### Windows 一键打包（推荐）
+
+下载或解压完整源码后，直接双击项目根目录的 `package-windows.bat`。脚本会打开独立的控制台窗口，持续显示执行进度，并自动：
+
+1. 检查 Node.js 22+；未安装时尝试通过 Windows `winget` 安装 Node.js LTS
+2. 下载并使用项目固定的 pnpm 10.13.1
+3. 安装锁定版本的依赖并构建 Windows x64 NSIS 安装包
+4. 将安装包及 SHA256 校验文件复制到根目录的 `release` 文件夹
+
+打包成功或失败后控制台都会保留，查看结果后按任意键退出。
+
+首次打包需要联网。若电脑没有 `winget`，请先手动安装 [Node.js LTS](https://nodejs.org/)。Electron 与 electron-builder 工具链的二进制下载已通过根目录 .npmrc 配置为 npmmirror 国内镜像，国内网络无需手动配置代理。
+
+也可以在 PowerShell 中运行 `scripts/package-windows.ps1`，效果相同。
+
+### 命令行打包
+
+在项目根目录执行：
 
 ```bash
 # NSIS 安装包
 pnpm package:win
 
 # 免安装目录（win-unpacked）
-pnpm exec electron-builder --win dir --x64 --publish never
+pnpm --dir apps/desktop exec electron-builder --win dir --x64 --publish never
 ```
 
-产物输出到 `apps/desktop/dist`。
+命令行打包产物输出到 `apps/desktop/dist`；一键脚本还会把最终安装包复制到根目录的 `release`。
 
 ## 开发约定
 

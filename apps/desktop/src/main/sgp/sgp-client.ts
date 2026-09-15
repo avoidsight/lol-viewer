@@ -7,6 +7,22 @@ const sgpParticipantSchema = z.object({
   puuid: z.string(), championId: z.number().int().nonnegative(),
   kills: z.number().int().nonnegative(), deaths: z.number().int().nonnegative(),
   assists: z.number().int().nonnegative(), win: z.boolean(), teamId: z.number().int().optional(),
+  mvp: z.boolean().optional(), isMvp: z.boolean().optional(),
+  largestMultiKill: z.number().int().nonnegative().optional(),
+  doubleKills: z.number().int().nonnegative().optional(), tripleKills: z.number().int().nonnegative().optional(),
+  quadraKills: z.number().int().nonnegative().optional(), pentaKills: z.number().int().nonnegative().optional(),
+  summoner1Id: z.number().int().positive().optional(), summoner2Id: z.number().int().positive().optional(),
+  spell1Id: z.number().int().positive().optional(), spell2Id: z.number().int().positive().optional(),
+  totalMinionsKilled: z.number().int().nonnegative().optional(),
+  neutralMinionsKilled: z.number().int().nonnegative().optional(),
+  goldEarned: z.number().int().nonnegative().optional(),
+  totalDamageDealtToChampions: z.number().int().nonnegative().optional(),
+  totalDamageTaken: z.number().int().nonnegative().optional(),
+  item0: z.number().int().nonnegative().optional(), item1: z.number().int().nonnegative().optional(),
+  item2: z.number().int().nonnegative().optional(), item3: z.number().int().nonnegative().optional(),
+  item4: z.number().int().nonnegative().optional(), item5: z.number().int().nonnegative().optional(),
+  item6: z.number().int().nonnegative().optional(),
+  teamPosition: z.string().optional(), individualPosition: z.string().optional(), lane: z.string().optional(),
   riotIdGameName: z.string().optional(), riotIdTagline: z.string().optional(),
   summonerName: z.string().optional(), profileIconId: z.number().int().nonnegative().optional()
 });
@@ -67,12 +83,41 @@ export function createSgpClient(lcu: LcuClient, rsoPlatformId: string, request: 
             participantId: index + 1,
             championId: participant.championId,
             ...(participant.teamId === undefined ? {} : { teamId: participant.teamId }),
+            ...((participant.mvp ?? participant.isMvp) === undefined ? {} : { mvp: participant.mvp ?? participant.isMvp }),
+            ...((participant.summoner1Id ?? participant.spell1Id) === undefined
+              ? {}
+              : { spell1Id: participant.summoner1Id ?? participant.spell1Id }),
+            ...((participant.summoner2Id ?? participant.spell2Id) === undefined
+              ? {}
+              : { spell2Id: participant.summoner2Id ?? participant.spell2Id }),
             stats: {
               win: participant.win,
               kills: participant.kills,
               deaths: participant.deaths,
-              assists: participant.assists
-            }
+              assists: participant.assists,
+              ...(participant.largestMultiKill === undefined ? {} : { largestMultiKill: participant.largestMultiKill }),
+              ...(participant.doubleKills === undefined ? {} : { doubleKills: participant.doubleKills }),
+              ...(participant.tripleKills === undefined ? {} : { tripleKills: participant.tripleKills }),
+              ...(participant.quadraKills === undefined ? {} : { quadraKills: participant.quadraKills }),
+              ...(participant.pentaKills === undefined ? {} : { pentaKills: participant.pentaKills }),
+              ...(participant.totalMinionsKilled === undefined ? {} : { totalMinionsKilled: participant.totalMinionsKilled }),
+              ...(participant.neutralMinionsKilled === undefined ? {} : { neutralMinionsKilled: participant.neutralMinionsKilled }),
+              ...(participant.goldEarned === undefined ? {} : { goldEarned: participant.goldEarned }),
+              ...(participant.totalDamageDealtToChampions === undefined
+                ? {}
+                : { totalDamageDealtToChampions: participant.totalDamageDealtToChampions }),
+              ...(participant.totalDamageTaken === undefined ? {} : { totalDamageTaken: participant.totalDamageTaken }),
+              ...Object.fromEntries(
+                ([0, 1, 2, 3, 4, 5, 6] as const).flatMap((slot) => {
+                  const key = `item${slot}` as const;
+                  const itemId = participant[key];
+                  return itemId === undefined ? [] : [[key, itemId]];
+                })
+              )
+            },
+            ...((participant.teamPosition ?? participant.individualPosition ?? participant.lane) === undefined
+              ? {}
+              : { timeline: { lane: participant.teamPosition ?? participant.individualPosition ?? participant.lane } })
           })),
           participantIdentities: ordered.map((participant, index) => ({
             participantId: index + 1,

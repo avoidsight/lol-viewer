@@ -19,4 +19,32 @@ describe('desktop packaging metadata', () => {
     expect(desktop.build?.win?.signAndEditExecutable).toBe(true);
     expect(desktop.build?.win?.signExecutable).toBe(false);
   });
+
+  it('provides a Windows one-click packaging entry point', () => {
+    const workspaceRoot = resolve('../..');
+    const workspace = JSON.parse(readFileSync(resolve(workspaceRoot, 'package.json'), 'utf8')) as {
+      scripts?: Record<string, string>;
+    };
+    const launcher = readFileSync(resolve(workspaceRoot, 'package-windows.bat'), 'utf8');
+    const packageScript = readFileSync(resolve(workspaceRoot, 'scripts/package-windows.ps1'), 'utf8');
+
+    expect(workspace.scripts?.['package:win']).toBe('pnpm --dir apps/desktop package:win');
+    expect(launcher).toContain('scripts\\package-windows.ps1');
+    expect(launcher).toContain('start "LOL Viewer - Windows Packaging" "%ComSpec%"');
+    expect(launcher).toContain('if /I not "%~1"=="--console"');
+    expect(launcher).toContain('chcp 65001');
+    expect(launcher).toContain('pause >nul');
+    expect(packageScript.charCodeAt(0)).toBe(0xfeff);
+    expect(packageScript).toContain('[Console]::OutputEncoding = $Utf8Encoding');
+    expect(packageScript).toContain('"--source", "winget"');
+    expect(packageScript).toContain('$installArguments = $wingetArguments + "--force"');
+    expect(packageScript).toContain('function Get-BestNodeInstallation');
+    expect(packageScript).toContain('Get-Command "node.exe" -All');
+    expect(packageScript).toContain('$version -gt $bestInstallation.Version');
+    expect(packageScript).toContain('$npxPath = Join-Path $nodeInstallation.Directory "npx.cmd"');
+    expect(packageScript).toContain('pnpm@$PnpmVersion');
+    expect(packageScript).toContain('install", "--frozen-lockfile');
+    expect(packageScript).toContain('"apps/desktop", "package:win"');
+    expect(packageScript).toContain('$ReleaseDirectory');
+  });
 });

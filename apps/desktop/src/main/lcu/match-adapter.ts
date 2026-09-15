@@ -11,11 +11,21 @@ const participantSchema = z.object({
   teamId: z.number().int().optional(),
   spell1Id: z.number().int().positive().optional(),
   spell2Id: z.number().int().positive().optional(),
+  mvp: z.boolean().optional(),
+  isMvp: z.boolean().optional(),
   stats: z.object({
     win: z.boolean(),
     kills: z.number().int().nonnegative(),
     deaths: z.number().int().nonnegative(),
     assists: z.number().int().nonnegative(),
+    gameEndedInEarlySurrender: z.boolean().optional(),
+    mvp: z.boolean().optional(),
+    isMvp: z.boolean().optional(),
+    largestMultiKill: z.number().int().nonnegative().optional(),
+    doubleKills: z.number().int().nonnegative().optional(),
+    tripleKills: z.number().int().nonnegative().optional(),
+    quadraKills: z.number().int().nonnegative().optional(),
+    pentaKills: z.number().int().nonnegative().optional(),
     totalMinionsKilled: z.number().int().nonnegative().optional(),
     neutralMinionsKilled: z.number().int().nonnegative().optional(),
     goldEarned: z.number().int().nonnegative().optional(),
@@ -89,6 +99,21 @@ function teamShare(
   return total > 0 ? localValue / total : undefined;
 }
 
+function participantCs(participant: z.infer<typeof participantSchema>): number | undefined {
+  const values = [participant.stats.totalMinionsKilled, participant.stats.neutralMinionsKilled];
+  return values.some((value) => value !== undefined)
+    ? values.reduce<number>((total, value) => total + (value ?? 0), 0)
+    : undefined;
+}
+
+function participantMultiKill(stats: z.infer<typeof participantSchema>['stats']): 2 | 3 | 4 | 5 | undefined {
+  if ((stats.pentaKills ?? 0) > 0 || (stats.largestMultiKill ?? 0) >= 5) return 5;
+  if ((stats.quadraKills ?? 0) > 0 || stats.largestMultiKill === 4) return 4;
+  if ((stats.tripleKills ?? 0) > 0 || stats.largestMultiKill === 3) return 3;
+  if ((stats.doubleKills ?? 0) > 0 || stats.largestMultiKill === 2) return 2;
+  return undefined;
+}
+
 function participantSummaries(
   game: z.infer<typeof matchHistoryGameSchema>,
   participants: Array<z.infer<typeof participantSchema>>
@@ -121,10 +146,9 @@ function participantSummaries(
 function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
   const participant = game.participants[0];
   const lane = normalizeLane(participant.timeline?.lane);
-  const csFields = [participant.stats.totalMinionsKilled, participant.stats.neutralMinionsKilled];
-  const cs = csFields.some((value) => value !== undefined)
-    ? csFields.reduce<number>((total, value) => total + (value ?? 0), 0)
-    : undefined;
+  const cs = participantCs(participant);
+  const mvp = participant.mvp ?? participant.isMvp ?? participant.stats.mvp ?? participant.stats.isMvp;
+  const multiKill = participantMultiKill(participant.stats);
   const itemIds = [
     participant.stats.item0, participant.stats.item1, participant.stats.item2,
     participant.stats.item3, participant.stats.item4, participant.stats.item5,
@@ -162,6 +186,10 @@ function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
     participant.stats.totalDamageDealtToChampions,
     teamParticipants.map((entry) => entry.stats.totalDamageDealtToChampions)
   );
+  const teamKills = teamParticipants.reduce((total, entry) => total + entry.stats.kills, 0);
+  const involvement = participant.stats.kills + participant.stats.assists;
+  const killParticipation = teamParticipants.length === 5 && teamKills > 0 && involvement <= teamKills
+    ? involvement / teamKills : undefined;
   const teamDamageTakenShare = teamShare(
     participant.stats.totalDamageTaken,
     teamParticipants.map((entry) => entry.stats.totalDamageTaken)
@@ -186,6 +214,11 @@ function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
       values: game.participants.map((entry) => entry.stats.assists)
     },
     {
+      type: 'MOST_DEATHS',
+      value: participant.stats.deaths,
+      values: game.participants.map((entry) => entry.stats.deaths)
+    },
+    {
       type: 'MOST_DAMAGE',
       value: participant.stats.totalDamageDealtToChampions,
       values: game.participants.map((entry) => entry.stats.totalDamageDealtToChampions)
@@ -194,12 +227,26 @@ function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
       type: 'MOST_DAMAGE_TAKEN',
       value: participant.stats.totalDamageTaken,
       values: game.participants.map((entry) => entry.stats.totalDamageTaken)
+    },
+    {
+      type: 'MOST_GOLD',
+      value: participant.stats.goldEarned,
+      values: game.participants.map((entry) => entry.stats.goldEarned)
+    },
+    {
+      type: 'MOST_CS',
+      value: cs,
+      values: game.participants.map(participantCs)
     }
   ];
   const achievements = achievementMetrics.flatMap<MatchAchievement>(({ type, value, values }) => {
-    if (value === undefined || value <= 0) return [];
-    const comparable = values.filter((entry): entry is number => entry !== undefined);
-    return comparable.length > 0 && value === Math.max(...comparable) ? [{ type, value }] : [];
+    if (
+      value === undefined ||
+      value <= 0 ||
+      game.participants.length <= 1 ||
+      values.some((entry) => entry === undefined)
+    ) return [];
+    return value === Math.max(...values as number[]) ? [{ type, value }] : [];
   });
 
   return {
@@ -212,6 +259,10 @@ function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
     kills: participant.stats.kills,
     deaths: participant.stats.deaths,
     assists: participant.stats.assists,
+    ...(killParticipation === undefined ? {} : { killParticipation }),
+    ...(participant.stats.gameEndedInEarlySurrender === undefined ? {} : { remake: participant.stats.gameEndedInEarlySurrender }),
+    ...(mvp === true ? { mvp: true } : {}),
+    ...(multiKill === undefined ? {} : { multiKill }),
     ...(cs === undefined ? {} : { cs }),
     ...(lane === undefined ? {} : { lane }),
     ...(itemIds.length === 0 ? {} : { itemIds }),

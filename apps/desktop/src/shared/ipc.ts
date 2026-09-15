@@ -18,7 +18,7 @@ export const PERSONAL_HISTORY_GET_CHANNEL = 'history:get-personal' as const;
 
 const laneSchema = z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'UNKNOWN']);
 const matchAchievementSchema = z.object({
-  type: z.enum(['MOST_KILLS', 'MOST_ASSISTS', 'MOST_DAMAGE', 'MOST_DAMAGE_TAKEN']),
+  type: z.enum(['MOST_KILLS', 'MOST_ASSISTS', 'MOST_DEATHS', 'MOST_DAMAGE', 'MOST_DAMAGE_TAKEN', 'MOST_GOLD', 'MOST_CS']),
   value: z.number().nonnegative()
 }).strict();
 const matchParticipantSummarySchema = z.object({
@@ -46,6 +46,8 @@ export const matchSummarySchema = z.object({
   kills: z.number().int().nonnegative(),
   deaths: z.number().int().nonnegative(),
   assists: z.number().int().nonnegative(),
+  mvp: z.boolean().optional(),
+  multiKill: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(5)]).optional(),
   cs: z.number().optional(),
   lane: laneSchema.optional(),
   itemIds: z.array(z.number().int().positive()).max(7).optional(),
@@ -61,9 +63,11 @@ export const matchSummarySchema = z.object({
   totalDamageDealtToChampions: z.number().int().nonnegative().optional(),
   totalDamageTaken: z.number().int().nonnegative().optional(),
   teamDamageShare: z.number().min(0).max(1).optional(),
+  killParticipation: z.number().min(0).max(1).optional(),
+  remake: z.boolean().optional(),
   teamDamageTakenShare: z.number().min(0).max(1).optional(),
   teamGoldShare: z.number().min(0).max(1).optional(),
-  achievements: z.array(matchAchievementSchema).max(4).optional()
+  achievements: z.array(matchAchievementSchema).max(7).optional()
 }).strict();
 
 const favoriteChampionSchema = z.object({
@@ -104,6 +108,7 @@ export const personalHistoryTargetSchema = z.object({
 export type PersonalHistoryTarget = z.infer<typeof personalHistoryTargetSchema>;
 
 export const playerSnapshotSchema: z.ZodType<PlayerSnapshot> = z.object({
+  itemIconPaths: z.record(z.string(), z.string().min(1)).optional(),
   playerId: z.string(),
   displayName: z.string(),
   teamId: z.number().int(),
@@ -129,6 +134,7 @@ export const playerSnapshotSchema: z.ZodType<PlayerSnapshot> = z.object({
 
 export const liveMatchSchema = z.object({
   players: z.array(playerSnapshotSchema).length(10),
+  gameId: z.string().min(1).optional(),
   localTeamId: z.number().int().nullable().optional(),
   queueId: z.number().int().nonnegative(),
   modeName: z.string().min(1),
@@ -144,6 +150,7 @@ export const liveRosterPlayerSchema = z.object({
 }).strict();
 export const liveRosterSchema = z.object({
   players: z.array(liveRosterPlayerSchema).length(10),
+  gameId: z.string().min(1).optional(),
   localTeamId: z.number().int().nullable().optional(),
   queueId: z.number().int().nonnegative(),
   modeName: z.string().min(1),
@@ -195,6 +202,7 @@ export type ChampionDetails = z.infer<typeof championDetailsSchema>;
 
 export interface LiveMatch {
   players: PlayerSnapshot[];
+  gameId?: string;
   localTeamId?: number | null;
   queueId: number;
   modeName: string;
