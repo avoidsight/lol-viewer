@@ -53,8 +53,10 @@ export default function PlayerCard({ player, overview = false, groupedError = fa
           : <span className="player-card__champion player-card__champion--fallback" role="img" aria-label={player.status === 'unavailable' ? '英雄信息暂不可用' : '英雄选择中'}><span className="player-card__champion-static" aria-hidden="true">◇</span></span>}
       <div className={`player-card__identity${form ? ' player-card__identity--rated' : ''}`}>
         {laneIcon && <span className="player-card__lane" aria-label={laneLabel} title={laneLabel}><img src={laneIcon} alt="" aria-hidden="true" /></span>}
+        <div className="player-card__name-row">
         <h3 id={identityId} title={player.displayName}>{player.displayName}</h3>
         {form && <span className={`player-form player-form--${form.tier}`} tabIndex={0} title={form.description} aria-label={`${form.label}：${form.description}`}><svg viewBox="0 0 16 16" aria-hidden="true"><path d={form.tier === 'elite' ? 'M2 5l3 2 3-5 3 5 3-2-2 8H4Z' : form.tier === 'strong' ? 'M9 1 3 9h4l-1 6 7-9H9Z' : form.tier === 'rough' ? 'm3 5 5 5 5-5M3 12h10' : 'm8 2 6 6-6 6-6-6Z'} /></svg>{form.label}</span>}
+        </div>
         <span className="player-card__rank">{localizeRank(player.rank) ?? '段位未知'}</span>
         {player.status === 'ready' && <span className="player-card__recent-record" role="group" aria-label={`近 ${visibleMatches.length} 场，${wins}胜${visibleMatches.length - wins}负`}>
           {visibleMatches.length ? `${wins}胜${visibleMatches.length - wins}负` : '暂无战绩'}
