@@ -36,6 +36,45 @@ function deferred<T>() {
 }
 
 describe('MatchService', () => {
+  it('uses the current Riot ID during champion select even when the roster name is hidden', async () => {
+    const team = participants.map((entry, index) => ({ summonerId: entry.summonerId, championId: entry.championId, cellId: index, gameName: '', playerAlias: '' }));
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') return { phase: 'ChampSelect', gameData: { teamOne: [], teamTwo: [], queueId: 440 } };
+      if (path === '/lol-champ-select/v1/session') return { myTeam: team.slice(0, 5), theirTeam: team.slice(5), localPlayerCellId: 0 };
+      if (path === '/lol-summoner/v1/current-summoner') return { summonerId: '1', puuid: 'local-puuid', displayName: '', gameName: '我的名字', tagLine: '12345' };
+      if (path.startsWith('/lol-summoner/v1/summoners/')) return {};
+      if (path.includes('/ranked-stats/')) return { queues: [] };
+      return history;
+    });
+    const service = new MatchService({ get } as LcuClient);
+    for (const result of [await service.loadLiveRoster(), await service.loadLiveMatch('all', vi.fn()), await service.loadLiveRoster()]) {
+      expect(result.players.find(player => player.playerId === '1')?.displayName).toBe('我的名字#12345');
+    }
+  });
+
+  it.each([
+    [{ displayName: '', gameName: ' 我的名字 ', tagLine: ' 12345 ' }, 'Player 1', '我的名字#12345'],
+    [{ displayName: '   ' }, 'Player 1', 'Player 1'],
+    [{ displayName: '' }, 'Player 1', 'Player 1'],
+    [{ displayName: '' }, '', '我的账号']
+  ])('keeps local identity consistent between roster refresh and loaded history (%j)', async (identity, rosterName, expected) => {
+    const team = participants.map((entry, index) => index === 0 ? { ...entry, summonerName: rosterName } : entry);
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: team.slice(0, 5), teamTwo: team.slice(5), queueId: 440 } };
+      if (path === '/lol-summoner/v1/current-summoner') return { summonerId: '1', puuid: 'local-puuid', ...identity };
+      if (path.startsWith('/lol-summoner/v1/summoners/')) return {};
+      if (path.includes('/ranked-stats/')) return { queues: [] };
+      return history;
+    });
+    const service = new MatchService({ get } as LcuClient);
+    const roster = await service.loadLiveRoster();
+    const loaded = await service.loadLiveMatch('all', vi.fn());
+    const refreshed = await service.loadLiveRoster();
+    for (const result of [roster, loaded, refreshed]) {
+      expect(result.players.find(player => player.playerId === '1')?.displayName).toBe(expected);
+    }
+  });
+
   it('refreshes a champion-select roster without loading rank or match history', async () => {
     const team = (offset: number) => Array.from({ length: 5 }, (_, index) => ({
       cellId: offset + index,

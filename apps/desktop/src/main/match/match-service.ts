@@ -55,7 +55,7 @@ const champSelectSessionSchema = z.object({
   localPlayerCellId: z.number().int().optional()
 });
 
-const currentSummonerSchema = z.object({ summonerId: z.union([z.string(), z.number()]), displayName: z.string().optional(), puuid: z.string().optional() });
+const currentSummonerSchema = z.object({ summonerId: z.union([z.string(), z.number()]), gameName: z.string().optional(), tagLine: z.string().optional(), displayName: z.string().optional(), puuid: z.string().optional() });
 const rankedStatsSchema = z.object({
   queues: z.array(z.object({
     queueType: z.string(), tier: z.string(), division: z.string(), leaguePoints: z.number().int()
@@ -74,6 +74,12 @@ const lanes = new Set<Lane>(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'UN
 const standardPositions = new Set(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']);
 type Participant = z.infer<typeof participantSchema> & { teamId: number };
 type CurrentSummoner = z.infer<typeof currentSummonerSchema>;
+
+function summonerName(identity?: { gameName?: string; tagLine?: string; displayName?: string }): string {
+  const gameName = identity?.gameName?.trim();
+  const tagLine = identity?.tagLine?.trim();
+  return gameName ? `${gameName}${tagLine ? `#${tagLine}` : ''}` : identity?.displayName?.trim() ?? '';
+}
 
 interface LoadedRoster {
   participants: Participant[];
@@ -166,7 +172,7 @@ export class MatchService {
         const isLocalPlayer = participant === roster.local;
         return {
           playerId: String(isLocalPlayer && roster.currentSummoner ? roster.currentSummoner.summonerId : participant.summonerId),
-          displayName: ((isLocalPlayer ? roster.currentSummoner?.displayName : undefined) ?? participant.summonerName.trim()) || '未知玩家',
+          displayName: (isLocalPlayer ? summonerName(roster.currentSummoner) : '') || participant.summonerName.trim() || (isLocalPlayer ? '我的账号' : '未知玩家'),
           teamId: participant.teamId,
           ...(roster.localTeamId === null ? {} : { isLocalTeam: participant.teamId === roster.localTeamId }),
           lane: laneOf(participant.selectedPosition),
@@ -207,9 +213,7 @@ export class MatchService {
     const players = await mapLimit(participants, 4, async (participant) => {
       checkCancelled(signal);
       const isLocalPlayer = participant === local;
-      let displayName = isLocalPlayer && currentSummoner?.displayName
-        ? currentSummoner.displayName
-        : participant.summonerName.trim();
+      let displayName = (isLocalPlayer ? summonerName(currentSummoner) : '') || participant.summonerName.trim();
       let playerPuuid = participant.puuid
         ?? (isLocalPlayer ? currentSummoner?.puuid : undefined);
       if (!displayName || !playerPuuid) {
@@ -220,9 +224,7 @@ export class MatchService {
           ));
           playerPuuid = playerPuuid ?? identity.puuid;
           if (!displayName) {
-            const gameName = identity.gameName?.trim();
-            const tagLine = identity.tagLine?.trim();
-            displayName = gameName ? `${gameName}${tagLine ? `#${tagLine}` : ''}` : identity.displayName?.trim() ?? '';
+            displayName = summonerName(identity);
           }
         } catch {
           checkCancelled(signal);
@@ -231,7 +233,7 @@ export class MatchService {
       const lookupId = playerPuuid ?? String(participant.summonerId);
       const base = {
         playerId: String(isLocalPlayer && currentSummoner ? currentSummoner.summonerId : participant.summonerId),
-        displayName: displayName || '未知玩家',
+        displayName: displayName || (isLocalPlayer ? '我的账号' : '未知玩家'),
         teamId: participant.teamId,
         ...(localTeamId === null ? {} : { isLocalTeam: participant.teamId === localTeamId }),
         lane: laneOf(participant.selectedPosition),
@@ -356,7 +358,7 @@ export class MatchService {
         sideName: string
       ): Array<z.infer<typeof participantSchema> & { teamId: number }> => team.map((participant, index) => ({
         summonerId: participant.summonerId,
-        summonerName: participant.gameName || participant.playerAlias || `${sideName}玩家 ${index + 1}`,
+        summonerName: participant.gameName?.trim() || participant.playerAlias?.trim() || `${sideName}玩家 ${index + 1}`,
         teamId,
         selectedPosition: participant.assignedPosition,
         championId: participant.championId,
@@ -390,7 +392,7 @@ export class MatchService {
       if (selection && incompleteTeam && teamId !== undefined) {
         incompleteTeam.push({
           summonerId: currentSummoner.summonerId,
-          summonerName: currentSummoner.displayName ?? '我的账号',
+          summonerName: summonerName(currentSummoner) || '我的账号',
           teamId,
           championId: selection.championId,
           isLocalPlayer: true
