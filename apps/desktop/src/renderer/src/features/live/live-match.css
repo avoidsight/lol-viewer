@@ -315,7 +315,12 @@
 .recent-match--compact .recent-match__kda { font-size: 11px; gap: 2px; color: #dce5ee; }
 .recent-match--compact .recent-match__kda b:nth-of-type(2) { color: #dc93a0; }
 .recent-match--compact .recent-match__kda i { color: #8797aa; }
-.recent-match--compact .recent-match__form { padding: 0 4px; border-radius: 3px; background: #514022; color: #f1d28a; font-size: 8px; font-weight: 700; line-height: 10px; white-space: nowrap; }
+.recent-match__form { padding: 0 6px; border-radius: 3px; background: #e7b549; color: #30230b; font-size: 9px; font-weight: 700; line-height: 14px; flex-shrink: 0; white-space: nowrap; }
+.recent-match__honors { display: flex; align-items: center; justify-content: center; gap: 3px; }
+.recent-match:not(.recent-match--compact):has(.recent-match__form) { padding-top: 1px; padding-bottom: 1px; }
+.recent-match:not(.recent-match--compact):has(.recent-match__form) .recent-match__performance { gap: 0; }
+.recent-match:not(.recent-match--compact):has(.recent-match__form) .recent-match__kda { line-height: 12px; }
+.recent-match:not(.recent-match--compact):has(.recent-match__form) .recent-match__mode { line-height: 9px; }
 .recent-match--compact .recent-match__kda { line-height: 12px; }
 .recent-match--compact .recent-match__mode { color: #9aaabd; opacity: 1; font-size: 8px; line-height: 9px; }
 .recent-match-preview__form { margin-top: 3px; font-size: 10px; color: #b8c7d8; }
