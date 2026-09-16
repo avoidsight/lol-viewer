@@ -49,12 +49,14 @@ function personalMatchesFor(target?: PersonalHistoryTarget): MatchSummary[] {
       championId: 30 + index,
       playerId: `fixture-enemy-${matchIndex}-${index}`,
       puuid: `fixture-enemy-puuid-${matchIndex}-${index}`,
-      displayName: `Fixture Enemy ${index + 1}`,
+      displayName: `Fixture Enemy ${index + 1}#192`,
       profileIconId: 40 + index
     }));
     return {
       ...base,
       matchId: `fixture-personal-${matchIndex}`,
+      ...(matchIndex === 0 ? { kills: 14, largestKillingSpree: 8, multiKill: 3 as const } : {}),
+      ...(matchIndex === 2 ? { kills: 12, deaths: 2, assists: 16, killParticipation: .7, achievements: [{ type: 'MOST_DAMAGE' as const, value: 42000 }, { type: 'MOST_DAMAGE_TAKEN' as const, value: 38000 }] } : {}),
       queueId: queueIds[matchIndex % queueIds.length],
       endedAt: Date.UTC(2026, 0, 1) - matchIndex * 1_800_000,
       allyChampionIds: allies.map(({ championId }) => championId),

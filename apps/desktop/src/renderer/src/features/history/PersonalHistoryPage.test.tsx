@@ -99,7 +99,7 @@ describe('PersonalHistoryPage', () => {
     expect(screen.queryByText('31.5k')).not.toBeInTheDocument();
     expect(screen.queryByText('28.1k')).not.toBeInTheDocument();
     expect(screen.queryByText('12.4k')).not.toBeInTheDocument();
-    expect(document.querySelector('.personal-history__achievement-icons')).toBeInTheDocument();
+    expect(screen.getAllByTestId('history-highlight')).toHaveLength(3);
     const itemImages = screen.getAllByRole('img', { name: /装备/ });
     expect(itemImages).toHaveLength(40);
     expect(screen.queryByRole('img', { name: '装备 3340' })).not.toBeInTheDocument();
@@ -113,17 +113,10 @@ describe('PersonalHistoryPage', () => {
     expect(screen.getAllByRole('img', { name: /己方英雄/ })).toHaveLength(100);
     expect(screen.getAllByRole('img', { name: /敌方英雄/ })).toHaveLength(100);
     expect(document.querySelectorAll('.personal-history__team-icon.is-local')).toHaveLength(20);
-    expect(screen.getByRole('img', { name: '击杀最多' })).toBeVisible();
-    expect(screen.getByRole('img', { name: '助攻最多' })).toBeVisible();
-    expect(screen.getByRole('img', { name: '死亡最多' })).toBeVisible();
-    expect(screen.getByRole('img', { name: '伤害最高' })).toBeVisible();
-    expect(screen.getByRole('img', { name: '承伤最高' })).toBeVisible();
-    expect(screen.getByRole('img', { name: '经济最高' })).toBeVisible();
-    expect(screen.getByRole('img', { name: '补刀最多' })).toBeVisible();
+    expect(screen.getByText('最高伤害')).toBeVisible();
+    expect(screen.queryByText('死亡最多')).not.toBeInTheDocument();
     expect(screen.getByText('三杀')).toBeVisible();
-    expect(screen.getAllByTestId('multi-kill-badge')).toHaveLength(1);
     expect(screen.getByText('MVP')).toBeVisible();
-    expect(screen.getAllByTestId('mvp-badge')).toHaveLength(1);
   });
 
   it('organizes the dashboard into a compact overview, horizontal favorites, and full-width matches', () => {
@@ -141,7 +134,8 @@ describe('PersonalHistoryPage', () => {
     const onPlayerSelect = vi.fn();
     render(<PersonalHistoryPage snapshot={snapshot} state="ready" onPlayerSelect={onPlayerSelect} />);
 
-    fireEvent.click(screen.getAllByRole('button', { name: '查看 对手 1 的个人战绩' })[0]);
+    expect(screen.getAllByRole('button', { name: '对手 1' })[0]).toHaveAttribute('title', '对手 1');
+    fireEvent.click(screen.getAllByRole('button', { name: '对手 1' })[0]);
 
     expect(onPlayerSelect).toHaveBeenCalledWith({
       playerId: 'enemy-0-0',
@@ -149,7 +143,7 @@ describe('PersonalHistoryPage', () => {
       displayName: '对手 1',
       profileIconId: 30
     });
-    expect(screen.queryByRole('button', { name: '查看 召唤师 的个人战绩' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '召唤师' })).not.toBeInTheDocument();
     const css = readFileSync(resolve('src/renderer/src/features/history/personal-history.css'), 'utf8');
     expect(css).toMatch(/\.personal-history__team-player\s*\{[^}]*width:\s*28px;[^}]*height:\s*28px;/s);
     expect(css).toMatch(/\.personal-history__team-player--link:focus-visible\s*\{[^}]*outline:\s*2px solid #fbbf24;/s);
@@ -214,11 +208,10 @@ describe('PersonalHistoryPage', () => {
     expect(css).toMatch(/\.personal-history__matches article\s*{[^}]*grid-template-columns:/i);
     expect(css).toMatch(/\.personal-history__match-champion\s*{[^}]*width:\s*60px[^}]*height:\s*60px/i);
     expect(css).toMatch(/\.personal-history__spells\s*{[^}]*flex-direction:\s*column/i);
-    expect(css).toMatch(/\.personal-history__multi-kill\s*{[^}]*border-radius:\s*999px/i);
+    expect(css).toMatch(/\.personal-history__honor\s*{[^}]*font-weight:\s*800/i);
     expect(css).toMatch(/\.personal-history__items\s*{[^}]*display:\s*flex/i);
     expect(css).not.toMatch(/personal-history__items img:nth-child\(n\+4\)/i);
-    expect(css).toMatch(/\.personal-history__achievement-icons > span\s*{[^}]*border:\s*1px solid currentColor/i);
-    expect(css).toMatch(/\.personal-history__achievement-icons svg\s*{[^}]*stroke:\s*currentColor/i);
+    expect(css).toMatch(/\.personal-history__match-highlights\s*{[^}]*flex-wrap:\s*wrap/i);
     expect(css).not.toMatch(/\.personal-history__performance-metrics/i);
     expect(css).not.toMatch(/\.personal-history__performance-bar/i);
     expect(css).toMatch(/@media\s*\(max-width:\s*1080px\)/i);

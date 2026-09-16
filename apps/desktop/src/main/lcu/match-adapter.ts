@@ -22,6 +22,7 @@ const participantSchema = z.object({
     mvp: z.boolean().optional(),
     isMvp: z.boolean().optional(),
     largestMultiKill: z.number().int().nonnegative().optional(),
+    largestKillingSpree: z.number().int().nonnegative().optional(),
     doubleKills: z.number().int().nonnegative().optional(),
     tripleKills: z.number().int().nonnegative().optional(),
     quadraKills: z.number().int().nonnegative().optional(),
@@ -243,7 +244,7 @@ function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
     if (
       value === undefined ||
       value <= 0 ||
-      game.participants.length <= 1 ||
+      game.participants.length < 10 ||
       values.some((entry) => entry === undefined)
     ) return [];
     return value === Math.max(...values as number[]) ? [{ type, value }] : [];
@@ -263,6 +264,7 @@ function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
     ...(participant.stats.gameEndedInEarlySurrender === undefined ? {} : { remake: participant.stats.gameEndedInEarlySurrender }),
     ...(mvp === true ? { mvp: true } : {}),
     ...(multiKill === undefined ? {} : { multiKill }),
+    ...(participant.stats.largestKillingSpree === undefined ? {} : { largestKillingSpree: participant.stats.largestKillingSpree }),
     ...(cs === undefined ? {} : { cs }),
     ...(lane === undefined ? {} : { lane }),
     ...(itemIds.length === 0 ? {} : { itemIds }),

@@ -48,6 +48,7 @@ export interface MatchSummary {
   remake?: boolean;
   mvp?: boolean;
   multiKill?: 2 | 3 | 4 | 5;
+  largestKillingSpree?: number;
   cs?: number;
   lane?: Lane;
   itemIds?: number[];

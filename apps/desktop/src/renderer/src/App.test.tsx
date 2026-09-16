@@ -142,7 +142,7 @@ describe('App tab lifecycle', () => {
     vi.mocked(api.getPersonalHistory).mockImplementation(async (target) => target ? otherHistory : localHistory);
     render(<App />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '查看 对手 的个人战绩' }));
+    fireEvent.click(await screen.findByRole('button', { name: '对手' }));
     expect(await screen.findByRole('heading', { name: '对手' })).toBeVisible();
     expect(api.getPersonalHistory).toHaveBeenLastCalledWith({
       playerId: 'other', puuid: 'other-puuid', displayName: '对手'

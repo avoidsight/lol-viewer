@@ -21,7 +21,7 @@ const cachedSnapshot: PersonalHistorySnapshot = {
   playerId: '7', displayName: 'Cached Player', profileIconId: 29, matches: [], sampleSize: 0,
   wins: 0, losses: 0, winRate: 0, averageKda: 0, favoriteChampions: [], cached: false,
   itemIconPaths: {},
-  historyDataVersion: 9,
+  historyDataVersion: 10,
   updatedAt: 1_000
 };
 
@@ -144,7 +144,7 @@ describe('PersonalHistoryService', () => {
       displayName: '目标玩家#CN1',
       profileIconId: 88,
       rank: '黄金 I 77 胜点',
-      historyDataVersion: 9
+      historyDataVersion: 10
     });
     expect(result.matches[0]).toMatchObject({
       championId: 99,
@@ -323,8 +323,8 @@ describe('PersonalHistoryService', () => {
     expect(get).toHaveBeenCalledWith('/lol-game-data/assets/v1/items.json', expect.anything());
   });
 
-  it('refreshes a version-eight target cache that may be missing multi-kill metadata', async () => {
-    const legacySnapshot = { ...cachedSnapshot, historyDataVersion: 8 };
+  it('refreshes a version-nine target cache that may be missing killing-spree metadata', async () => {
+    const legacySnapshot = { ...cachedSnapshot, historyDataVersion: 9 };
     const get = vi.fn(async (path: string) => {
       if (path === '/lol-game-data/assets/v1/items.json') return [];
       if (path === '/lol-patch/v1/game-version') return '16.17.1';
@@ -341,7 +341,7 @@ describe('PersonalHistoryService', () => {
     });
 
     expect(sgp.getHistory).toHaveBeenCalledWith('target-puuid', 40);
-    expect(result.historyDataVersion).toBe(9);
+    expect(result.historyDataVersion).toBe(10);
     expect(cache.put).toHaveBeenCalled();
   });
 

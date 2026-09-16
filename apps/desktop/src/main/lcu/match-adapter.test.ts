@@ -3,6 +3,19 @@ import fixture from '../../../tests/fixtures/match-history.json';
 import { adaptMatchHistory, describeQueue } from './match-adapter';
 
 describe('adaptMatchHistory', () => {
+  it('preserves actual killing spree data without inferring it from total kills', () => {
+    const base = structuredClone(fixture.games[0]);
+    const adapt = (stats: object) => adaptMatchHistory({ games: [{ ...base, participants: [{ ...base.participants[0], stats: { ...base.participants[0].stats, kills: 20, ...stats } }] }] }, { scope: 'all', limit: 10 })[0];
+    expect(adapt({}).largestKillingSpree).toBeUndefined();
+    expect(adapt({ largestKillingSpree: 7 }).largestKillingSpree).toBe(7);
+    expect(adapt({ largestKillingSpree: 8 }).largestKillingSpree).toBe(8);
+  });
+
+  it('does not award global highs with only a partial roster', () => {
+    const base = structuredClone(fixture.games[0]);
+    base.participants = Array.from({ length: 5 }, () => structuredClone(base.participants[0]));
+    expect(adaptMatchHistory({ games: [base] }, { scope: 'all', limit: 10 })[0].achievements).toBeUndefined();
+  });
   it('only derives participation from a complete team and preserves remake flags', () => {
     const base = structuredClone(fixture.games[0]);
     const participants = Array.from({ length: 5 }, (_, i) => ({ ...base.participants[0], teamId: 100, participantId: i + 1, stats: { ...base.participants[0].stats, kills: 4, assists: 6, gameEndedInEarlySurrender: true } }));

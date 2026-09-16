@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { MatchAchievementType, MatchParticipantSummary, MatchSummary, PersonalHistorySnapshot } from '../../../../shared/domain';
+import type { MatchParticipantSummary, MatchSummary, PersonalHistorySnapshot } from '../../../../shared/domain';
+import { historyHighlights } from './match-highlights';
 import type { PersonalHistoryTarget } from '../../../../shared/ipc';
 import { localizeRank } from '../../../../shared/rank';
 import { isBuildItem } from '../../../../shared/items';
@@ -83,8 +84,8 @@ function TeamComposition({ match, assetVersion, viewerPlayerId, onPlayerSelect }
         key={`${side}-${index}-${championId}`}
         type="button"
         className="personal-history__team-player personal-history__team-player--link"
-        aria-label={`查看 ${label} 的个人战绩`}
-        title={`查看 ${label} 的个人战绩`}
+        aria-label={label}
+        title={label}
         onClick={() => onPlayerSelect({
           playerId: player.playerId!,
           ...(player.puuid ? { puuid: player.puuid } : {}),
@@ -100,69 +101,11 @@ function TeamComposition({ match, assetVersion, viewerPlayerId, onPlayerSelect }
   </div>;
 }
 
-const performanceAchievements: Array<{
-  type: MatchAchievementType;
-  label: string;
-  tone: string;
-}> = [
-  { type: 'MOST_KILLS', label: '击杀最多', tone: 'kills' },
-  { type: 'MOST_ASSISTS', label: '助攻最多', tone: 'assists' },
-  { type: 'MOST_DEATHS', label: '死亡最多', tone: 'deaths' },
-  { type: 'MOST_DAMAGE', label: '伤害最高', tone: 'damage' },
-  { type: 'MOST_DAMAGE_TAKEN', label: '承伤最高', tone: 'damage-taken' },
-  { type: 'MOST_GOLD', label: '经济最高', tone: 'gold' },
-  { type: 'MOST_CS', label: '补刀最多', tone: 'cs' }
-];
-
-function AchievementGlyph({ type }: { type: MatchAchievementType }) {
-  let glyph;
-  switch (type) {
-    case 'MOST_KILLS':
-      glyph = <><path d="m5 4 6 6-2 2-6-6 2-2Zm14 0-6 6 2 2 6-6-2-2ZM8 13l3 3-4 4-3-3 4-4Zm8 0-3 3 4 4 3-3-4-4Z" /></>;
-      break;
-    case 'MOST_ASSISTS':
-      glyph = <><circle cx="8" cy="8" r="3" /><circle cx="16" cy="8" r="3" /><path d="M3.5 19c.5-3.4 2-5 4.5-5 1.9 0 3.2.9 4 2.7.8-1.8 2.1-2.7 4-2.7 2.5 0 4 1.6 4.5 5" /></>;
-      break;
-    case 'MOST_DEATHS':
-      glyph = <><path d="M5 11a7 7 0 1 1 14 0c0 2.8-1.3 4.7-3.3 5.8V20l-2-1.3L12 20l-1.7-1.3L8 20v-3.2C6.1 15.7 5 13.8 5 11Z" /><circle cx="9" cy="11" r="1.2" /><circle cx="15" cy="11" r="1.2" /><path d="m11 15 1-1 1 1" /></>;
-      break;
-    case 'MOST_DAMAGE':
-      glyph = <path d="M13.5 2 5 13h6l-.5 9L19 10h-6l.5-8Z" />;
-      break;
-    case 'MOST_DAMAGE_TAKEN':
-      glyph = <path d="M12 3 5 6v5c0 4.7 2.7 8.2 7 10 4.3-1.8 7-5.3 7-10V6l-7-3Zm0 4v10" />;
-      break;
-    case 'MOST_GOLD':
-      glyph = <><ellipse cx="12" cy="7" rx="7" ry="3" /><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5" /></>;
-      break;
-    case 'MOST_CS':
-      glyph = <><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2.5" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></>;
-      break;
-  }
-  return <svg viewBox="0 0 24 24" aria-hidden="true">{glyph}</svg>;
-}
-
-function PerformanceAchievements({ match }: { match: MatchSummary }) {
-  const visible = performanceAchievements.filter(({ type }) =>
-    match.achievements?.some((achievement) => achievement.type === type));
-  if (visible.length === 0) return null;
-  return <span className="personal-history__achievement-icons" aria-label="本场最高数据">
-    {visible.map(({ type, label, tone }) => <span key={type} className={`is-${tone}`} role="img" aria-label={label} title={label}>
-      <AchievementGlyph type={type} />
-    </span>)}
-  </span>;
-}
-
-const multiKillLabels = { 2: '双杀', 3: '三杀', 4: '四杀', 5: '五杀' } as const;
-
 function MatchHighlights({ match }: { match: MatchSummary }) {
-  const hasAchievements = performanceAchievements.some(({ type }) =>
-    match.achievements?.some((achievement) => achievement.type === type));
-  if (!hasAchievements && !match.mvp && match.multiKill === undefined) return null;
-  return <span className="personal-history__match-highlights">
-    <PerformanceAchievements match={match} />
-    {match.mvp && <strong className="personal-history__mvp" data-testid="mvp-badge">MVP</strong>}
-    {match.multiKill !== undefined && <strong className={`personal-history__multi-kill is-${match.multiKill}`} data-testid="multi-kill-badge">{multiKillLabels[match.multiKill]}</strong>}
+  const badges = historyHighlights(match);
+  if (!badges.length) return null;
+  return <span className="personal-history__match-highlights" aria-label="本场表现">
+    {badges.map(badge => <strong key={badge.key} className={`personal-history__honor is-${badge.tone}`} title={badge.description} data-testid="history-highlight">{badge.label}</strong>)}
   </span>;
 }
 
