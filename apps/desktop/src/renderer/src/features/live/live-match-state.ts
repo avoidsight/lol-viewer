@@ -3,6 +3,7 @@ import type { LiveMatch, LiveRoster } from '../../../../shared/ipc';
 
 export type LiveMatchStatus =
   | 'waiting'
+  | 'disconnected'
   | 'loading'
   | 'current'
   | 'last-match'
@@ -26,7 +27,7 @@ export type LiveMatchAction =
   | { type: 'request-succeeded'; match: LiveMatch }
   | { type: 'roster-refreshed'; roster: LiveRoster }
   | { type: 'request-failed'; reason?: LiveMatchErrorReason }
-  | { type: 'phase-observed'; phase: string; active: boolean }
+  | { type: 'phase-observed'; phase: string; active: boolean; connected?: boolean }
   | { type: 'enrichment-paused'; phase: string }
   | { type: 'new-match-detected'; phase: string };
 
@@ -105,9 +106,14 @@ export function liveMatchReducer(
         ? { ...state, requesting: false }
         : { ...state, status: 'error', requesting: false, errorReason: action.reason ?? 'data-unavailable' };
     case 'phase-observed':
+      if (!action.active && !state.match) return {
+        status: action.connected === false ? 'disconnected' : 'waiting',
+        phase: action.phase, progress: [], requesting: false
+      };
       return {
         ...state,
         phase: action.phase,
+        ...(!action.active ? { requesting: false } : {}),
         ...(state.match ? { status: action.active ? 'current' : 'last-match' } : {})
       };
     case 'enrichment-paused':

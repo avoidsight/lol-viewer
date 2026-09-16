@@ -183,11 +183,34 @@ describe('App tab lifecycle', () => {
     window.removeEventListener('unhandledrejection', unhandled);
   });
 
-  it('shows initial loading progress without ten placeholder slots', async () => {
+  it('checks session before showing a ten-player loading progress', async () => {
     install(() => new Promise(() => undefined)); render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: '对战信息' }));
-    expect(await screen.findByRole('status', { name: '阵容加载进度 0/10' })).toBeVisible();
+    expect(await screen.findByText('正在检测客户端与对局状态')).toBeVisible();
+    expect(screen.queryByRole('status', { name: '阵容加载进度 0/10' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('player-slot')).not.toBeInTheDocument();
+  });
+
+  it.each([{ phase: 'None', connected: false }, { phase: 'Lobby', connected: true }])('stops empty loading for $phase and resumes on champion select', async (identity) => {
+    vi.useFakeTimers();
+    try {
+      const pending = deferred<LiveMatch>();
+      const { api, emit } = install(vi.fn().mockImplementationOnce(() => pending.promise).mockResolvedValue(match));
+      vi.mocked(api.getGameflowSessionIdentity).mockResolvedValue(identity);
+      render(<App initialTab="live" />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+      expect(screen.getByText(identity.connected ? '等待进入英雄选择或游戏' : '未连接英雄联盟客户端')).toBeVisible();
+      expect(screen.queryByLabelText('阵容加载进度 0/10')).not.toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: '显示方式' })).not.toBeInTheDocument();
+      expect(api.cancelLiveMatch).toHaveBeenCalled();
+      await act(async () => { emit(player); pending.resolve(match); });
+      expect(screen.queryByTestId('player-card')).not.toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(6000); });
+      expect(api.getLiveMatch).toHaveBeenCalledTimes(1);
+      vi.mocked(api.getGameflowSessionIdentity).mockResolvedValue({ phase: 'ChampSelect', gameId: 'game-new' });
+      await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+      expect(screen.getByText('Player One')).toBeVisible();
+    } finally { vi.useRealTimers(); }
   });
 
   it('uses a new generation on re-entry and ignores late events and promises', async () => {

@@ -27,6 +27,7 @@ interface Props { match?: LiveMatch; players?: PlayerSnapshot[]; loadingProgress
 export type LiveHistoryScope = 'all' | 'ranked';
 
 function statusLabel(status: LiveMatchStatus, phase: string | undefined): string {
+  if (status === 'disconnected') return '未连接客户端';
   if (status === 'last-match') return '上一局记录';
   if (status === 'new-match-loading') return '新对局加载中';
   if (status === 'error') return '数据暂不可用';
@@ -34,7 +35,7 @@ function statusLabel(status: LiveMatchStatus, phase: string | undefined): string
   if (phase === 'ChampSelect') return '英雄选择中';
   if (phase === 'GameStart') return '正在进入游戏';
   if (phase === 'InProgress' || phase === 'Reconnect') return '游戏进行中';
-  if (status === 'loading') return '阵容加载中';
+  if (status === 'loading') return phase ? '阵容加载中' : '正在检测对局';
   return status === 'current' ? '当前对局' : '等待对局';
 }
 
@@ -61,7 +62,7 @@ export default function LiveMatchPage({ match, players = [], loadingProgress, no
         <span className="live-match-page__status" data-status={lifecycleStatus}><i aria-hidden="true" />{statusLabel(lifecycleStatus, gameflowPhase)}</span>
         {!oriented && visiblePlayers.length > 0 && <span className="live-match-page__orientation" role="status" aria-label="阵营方向无法确认" title="阵营方向无法确认">?</span>}
       </div>
-      <div className="live-match-page__controls">
+      {visiblePlayers.length > 0 && <div className="live-match-page__controls">
       <div className="live-match-page__scope" role="group" aria-label="显示方式">
         <button type="button" aria-pressed={viewMode === 'detail'} onClick={() => setViewMode('detail')}>详细</button>
         <button type="button" title="左列最近第 1–5 场，右列第 6–10 场；悬停查看详情" aria-pressed={viewMode === 'overview'} onClick={() => setViewMode('overview')}>总览</button>
@@ -70,7 +71,7 @@ export default function LiveMatchPage({ match, players = [], loadingProgress, no
         <button type="button" aria-label="全部对局" title="全部对局" aria-pressed={historyScope === 'all'} onClick={() => setHistoryScope('all')}><i className="is-all" aria-hidden="true" />全部</button>
         <button type="button" aria-label="排位对局" title="排位对局" aria-pressed={historyScope === 'ranked'} onClick={() => setHistoryScope('ranked')}><i className="is-ranked" aria-hidden="true" />排位</button>
       </div>
-      </div>
+      </div>}
     </header>
     {notice && <div className={`live-match-page__notice-wrap${visiblePlayers.length > 0 ? ' is-inline' : ''}`}>{notice}</div>}
     {loadingProgress !== undefined && <div className="live-match-page__progress" role="status" aria-label={`阵容加载进度 ${loadingProgress}/10`}><strong>{loadingProgress}<small>/10</small></strong><div className="live-match-page__loading-slots" aria-hidden="true">{Array.from({ length: 10 }, (_, index) => { const loadedPlayer = players[index]; return <span key={index} className={loadedPlayer ? 'is-loaded' : index === loadingProgress ? 'is-loading' : ''}>{loadedPlayer?.championId ? <img src={`lol-asset://champion-icons/${loadedPlayer.championId}.png`} alt="" /> : loadedPlayer ? <b>✓</b> : <i />}</span>; })}</div><progress max={10} value={loadingProgress} /></div>}

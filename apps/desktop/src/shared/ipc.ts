@@ -161,7 +161,7 @@ export const liveRosterSchema = z.object({
 export const liveMatchRequestSchema = z.object({ scope: queueScopeSchema, generation: z.number().int().nonnegative() }).strict();
 export const playerUpdateSchema = z.object({ generation: z.number().int().nonnegative(), player: playerSnapshotSchema }).strict();
 export const gameflowPhaseSchema = z.string().min(1);
-export const gameflowSessionIdentitySchema = z.object({ phase: gameflowPhaseSchema, gameId: z.string().min(1).optional() }).strict();
+export const gameflowSessionIdentitySchema = z.object({ phase: gameflowPhaseSchema, gameId: z.string().min(1).optional(), connected: z.boolean().optional() }).strict();
 export type GameflowSessionIdentity = z.infer<typeof gameflowSessionIdentitySchema>;
 
 export const championLaneSchema = z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']);

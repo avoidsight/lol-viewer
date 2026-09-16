@@ -193,8 +193,8 @@ void app.whenReady().then(() => {
     getGameflowSessionIdentity: async () => {
       if (fixtureMode || aramFixtureMode) return { phase: 'InProgress', gameId: 'fixture-game' };
       const connection = await discoverLcuConnection();
-      if (!connection) return { phase: 'None' };
-      return readGameflowSessionIdentity(createLcuClient(connection));
+      if (!connection) return { phase: 'None', connected: false };
+      return { ...await readGameflowSessionIdentity(createLcuClient(connection)), connected: true };
     }
   });
   createWindow();

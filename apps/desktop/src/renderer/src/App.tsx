@@ -128,7 +128,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     const currentGeneration = ++generation.current;
     dispatchLive({ type: 'request-started' });
     const unsubscribe = api.onPlayerUpdated((player, eventGeneration = currentGeneration) => {
-      if (!active || eventGeneration !== currentGeneration || player.scope !== 'all') return;
+      if (!active || currentGeneration !== generation.current || eventGeneration !== currentGeneration || player.scope !== 'all') return;
       dispatchLive({ type: 'player-updated', player });
     });
     void api.getLiveMatch('all', currentGeneration).then((next) => {
@@ -176,7 +176,13 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
         if (isActive && identity.gameId !== undefined) currentGameIdRef.current = identity.gameId;
 
         if (pageRef.current === 'live') {
-          if (gameIdChanged || enteredChampionSelect) {
+          if (!isActive) {
+            if (liveViewRef.current.requesting) {
+              generation.current += 1;
+              void Promise.resolve(api.cancelLiveMatch?.()).catch(() => undefined);
+            }
+            dispatchLive({ type: 'phase-observed', phase, active: false, connected: identity.connected });
+          } else if (gameIdChanged || enteredChampionSelect) {
             generation.current += 1;
             loadedGameIdRef.current = undefined;
             if (liveViewRef.current.requesting) {
@@ -211,8 +217,13 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
         } else if (!isActive) {
           setLiveAttention(false);
         }
-      } catch {
-        // The League client can briefly disappear between games; keep the last stable UI.
+      } catch (error) {
+        // Preserve completed snapshots, but never leave an empty page loading forever.
+        if (active && pageRef.current === 'live' && !liveViewRef.current.match) {
+          generation.current += 1;
+          void Promise.resolve(window.lolViewer?.cancelLiveMatch?.()).catch(() => undefined);
+          dispatchLive({ type: 'request-failed', reason: liveErrorReason(error) });
+        }
       } finally {
         schedule(nextDelay);
       }
@@ -324,7 +335,11 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     'not-in-match': '暂未检测到可读取的对局阵容',
     'data-unavailable': '对战数据暂时无法读取，正在自动重试'
   };
-  const liveNotice = liveView.status === 'error'
+  const liveNotice = liveView.status === 'disconnected'
+      ? <LiveStateNotice kind="waiting" title="未连接英雄联盟客户端" detail="请先启动并登录英雄联盟客户端，进入英雄选择后将自动展示对局信息。" />
+      : liveView.status === 'loading' && !liveView.match && liveView.progress.length === 0
+      ? <LiveStateNotice kind="loading" title={liveView.phase && activePhases.has(liveView.phase) ? '正在读取对局阵容' : '正在检测客户端与对局状态'} detail="检测完成后会自动更新，无需手动刷新。" />
+      : liveView.status === 'error'
       ? <LiveStateNotice kind="error" alert title={liveErrorMessages[liveView.errorReason ?? 'data-unavailable']} detail={liveView.errorReason === 'client-unavailable' ? '启动客户端后会自动重新连接，无需手动刷新。' : 'LOL Viewer 会在后台低频重试，已有数据不会被清空。'} />
       : liveView.status === 'paused'
         ? <LiveStateNotice kind="paused" title="游戏已经开始，已停止后台补全战绩，避免影响游戏性能" detail="已读取的玩家数据会继续保留，下一局将自动恢复加载。" />
@@ -334,7 +349,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
 
   const content = <>
     <div hidden={page !== 'history'}><PersonalHistoryPage snapshot={history} state={historyState} onRefresh={() => void refreshHistory()} onPlayerSelect={(target) => void viewPlayerHistory(target)} onBack={historyTarget ? returnToOwnHistory : undefined} refreshing={historyRefreshing} refreshError={historyRefreshError} /></div>
-    <div hidden={page !== 'live'}><LiveMatchPage match={liveView.match} players={liveView.match ? undefined : liveView.progress} loadingProgress={liveView.requesting && !liveView.match ? liveView.progress.length : undefined} lifecycleStatus={liveView.status} gameflowPhase={liveView.phase} showLaneDifferences={settings.showLaneDifferences} notice={liveNotice} /></div>
+    <div hidden={page !== 'live'}><LiveMatchPage match={liveView.match} players={liveView.match ? undefined : liveView.progress} loadingProgress={liveView.requesting && !liveView.match && (liveView.progress.length > 0 || (liveView.phase !== undefined && activePhases.has(liveView.phase))) ? liveView.progress.length : undefined} lifecycleStatus={liveView.status} gameflowPhase={liveView.phase} showLaneDifferences={settings.showLaneDifferences} notice={liveNotice} /></div>
     {page === 'champions' && <ChampionLibraryPage getCatalog={getChampionCatalog} getDetails={getChampionDetails} getGuide={getChampionGuide} />}
     {page === 'settings' && <SettingsPage settings={settings} message={message} onUsageStatisticsChange={(checked) => void updateUsageStatistics(checked)} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onLaneDifferencesChange={(checked) => void updateLaneSetting(checked)} onClearCache={() => void clearCache()} />}
   </>;
