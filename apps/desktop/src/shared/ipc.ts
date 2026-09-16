@@ -32,7 +32,8 @@ export const queueScopeSchema = z.enum(['ranked-solo', 'all']);
 export const appSettingsSchema = z.object({
   autoOpenLiveMatch: z.boolean(),
   showLaneDifferences: z.boolean(),
-  autoAcceptReadyCheck: z.boolean()
+  autoAcceptReadyCheck: z.boolean(),
+  usageStatistics: z.boolean().optional()
 }).strict();
 export const appSettingsPatchSchema = appSettingsSchema.partial().strict();
 export type AppSettings = z.infer<typeof appSettingsSchema>;

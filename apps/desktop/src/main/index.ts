@@ -5,7 +5,8 @@ import { registerFeedbackIpc } from './ipc/register-feedback-ipc';
 import { createDeviceIdProvider } from './feedback/device-id';
 import { FeedbackService, feedbackEndpoint } from './feedback/feedback-service';
 import Database from 'better-sqlite3';
-import { app, BrowserWindow, protocol } from 'electron';
+import { app, BrowserWindow, protocol, powerMonitor } from 'electron';
+import { UsageReporter } from './telemetry/reporter';
 import { is } from '@electron-toolkit/utils';
 import appIcon from '../../resources/icon.png?asset';
 import { discoverLcuConnection } from './lcu/discovery';
@@ -39,6 +40,7 @@ protocol.registerSchemesAsPrivileged([{
 let database: Database.Database | undefined;
 let coordinator: GameflowCoordinator | undefined;
 let readyCheckAutoAcceptor: ReadyCheckAutoAcceptor | undefined;
+let usageReporter: UsageReporter | undefined;
 
 function rosterFromMatch(match: LiveMatch): LiveRoster {
   return {
@@ -119,7 +121,15 @@ void app.whenReady().then(() => {
     getDetails: async (championId) => (await getCatalogService()).getDetails(championId)
   });
   const settingsService = new SettingsService(database, cache, guideCache, personalHistoryCache);
-  registerSettingsIpc(settingsService);
+  registerSettingsIpc({
+    get: () => settingsService.get(),
+    clearCache: () => settingsService.clearCache(),
+    update: patch => {
+      const settings = settingsService.update(patch);
+      usageReporter?.setEnabled(settings.usageStatistics !== false);
+      return settings;
+    }
+  });
   const getDeviceId = createDeviceIdProvider(join(app.getPath('appData'), 'lol-viewer-identity'));
   const feedback = new FeedbackService(async () => ({
     deviceId: fixtureMode ? 'f'.repeat(64) : await getDeviceId(),
@@ -188,6 +198,15 @@ void app.whenReady().then(() => {
     }
   });
   createWindow();
+  // Development and fixture sessions must never pollute production statistics.
+  if (app.isPackaged && !fixtureMode) {
+    usageReporter = new UsageReporter(async () => ({
+      deviceId: await getDeviceId(), clientVersion: app.getVersion(),
+      osName: process.platform, osVersion: release(), arch: process.arch
+    }));
+    usageReporter.setEnabled(settingsService.get().usageStatistics !== false);
+    powerMonitor.on('resume', () => usageReporter?.resume());
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -195,6 +214,8 @@ void app.whenReady().then(() => {
 });
 
 app.on('before-quit', () => {
+  usageReporter?.dispose();
+  usageReporter = undefined;
   readyCheckAutoAcceptor?.dispose();
   readyCheckAutoAcceptor = undefined;
   coordinator?.dispose();

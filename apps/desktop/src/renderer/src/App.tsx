@@ -309,6 +309,9 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   const updateAutoAcceptSetting = async (autoAcceptReadyCheck: boolean) => {
     try { const next = await window.lolViewer?.updateSettings({ autoAcceptReadyCheck }); if (next) { settingsRef.current = next; setSettings(next); } } catch { setMessage('Settings could not be saved'); }
   };
+  const updateUsageStatistics = async (usageStatistics: boolean) => {
+    try { const next = await window.lolViewer?.updateSettings({ usageStatistics }); if (next) { settingsRef.current = next; setSettings(next); setMessage(usageStatistics ? '使用统计已开启' : '使用统计已关闭'); } } catch { setMessage('设置保存失败，请重试'); }
+  };
   const updateAutoOpenSetting = async (autoOpenLiveMatch: boolean) => {
     try { const next = await window.lolViewer?.updateSettings({ autoOpenLiveMatch }); if (next) { settingsRef.current = next; setSettings(next); } } catch { setMessage('Settings could not be saved'); }
   };
@@ -333,7 +336,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     <div hidden={page !== 'history'}><PersonalHistoryPage snapshot={history} state={historyState} onRefresh={() => void refreshHistory()} onPlayerSelect={(target) => void viewPlayerHistory(target)} onBack={historyTarget ? returnToOwnHistory : undefined} refreshing={historyRefreshing} refreshError={historyRefreshError} /></div>
     <div hidden={page !== 'live'}><LiveMatchPage match={liveView.match} players={liveView.match ? undefined : liveView.progress} loadingProgress={liveView.requesting && !liveView.match ? liveView.progress.length : undefined} lifecycleStatus={liveView.status} gameflowPhase={liveView.phase} showLaneDifferences={settings.showLaneDifferences} notice={liveNotice} /></div>
     {page === 'champions' && <ChampionLibraryPage getCatalog={getChampionCatalog} getDetails={getChampionDetails} getGuide={getChampionGuide} />}
-    {page === 'settings' && <SettingsPage settings={settings} message={message} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onLaneDifferencesChange={(checked) => void updateLaneSetting(checked)} onClearCache={() => void clearCache()} />}
+    {page === 'settings' && <SettingsPage settings={settings} message={message} onUsageStatisticsChange={(checked) => void updateUsageStatistics(checked)} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onLaneDifferencesChange={(checked) => void updateLaneSetting(checked)} onClearCache={() => void clearCache()} />}
   </>;
   return <><AppShell active={page} onChange={handleTabChange} liveAttention={liveAttention} onFeedback={() => setFeedbackOpen(true)}>{content}</AppShell><FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} api={window.lolViewer} /></>;
 }

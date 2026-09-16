@@ -6,13 +6,15 @@ import type { MatchCache } from '../cache/database';
 const DEFAULT_SETTINGS: AppSettings = {
   autoOpenLiveMatch: true,
   showLaneDifferences: true,
-  autoAcceptReadyCheck: false
+  autoAcceptReadyCheck: false,
+  usageStatistics: true
 };
 
 const settingsRowSchema = z.object({
   auto_open_live_match: z.union([z.literal(0), z.literal(1)]),
   show_lane_differences: z.union([z.literal(0), z.literal(1)]),
-  auto_accept_ready_check: z.union([z.literal(0), z.literal(1)])
+  auto_accept_ready_check: z.union([z.literal(0), z.literal(1)]),
+  usage_statistics: z.union([z.literal(0), z.literal(1)])
 }).strict();
 
 export class SettingsService {
@@ -25,7 +27,7 @@ export class SettingsService {
 
   get(): AppSettings {
     const rawRow = this.database.prepare(`
-      SELECT auto_open_live_match, show_lane_differences, auto_accept_ready_check
+      SELECT auto_open_live_match, show_lane_differences, auto_accept_ready_check, usage_statistics
       FROM app_settings WHERE id = ?
     `).get(1);
     if (!rawRow) return { ...DEFAULT_SETTINGS };
@@ -33,7 +35,8 @@ export class SettingsService {
     return appSettingsSchema.parse({
       autoOpenLiveMatch: row.auto_open_live_match === 1,
       showLaneDifferences: row.show_lane_differences === 1,
-      autoAcceptReadyCheck: row.auto_accept_ready_check === 1
+      autoAcceptReadyCheck: row.auto_accept_ready_check === 1,
+      usageStatistics: row.usage_statistics === 1
     });
   }
 
@@ -41,13 +44,14 @@ export class SettingsService {
     const next = appSettingsSchema.parse({ ...this.get(), ...appSettingsPatchSchema.parse(patch) });
     this.database.prepare(`
       INSERT INTO app_settings (
-        id, queue_scope, auto_open_live_match, show_lane_differences, auto_accept_ready_check
-      ) VALUES (?, 'all', ?, ?, ?)
+        id, queue_scope, auto_open_live_match, show_lane_differences, auto_accept_ready_check, usage_statistics
+      ) VALUES (?, 'all', ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         auto_open_live_match = excluded.auto_open_live_match,
         show_lane_differences = excluded.show_lane_differences,
-        auto_accept_ready_check = excluded.auto_accept_ready_check
-    `).run(1, Number(next.autoOpenLiveMatch), Number(next.showLaneDifferences), Number(next.autoAcceptReadyCheck));
+        auto_accept_ready_check = excluded.auto_accept_ready_check,
+        usage_statistics = excluded.usage_statistics
+    `).run(1, Number(next.autoOpenLiveMatch), Number(next.showLaneDifferences), Number(next.autoAcceptReadyCheck), Number(next.usageStatistics !== false));
     return next;
   }
 

@@ -4,6 +4,14 @@ import { ChampionGuideCache, MatchCache, migrateDatabase, PersonalHistoryCache }
 import { SettingsService } from './settings-service';
 
 describe('SettingsService', () => {
+  it('keeps statistics opt-out through cache cleanup and service recreation', () => {
+    const database = new Database(':memory:');
+    migrateDatabase(database);
+    const service = new SettingsService(database, new MatchCache(database));
+    service.update({ usageStatistics: false }); service.clearCache();
+    expect(new SettingsService(database, new MatchCache(database)).get().usageStatistics).toBe(false);
+    database.close();
+  });
   it('persists validated partial setting updates', () => {
     const database = new Database(':memory:');
     migrateDatabase(database);
@@ -12,7 +20,8 @@ describe('SettingsService', () => {
     expect(service.update({ autoOpenLiveMatch: false })).toEqual({
       autoOpenLiveMatch: false,
       showLaneDifferences: true,
-      autoAcceptReadyCheck: false
+      autoAcceptReadyCheck: false,
+      usageStatistics: true
     });
     expect(new SettingsService(database, new MatchCache(database)).get().autoOpenLiveMatch).toBe(false);
     expect(() => service.update({ queueScope: 'invalid' } as never)).toThrow();
