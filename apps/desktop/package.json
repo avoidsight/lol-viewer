@@ -1,6 +1,6 @@
 {
   "name": "@lol-viewer/desktop",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "packageManager": "pnpm@10.13.1",
   "type": "module",
@@ -15,7 +15,7 @@
     "test": "pnpm rebuild:test-native && vitest run --configLoader runner",
     "typecheck": "tsc --noEmit",
     "test:e2e": "pnpm build && playwright test",
-    "package:win": "pnpm build && electron-builder --win nsis --x64 --publish never",
+    "package:win": "node ../../scripts/release-version.mjs check && pnpm build && electron-builder --win nsis --x64 --publish never",
     "verify": "pnpm test && pnpm typecheck && pnpm rebuild:native && pnpm smoke:sqlite && electron-vite build"
   },
   "dependencies": {

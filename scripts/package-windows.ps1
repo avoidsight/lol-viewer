@@ -1,5 +1,5 @@
 ﻿[CmdletBinding()]
-param()
+param([string]$Version)
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
@@ -192,6 +192,14 @@ try {
 
     Push-Location $ProjectRoot
     try {
+        $desktopPackage = Get-Content (Join-Path $DesktopDirectory "package.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+        if (-not $Version) {
+            $Version = Read-Host "请输入本次发布版本 x.y.z（当前 $($desktopPackage.version)，回车沿用；需与后台发布版本一致）"
+            if (-not $Version) { $Version = $desktopPackage.version }
+        }
+        & $nodeInstallation.Path (Join-Path $PSScriptRoot "release-version.mjs") set $Version
+        if ($LASTEXITCODE -ne 0) { throw "发布版本无效，请重新打包并输入正确版本号。" }
+
         Write-Step 2 "安装项目依赖"
         Invoke-Pnpm -PnpmArguments @("install", "--frozen-lockfile")
 
@@ -199,9 +207,7 @@ try {
         Invoke-Pnpm -PnpmArguments @("--dir", "apps/desktop", "package:win")
 
         Write-Step 4 "整理安装包和校验文件"
-        $installer = Get-ChildItem -Path $DesktopDistDirectory -Filter "*-setup.exe" -File |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
+        $installer = Get-Item -LiteralPath (Join-Path $DesktopDistDirectory "lol-viewer-$Version-windows-x64-setup.exe") -ErrorAction SilentlyContinue
 
         if (-not $installer) {
             throw "打包命令已结束，但在 $DesktopDistDirectory 中没有找到安装包。"
@@ -232,4 +238,3 @@ try {
 }
 
 exit 0
-
