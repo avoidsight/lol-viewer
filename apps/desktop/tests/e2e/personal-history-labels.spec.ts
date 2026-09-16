@@ -8,8 +8,9 @@ test('personal history uses readable bounded honors and ID-only player tooltips'
     await page.setViewportSize({ width: 1184, height: 735 });
     const rows = page.getByTestId('personal-match');
     await expect(rows).toHaveCount(20);
-    await expect(rows.first().getByTestId('history-highlight')).toHaveText(['三杀', '超神', 'MVP']);
-    await expect(rows.nth(2).getByTestId('history-highlight')).toHaveText(['CARRY', '最高伤害', '最高承伤']);
+    await expect(rows.first().getByTestId('history-highlight')).toHaveText(['超神', '三杀', '最高输出']);
+    await expect(rows.nth(2).getByTestId('history-highlight')).toHaveText(['CARRY', '最高输出', '最高承伤']);
+    await expect(page.getByText('MVP', { exact: true })).toHaveCount(0);
     const player = rows.first().getByRole('button', { name: 'Fixture Enemy 1#192', exact: true });
     await expect(player).toHaveAttribute('title', 'Fixture Enemy 1#192');
     for (const width of [1184, 1000, 900]) {

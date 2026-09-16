@@ -113,10 +113,11 @@ describe('PersonalHistoryPage', () => {
     expect(screen.getAllByRole('img', { name: /己方英雄/ })).toHaveLength(100);
     expect(screen.getAllByRole('img', { name: /敌方英雄/ })).toHaveLength(100);
     expect(document.querySelectorAll('.personal-history__team-icon.is-local')).toHaveLength(20);
-    expect(screen.getByText('最高伤害')).toBeVisible();
+    expect(screen.getByText('最高输出')).toBeVisible();
+    expect(screen.getByText('最高承伤')).toBeVisible();
     expect(screen.queryByText('死亡最多')).not.toBeInTheDocument();
     expect(screen.getByText('三杀')).toBeVisible();
-    expect(screen.getByText('MVP')).toBeVisible();
+    expect(screen.queryByText('MVP')).not.toBeInTheDocument();
   });
 
   it('organizes the dashboard into a compact overview, horizontal favorites, and full-width matches', () => {

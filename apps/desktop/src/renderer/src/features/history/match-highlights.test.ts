@@ -9,14 +9,17 @@ describe('personal history text highlights', () => {
     expect(historyHighlights({ ...match, largestKillingSpree: 7 })).toEqual([]);
     expect(historyHighlights({ ...match, largestKillingSpree: 8 }).map(x => x.label)).toEqual(['超神']);
   });
-  it('caps three honors and prioritizes multi-kill, legendary and MVP over Carry', () => {
-    expect(historyHighlights({ ...match, killParticipation: .8, largestKillingSpree: 9, multiKill: 5, mvp: true, achievements: [{ type: 'MOST_DAMAGE', value: 100 }] }).map(x => x.label)).toEqual(['五杀', '超神', 'MVP']);
+  it('caps three honors in Carry, legendary, multi-kill order even with legacy MVP', () => {
+    expect(historyHighlights({ ...match, killParticipation: .8, largestKillingSpree: 9, multiKill: 5, mvp: true, achievements: [{ type: 'MOST_DAMAGE', value: 100 }, { type: 'MOST_DAMAGE_TAKEN', value: 100 }] }).map(x => x.label)).toEqual(['CARRY', '超神', '五杀']);
   });
   it('uses existing ranked Carry logic and keeps highest damage/tanking readable', () => {
     const data: MatchSummary = { ...match, killParticipation: .8, achievements: [{ type: 'MOST_DAMAGE_TAKEN', value: 10 }, { type: 'MOST_DAMAGE', value: 10 }, { type: 'MOST_GOLD', value: 10 }] };
-    expect(historyHighlights(data).map(x => x.label)).toEqual(['CARRY', '最高伤害', '最高承伤']);
-    expect(historyHighlights({ ...data, queueId: 450 }).map(x => x.label)).toEqual(['最高伤害', '最高承伤', '最高经济']);
+    expect(historyHighlights(data).map(x => x.label)).toEqual(['CARRY', '最高输出', '最高承伤']);
+    expect(historyHighlights({ ...data, queueId: 450 }).map(x => x.label)).toEqual(['最高输出', '最高承伤']);
     expect(historyHighlights({ ...data, remake: true }).some(x => x.label === 'CARRY')).toBe(false);
+  });
+  it('ignores MVP and all unrequested achievements', () => {
+    expect(historyHighlights({ ...match, mvp: true, achievements: ['MOST_GOLD', 'MOST_ASSISTS', 'MOST_KILLS', 'MOST_CS', 'MOST_DEATHS'].map(type => ({ type: type as NonNullable<MatchSummary['achievements']>[number]['type'], value: 10 })) })).toEqual([]);
   });
   it.each([2, 3, 4, 5] as const)('shows one highest multi-kill badge (%s)', multiKill => {
     expect(historyHighlights({ ...match, multiKill })).toHaveLength(1);
