@@ -21,7 +21,11 @@ describe('personal history text highlights', () => {
   it('ignores MVP and all unrequested achievements', () => {
     expect(historyHighlights({ ...match, mvp: true, achievements: ['MOST_GOLD', 'MOST_ASSISTS', 'MOST_KILLS', 'MOST_CS', 'MOST_DEATHS'].map(type => ({ type: type as NonNullable<MatchSummary['achievements']>[number]['type'], value: 10 })) })).toEqual([]);
   });
-  it.each([2, 3, 4, 5] as const)('shows one highest multi-kill badge (%s)', multiKill => {
+  it('omits double kills without occupying a badge slot', () => {
+    expect(historyHighlights({ ...match, multiKill: 2 })).toEqual([]);
+    expect(historyHighlights({ ...match, multiKill: 2, killParticipation: .8, achievements: [{ type: 'MOST_DAMAGE', value: 100 }, { type: 'MOST_DAMAGE_TAKEN', value: 100 }] }).map(x => x.label)).toEqual(['CARRY', '最高输出', '最高承伤']);
+  });
+  it.each([3, 4, 5] as const)('shows one highest multi-kill badge (%s)', multiKill => {
     expect(historyHighlights({ ...match, multiKill })).toHaveLength(1);
   });
 });
