@@ -215,6 +215,8 @@ export type LiveRosterPlayer = z.infer<typeof liveRosterPlayerSchema>;
 export type LiveRoster = z.infer<typeof liveRosterSchema>;
 
 export interface LolViewerApi {
+  getDonationConfig?: () => Promise<import('./donation').DonationConfig>;
+  getDonationImage?: () => Promise<string | null>;
   getFeedbackContext?: import('./feedback').FeedbackApi['getFeedbackContext'];
   submitFeedback?: import('./feedback').FeedbackApi['submitFeedback'];
   getPersonalHistory(target?: PersonalHistoryTarget): Promise<PersonalHistorySnapshot>;

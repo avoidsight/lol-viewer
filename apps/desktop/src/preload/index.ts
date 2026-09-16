@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { z } from 'zod';
+import { DONATION_CONFIG_CHANNEL, DONATION_IMAGE_CHANNEL, donationConfigSchema, donationImageSchema } from '../shared/donation';
 import { FEEDBACK_CONTEXT_CHANNEL, FEEDBACK_SUBMIT_CHANNEL, feedbackContextSchema, feedbackInputSchema, feedbackResultSchema, type FeedbackInput } from '../shared/feedback';
 import type { PersonalHistorySnapshot, PlayerSnapshot, QueueScope } from '../shared/domain';
 import {
@@ -43,6 +44,8 @@ import {
 } from '../shared/ipc';
 
 const api: LolViewerApi = Object.freeze({
+  getDonationConfig: async () => donationConfigSchema.parse(await ipcRenderer.invoke(DONATION_CONFIG_CHANNEL)),
+  getDonationImage: async () => donationImageSchema.parse(await ipcRenderer.invoke(DONATION_IMAGE_CHANNEL)),
   getFeedbackContext: async () => feedbackContextSchema.parse(await ipcRenderer.invoke(FEEDBACK_CONTEXT_CHANNEL)),
   submitFeedback: async (input: FeedbackInput) => feedbackResultSchema.parse(await ipcRenderer.invoke(FEEDBACK_SUBMIT_CHANNEL, feedbackInputSchema.parse(input))),
   getPersonalHistory: async (target?: PersonalHistoryTarget): Promise<PersonalHistorySnapshot> => {

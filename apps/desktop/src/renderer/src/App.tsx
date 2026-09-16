@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import type { PersonalHistorySnapshot } from '../../shared/domain';
 import type { AppSettings, LolViewerApi, PersonalHistoryTarget } from '../../shared/ipc';
 import AppShell, { type AppTab } from './AppShell';
+import { DonationControl } from './features/donation/DonationControl';
 import ChampionLibraryPage from './features/champions/ChampionLibraryPage';
 import PersonalHistoryPage from './features/history/PersonalHistoryPage';
 import LiveMatchPage from './features/live/LiveMatchPage';
@@ -353,5 +354,5 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     {page === 'champions' && <ChampionLibraryPage getCatalog={getChampionCatalog} getDetails={getChampionDetails} getGuide={getChampionGuide} />}
     {page === 'settings' && <SettingsPage settings={settings} message={message} onUsageStatisticsChange={(checked) => void updateUsageStatistics(checked)} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onLaneDifferencesChange={(checked) => void updateLaneSetting(checked)} onClearCache={() => void clearCache()} />}
   </>;
-  return <><AppShell active={page} onChange={handleTabChange} liveAttention={liveAttention} onFeedback={() => setFeedbackOpen(true)}>{content}</AppShell><FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} api={window.lolViewer} /></>;
+  return <><AppShell active={page} onChange={handleTabChange} liveAttention={liveAttention} support={<DonationControl api={window.lolViewer} />} onFeedback={() => setFeedbackOpen(true)}>{content}</AppShell><FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} api={window.lolViewer} /></>;
 }

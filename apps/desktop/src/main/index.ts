@@ -2,6 +2,8 @@ import { join } from 'node:path';
 import { release } from 'node:os';
 import { readFileSync } from 'node:fs';
 import { registerFeedbackIpc } from './ipc/register-feedback-ipc';
+import { registerDonationIpc } from './ipc/register-donation-ipc';
+import { DonationService } from './donation/service';
 import { createDeviceIdProvider } from './feedback/device-id';
 import { FeedbackService, feedbackEndpoint } from './feedback/feedback-service';
 import Database from 'better-sqlite3';
@@ -78,6 +80,7 @@ function createWindow(): void {
 
 void app.whenReady().then(() => {
   const fixtureMode = fixtureModeEnabled(process.argv, app.isPackaged, process.env);
+  registerDonationIpc(new DonationService(app.isPackaged && !fixtureMode));
   const aramFixtureMode = fixtureMode && process.argv.includes('--fixture-aram');
   registerLcuAssetProtocol(join(app.getPath('userData'), 'asset-cache'), fixtureMode);
   database = new Database(join(app.getPath('userData'), 'lol-viewer.sqlite3'));
