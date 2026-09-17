@@ -27,7 +27,7 @@ export class UpdateService {
         }
       } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
       const { release } = responseSchema.parse(JSON.parse(Buffer.concat(chunks).toString('utf8')));
-      return release?.important && newerVersion(release.version, this.version) ? release : null;
+      return release && newerVersion(release.version, this.version) ? release : null;
     } catch { return null; }
   }
   private latest(force = false): Promise<Release | null> {
@@ -40,7 +40,7 @@ export class UpdateService {
   }
   async check(): Promise<AvailableUpdate | null> {
     const release = await this.latest();
-    return release ? { version: release.version, notes: release.notes } : null;
+    return release ? { version: release.version, notes: release.notes, important: release.important } : null;
   }
   async open(version: string): Promise<boolean> {
     if (!versionSchema.safeParse(version).success) return false;

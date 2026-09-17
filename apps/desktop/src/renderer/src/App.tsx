@@ -50,6 +50,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   const [historyRefreshError, setHistoryRefreshError] = useState('');
   const [liveView, dispatchLiveView] = useReducer(liveMatchReducer, initialLiveMatchState);
   const [liveAttention, setLiveAttention] = useState(false);
+  const [updatePhase, setUpdatePhase] = useState<string | undefined>(undefined);
   const [settings, setSettings] = useState<AppSettings>(defaults);
   const [message, setMessage] = useState('');
   const [retryNonce, setRetryNonce] = useState(0);
@@ -179,6 +180,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
         const identity = await api.getGameflowSessionIdentity();
         if (!active) return;
         const phase = identity.phase;
+        setUpdatePhase(phase);
         const isActive = activePhases.has(phase);
         const enteredChampionSelect = previousPhase !== undefined && phase === 'ChampSelect' && previousPhase !== 'ChampSelect';
         const gameIdChanged = isActive && identity.gameId !== undefined && currentGameIdRef.current !== undefined && identity.gameId !== currentGameIdRef.current;
@@ -231,6 +233,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
         }
       } catch (error) {
         // Preserve completed snapshots, but never leave an empty page loading forever.
+        if (active) setUpdatePhase(undefined);
         if (active && pageRef.current === 'live' && !liveViewRef.current.match) {
           generation.current += 1;
           void Promise.resolve(window.lolViewer?.cancelLiveMatch?.()).catch(() => undefined);
@@ -366,5 +369,5 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     {page === 'settings' && <SettingsPage settings={settings} message={message} onAutoCopyEnemyHistoryChange={(checked) => void updateAutoCopySetting(checked)} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onClearCache={() => void clearCache()} />}
     {clipboardNotice && <div role="status" className="clipboard-notice">敌方战绩已复制</div>}
   </>;
-  return <><AppShell active={page} onChange={handleTabChange} liveAttention={liveAttention} support={<><UpdateControl api={window.lolViewer} /><DonationControl api={window.lolViewer} /></>} onFeedback={() => setFeedbackOpen(true)}>{content}</AppShell><FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} api={window.lolViewer} /></>;
+return <><AppShell active={page} onChange={handleTabChange} liveAttention={liveAttention} support={<><UpdateControl api={window.lolViewer} canAutoPrompt={!feedbackOpen && ['None', 'Lobby', 'EndOfGame'].includes(updatePhase ?? '')} /><DonationControl api={window.lolViewer} /></>} onFeedback={() => setFeedbackOpen(true)}>{content}</AppShell><FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} api={window.lolViewer} /></>;
 }
