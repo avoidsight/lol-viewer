@@ -3,6 +3,7 @@ import type { PersonalHistorySnapshot } from '../../shared/domain';
 import type { AppSettings, LolViewerApi, PersonalHistoryTarget } from '../../shared/ipc';
 import AppShell, { type AppTab } from './AppShell';
 import { DonationControl } from './features/donation/DonationControl';
+import { UpdateControl } from './features/updates/UpdateControl';
 import ChampionLibraryPage from './features/champions/ChampionLibraryPage';
 import PersonalHistoryPage from './features/history/PersonalHistoryPage';
 import LiveMatchPage from './features/live/LiveMatchPage';
@@ -365,5 +366,5 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     {page === 'settings' && <SettingsPage settings={settings} message={message} onAutoCopyEnemyHistoryChange={(checked) => void updateAutoCopySetting(checked)} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onClearCache={() => void clearCache()} />}
     {clipboardNotice && <div role="status" className="clipboard-notice">敌方战绩已复制</div>}
   </>;
-  return <><AppShell active={page} onChange={handleTabChange} liveAttention={liveAttention} support={<DonationControl api={window.lolViewer} />} onFeedback={() => setFeedbackOpen(true)}>{content}</AppShell><FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} api={window.lolViewer} /></>;
+  return <><AppShell active={page} onChange={handleTabChange} liveAttention={liveAttention} support={<><UpdateControl api={window.lolViewer} /><DonationControl api={window.lolViewer} /></>} onFeedback={() => setFeedbackOpen(true)}>{content}</AppShell><FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} api={window.lolViewer} /></>;
 }

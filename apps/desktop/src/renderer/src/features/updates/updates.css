@@ -1,0 +1,16 @@
+.update-trigger { display:flex; align-items:center; gap:6px; padding:7px 10px; border:1px solid #38738b; border-radius:7px; background:#122f40; color:#9de3ff; font:inherit; font-size:12px; cursor:pointer; white-space:nowrap; }
+.update-trigger svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.7; }
+.update-trigger__dot { width:5px; height:5px; background:#83e3fd; border-radius:50%; }
+.update-dialog { margin:auto; width:min(540px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; box-sizing:border-box; padding:26px; border:1px solid #345469; border-radius:16px; background:#121e2b; color:#edf4fa; box-shadow:0 24px 80px #0009; }
+.update-dialog::backdrop { background:#03070dbb; }
+.update-dialog__badge { font-size:11px; color:#8bdefa; background:#19364a; padding:4px 8px; border-radius:4px; }
+.update-dialog h2 { margin:16px 0; font-size:22px; }
+.update-dialog__notes { white-space:pre-wrap; overflow-wrap:anywhere; max-height:45vh; overflow:auto; padding:16px; border-radius:8px; background:#0c1520; font-size:14px; line-height:1.8; }
+.update-dialog__hint { color:#99aabd; font-size:12px; line-height:1.7; }
+.update-dialog__actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:20px; }
+.update-dialog button { padding:8px 14px; border-radius:6px; border:1px solid #41566b; background:#1d2b3b; color:#dce7f1; cursor:pointer; }
+.update-dialog .update-dialog__primary { background:#77d6f4; color:#102734; border-color:#77d6f4; font-weight:700; }
+.update-dialog .update-dialog__ignore { margin-right:auto; padding-left:0; border-color:transparent; background:transparent; color:#9cadbe; font-size:12px; }
+.update-dialog button:disabled { opacity:.5; cursor:wait; }
+.update-dialog__error { color:#ffb5b5; font-size:12px; }
+.update-trigger:focus-visible,.update-dialog button:focus-visible { outline:2px solid #8bdefa; outline-offset:3px; }

@@ -218,6 +218,8 @@ export type LiveRosterPlayer = z.infer<typeof liveRosterPlayerSchema>;
 export type LiveRoster = z.infer<typeof liveRosterSchema>;
 
 export interface LolViewerApi {
+  checkUpdate?: () => Promise<import('./updates').AvailableUpdate | null>;
+  openUpdate?: (version: string) => Promise<boolean>;
   onEnemyHistoryCopied?: (callback: () => void) => () => void;
   getDonationConfig?: () => Promise<import('./donation').DonationConfig>;
   getDonationImage?: () => Promise<string | null>;

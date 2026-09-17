@@ -7,7 +7,9 @@ import { DonationService } from './donation/service';
 import { createDeviceIdProvider } from './feedback/device-id';
 import { FeedbackService, feedbackEndpoint } from './feedback/feedback-service';
 import Database from 'better-sqlite3';
-import { app, BrowserWindow, protocol, powerMonitor, clipboard } from 'electron';
+import { app, BrowserWindow, protocol, powerMonitor, clipboard, shell } from 'electron';
+import { UpdateService } from './updates/service';
+import { registerUpdateIpc } from './ipc/register-update-ipc';
 import { EnemyHistoryClipboard } from './match/enemy-history-clipboard';
 import { ENEMY_HISTORY_COPIED_CHANNEL } from '../shared/enemy-history';
 import { UsageReporter } from './telemetry/reporter';
@@ -84,6 +86,7 @@ function createWindow(): void {
 void app.whenReady().then(() => {
   const fixtureMode = fixtureModeEnabled(process.argv, app.isPackaged, process.env);
   registerDonationIpc(new DonationService(app.isPackaged && !fixtureMode));
+  registerUpdateIpc(new UpdateService(app.isPackaged && !fixtureMode, app.getVersion(), url => shell.openExternal(url)));
   const aramFixtureMode = fixtureMode && process.argv.includes('--fixture-aram');
   registerLcuAssetProtocol(join(app.getPath('userData'), 'asset-cache'), fixtureMode);
   database = new Database(join(app.getPath('userData'), 'lol-viewer.sqlite3'));

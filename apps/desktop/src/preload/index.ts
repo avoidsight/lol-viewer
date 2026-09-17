@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { z } from 'zod';
+import { UPDATE_CHECK, UPDATE_OPEN, updateSchema, versionSchema } from '../shared/updates';
 import { ENEMY_HISTORY_COPIED_CHANNEL } from '../shared/enemy-history';
 import { DONATION_CONFIG_CHANNEL, DONATION_IMAGE_CHANNEL, donationConfigSchema, donationImageSchema } from '../shared/donation';
 import { FEEDBACK_CONTEXT_CHANNEL, FEEDBACK_SUBMIT_CHANNEL, feedbackContextSchema, feedbackInputSchema, feedbackResultSchema, type FeedbackInput } from '../shared/feedback';
@@ -45,6 +46,8 @@ import {
 } from '../shared/ipc';
 
 const api: LolViewerApi = Object.freeze({
+  checkUpdate: async () => updateSchema.nullable().parse(await ipcRenderer.invoke(UPDATE_CHECK)),
+  openUpdate: async (version: string) => z.boolean().parse(await ipcRenderer.invoke(UPDATE_OPEN, versionSchema.parse(version))),
   onEnemyHistoryCopied: (callback: () => void) => {
     const listener = () => callback();
     ipcRenderer.on(ENEMY_HISTORY_COPIED_CHANNEL, listener);
