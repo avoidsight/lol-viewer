@@ -12,6 +12,13 @@ test('live detail and overview only show custom awards and carry without overflo
     await expect(page.getByTestId('player-card')).toHaveCount(10);
     for (const mode of ['详细', '总览']) {
       await page.getByRole('button', { name: mode, exact: true }).click();
+      const firstRow = page.getByTestId('player-card').first().getByTestId('recent-match').first();
+      await expect(firstRow.locator('.recent-match__honors > span')).toHaveCount(mode === '总览' ? 1 : 2);
+      if (mode === '总览') {
+        await firstRow.hover();
+        await expect(page.getByRole('tooltip').locator('.recent-match__honors > span')).toHaveCount(2);
+        await page.getByRole('button', { name: '总览', exact: true }).hover();
+      }
       for (const width of [1184, 900]) {
         await page.setViewportSize({ width, height: 735 });
         await expect(page.locator('.recent-match__award').first()).toBeVisible();

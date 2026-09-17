@@ -35,7 +35,7 @@ export default function RecentMatch({ match, itemIconPaths = {}, compact = false
       <span className="recent-match__performance">
         {(form?.tier === 'carry' || award) && <span className="recent-match__honors">
           {award && <span className={`recent-match__award${award === 'SVP' ? ' is-svp' : ''}`} title={`${award} · 本工具自定义评分 · 该场己方五人中综合分唯一最高，非官方评级`}>{award}</span>}
-          {form?.tier === 'carry' && <span className="recent-match__form" title={form.description}>CARRY</span>}
+          {form?.tier === 'carry' && (!compact || !award) && <span className="recent-match__form" title={form.description}>CARRY</span>}
         </span>}
         <span className="recent-match__kda" aria-hidden="true"><b>{match.kills}</b><i>/</i><b>{match.deaths}</b><i>/</i><b>{match.assists}</b></span>
         <small className="recent-match__mode">{describeQueue(match.queueId)}</small>

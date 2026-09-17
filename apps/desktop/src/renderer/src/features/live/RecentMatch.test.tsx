@@ -38,14 +38,17 @@ describe('live history detail row', () => {
     expect(screen.getByRole('img', { name: '装备 3071' })).toBeVisible();
     expect(screen.queryByRole('img', { name: '装备 3053' })).not.toBeInTheDocument();
   });
-  it.each([true, false])('shows custom MVP/SVP alongside CARRY in either view (compact=%s)', compact => {
+  it.each([true, false])('prioritizes custom MVP/SVP in overview and keeps both in detail (compact=%s)', compact => {
     const data = { ...match, killParticipation: .7, teamDamageShare: .35, teamDamageTakenShare: .3, multiKill: 5 as const };
     const { rerender } = render(<ol><RecentMatch compact={compact} match={{ ...data, performanceAward: 'MVP' }} /></ol>);
     expect(screen.getByText('MVP')).toHaveAttribute('title', expect.stringContaining('非官方'));
-    expect(screen.getByText('CARRY')).toBeVisible();
+    if (compact) expect(screen.queryByText('CARRY')).toBeNull();
+    else expect(screen.getByText('CARRY')).toBeVisible();
     expect(screen.queryByText('五杀')).toBeNull();
     rerender(<ol><RecentMatch compact={compact} match={{ ...data, win: false, performanceAward: 'SVP' }} /></ol>);
     expect(screen.getByText('SVP')).toHaveClass('is-svp');
+    if (compact) expect(screen.queryByText('CARRY')).toBeNull();
+    else expect(screen.getByText('CARRY')).toBeVisible();
     expect(screen.queryByText('MVP')).toBeNull();
     rerender(<ol><RecentMatch compact={compact} match={{ ...data, win: false, performanceAward: 'MVP' }} /></ol>);
     expect(screen.queryByText('MVP')).toBeNull();
