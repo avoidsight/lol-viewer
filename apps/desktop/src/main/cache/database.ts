@@ -69,6 +69,11 @@ export function migrateDatabase(database: Database.Database): void {
       database.exec('ALTER TABLE app_settings ADD COLUMN usage_statistics INTEGER NOT NULL DEFAULT 1;');
       database.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)').run(5, Date.now());
     }
+    if (!database.prepare('SELECT 1 FROM schema_migrations WHERE version = ?').get(6)) {
+      database.exec(`ALTER TABLE app_settings ADD COLUMN auto_copy_enemy_history INTEGER NOT NULL DEFAULT 0;
+        CREATE TABLE copied_enemy_games (game_id TEXT PRIMARY KEY, copied_at INTEGER NOT NULL);`);
+      database.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)').run(6, Date.now());
+    }
   })();
 }
 

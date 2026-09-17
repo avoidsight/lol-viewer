@@ -41,6 +41,7 @@ function LiveStateNotice({
 export default function App({ initialTab = 'history' }: { initialTab?: AppTab } = {}) {
   const [page, setPage] = useState<AppTab>(initialTab);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [clipboardNotice, setClipboardNotice] = useState(false);
   const [history, setHistory] = useState<PersonalHistorySnapshot>();
   const [historyTarget, setHistoryTarget] = useState<PersonalHistoryTarget>();
   const [historyState, setHistoryState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
@@ -86,6 +87,15 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
 
   useEffect(() => { pageRef.current = page; }, [page]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const unsubscribe = window.lolViewer?.onEnemyHistoryCopied?.(() => {
+      setClipboardNotice(true);
+      clearTimeout(timer);
+      timer = setTimeout(() => setClipboardNotice(false), 5000);
+    });
+    return () => { unsubscribe?.(); clearTimeout(timer); };
+  }, []);
 
   useEffect(() => {
     if (page !== 'history' || historyTarget || historyState !== 'unavailable' || !window.lolViewer) return;
@@ -321,6 +331,12 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   const updateAutoAcceptSetting = async (autoAcceptReadyCheck: boolean) => {
     try { const next = await window.lolViewer?.updateSettings({ autoAcceptReadyCheck }); if (next) { settingsRef.current = next; setSettings(next); } } catch { setMessage('Settings could not be saved'); }
   };
+  const updateAutoCopySetting = async (autoCopyEnemyHistory: boolean) => {
+    try {
+      const next = await window.lolViewer?.updateSettings({ autoCopyEnemyHistory });
+      if (next) { settingsRef.current = next; setSettings(next); setMessage(autoCopyEnemyHistory ? '已开启：下次对局战绩加载完成后自动复制' : '自动复制已关闭'); }
+    } catch { setMessage('设置保存失败，请重试'); }
+  };
   const updateUsageStatistics = async (usageStatistics: boolean) => {
     try { const next = await window.lolViewer?.updateSettings({ usageStatistics }); if (next) { settingsRef.current = next; setSettings(next); setMessage(usageStatistics ? '使用统计已开启' : '使用统计已关闭'); } } catch { setMessage('设置保存失败，请重试'); }
   };
@@ -352,7 +368,8 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     <div hidden={page !== 'history'}><PersonalHistoryPage snapshot={history} state={historyState} onRefresh={() => void refreshHistory()} onPlayerSelect={(target) => void viewPlayerHistory(target)} onBack={historyTarget ? returnToOwnHistory : undefined} refreshing={historyRefreshing} refreshError={historyRefreshError} /></div>
     <div hidden={page !== 'live'}><LiveMatchPage match={liveView.match} players={liveView.match ? undefined : liveView.progress} loadingProgress={liveView.requesting && !liveView.match && (liveView.progress.length > 0 || (liveView.phase !== undefined && activePhases.has(liveView.phase))) ? liveView.progress.length : undefined} lifecycleStatus={liveView.status} gameflowPhase={liveView.phase} showLaneDifferences={settings.showLaneDifferences} notice={liveNotice} /></div>
     {page === 'champions' && <ChampionLibraryPage getCatalog={getChampionCatalog} getDetails={getChampionDetails} getGuide={getChampionGuide} />}
-    {page === 'settings' && <SettingsPage settings={settings} message={message} onUsageStatisticsChange={(checked) => void updateUsageStatistics(checked)} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onLaneDifferencesChange={(checked) => void updateLaneSetting(checked)} onClearCache={() => void clearCache()} />}
+    {page === 'settings' && <SettingsPage settings={settings} message={message} onAutoCopyEnemyHistoryChange={(checked) => void updateAutoCopySetting(checked)} onUsageStatisticsChange={(checked) => void updateUsageStatistics(checked)} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onLaneDifferencesChange={(checked) => void updateLaneSetting(checked)} onClearCache={() => void clearCache()} />}
+    {clipboardNotice && <div role="status" className="clipboard-notice">敌方战绩已复制，可在队伍聊天中粘贴发送</div>}
   </>;
   return <><AppShell active={page} onChange={handleTabChange} liveAttention={liveAttention} support={<DonationControl api={window.lolViewer} />} onFeedback={() => setFeedbackOpen(true)}>{content}</AppShell><FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} api={window.lolViewer} /></>;
 }

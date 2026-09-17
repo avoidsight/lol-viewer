@@ -57,3 +57,4 @@ button { font: inherit; }
   70% { box-shadow: 0 0 0 8px rgb(255 93 93 / 0); }
   100% { box-shadow: 0 0 0 0 rgb(255 93 93 / 0); }
 }
+.clipboard-notice { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 40px); padding: 12px 20px; border: 1px solid #2c807a; border-radius: 10px; color: #d6fff5; background: #12332fee; box-shadow: 0 8px 32px #0006; font-size: 13px; z-index: 50; pointer-events: none; }

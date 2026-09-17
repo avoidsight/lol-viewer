@@ -4,6 +4,14 @@ import { ChampionGuideCache, MatchCache, migrateDatabase, PersonalHistoryCache }
 import { SettingsService } from './settings-service';
 
 describe('SettingsService', () => {
+  it('keeps auto copy opt-in and persists it through cache cleanup', () => {
+    const database = new Database(':memory:'); migrateDatabase(database);
+    const service = new SettingsService(database, new MatchCache(database));
+    expect(service.get().autoCopyEnemyHistory).toBe(false);
+    service.update({ autoCopyEnemyHistory: true }); service.clearCache();
+    expect(new SettingsService(database, new MatchCache(database)).get().autoCopyEnemyHistory).toBe(true);
+    database.close();
+  });
   it('keeps statistics opt-out through cache cleanup and service recreation', () => {
     const database = new Database(':memory:');
     migrateDatabase(database);
@@ -21,7 +29,8 @@ describe('SettingsService', () => {
       autoOpenLiveMatch: false,
       showLaneDifferences: true,
       autoAcceptReadyCheck: false,
-      usageStatistics: true
+      usageStatistics: true,
+      autoCopyEnemyHistory: false
     });
     expect(new SettingsService(database, new MatchCache(database)).get().autoOpenLiveMatch).toBe(false);
     expect(() => service.update({ queueScope: 'invalid' } as never)).toThrow();

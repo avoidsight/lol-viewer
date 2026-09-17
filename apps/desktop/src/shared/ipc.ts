@@ -30,6 +30,7 @@ const matchParticipantSummarySchema = z.object({
 }).strict();
 export const queueScopeSchema = z.enum(['ranked-solo', 'all']);
 export const appSettingsSchema = z.object({
+  autoCopyEnemyHistory: z.boolean().optional(),
   autoOpenLiveMatch: z.boolean(),
   showLaneDifferences: z.boolean(),
   autoAcceptReadyCheck: z.boolean(),
@@ -215,6 +216,7 @@ export type LiveRosterPlayer = z.infer<typeof liveRosterPlayerSchema>;
 export type LiveRoster = z.infer<typeof liveRosterSchema>;
 
 export interface LolViewerApi {
+  onEnemyHistoryCopied?: (callback: () => void) => () => void;
   getDonationConfig?: () => Promise<import('./donation').DonationConfig>;
   getDonationImage?: () => Promise<string | null>;
   getFeedbackContext?: import('./feedback').FeedbackApi['getFeedbackContext'];

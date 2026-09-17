@@ -7,7 +7,9 @@ import { DonationService } from './donation/service';
 import { createDeviceIdProvider } from './feedback/device-id';
 import { FeedbackService, feedbackEndpoint } from './feedback/feedback-service';
 import Database from 'better-sqlite3';
-import { app, BrowserWindow, protocol, powerMonitor } from 'electron';
+import { app, BrowserWindow, protocol, powerMonitor, clipboard } from 'electron';
+import { EnemyHistoryClipboard } from './match/enemy-history-clipboard';
+import { ENEMY_HISTORY_COPIED_CHANNEL } from '../shared/enemy-history';
 import { UsageReporter } from './telemetry/reporter';
 import { is } from '@electron-toolkit/utils';
 import appIcon from '../../resources/icon.png?asset';
@@ -164,6 +166,18 @@ void app.whenReady().then(() => {
       return new PersonalHistoryService(lcu, personalHistoryCache, sgp, staticData).load(target);
     }
   });
+  const readIdentity = async () => {
+    if (fixtureMode || aramFixtureMode) return { phase: 'InProgress', gameId: 'fixture-game' };
+    const connection = await discoverLcuConnection();
+    if (!connection) return { phase: 'None', connected: false };
+    return { ...await readGameflowSessionIdentity(createLcuClient(connection)), connected: true };
+  };
+  const enemyClipboard = new EnemyHistoryClipboard(database, {
+    enabled: () => !fixtureMode && settingsService.get().autoCopyEnemyHistory === true,
+    identity: readIdentity,
+    write: text => clipboard.writeText(text),
+    notify: () => { for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send(ENEMY_HISTORY_COPIED_CHANNEL); }
+  });
   coordinator = new GameflowCoordinator(async (scope, onPlayer, signal) => {
       if (aramFixtureMode) return createFixtureAramLiveMatch(scope);
       if (fixtureMode) return createFixtureLiveMatch(scope);
@@ -174,7 +188,9 @@ void app.whenReady().then(() => {
       const sgp = connection.region?.toUpperCase() === 'TENCENT' && connection.rsoPlatformId
         ? createSgpClient(lcu, connection.rsoPlatformId)
         : undefined;
-      return new MatchService(lcu, { cache, staticData, ...(sgp ? { sgp } : {}) }).loadLiveMatch(scope, onPlayer, signal);
+      const match = await new MatchService(lcu, { cache, staticData, ...(sgp ? { sgp } : {}) }).loadLiveMatch(scope, onPlayer, signal);
+      await enemyClipboard.copy(match, signal);
+      return match;
   });
   registerMatchIpc({
     loadLiveMatch: (scope, onPlayer) => coordinator!.loadLiveMatch(scope, onPlayer),
@@ -193,12 +209,7 @@ void app.whenReady().then(() => {
       if (!connection) throw new Error('League client is unavailable');
       return createLcuClient(connection).get('/lol-gameflow/v1/gameflow-phase', z.string().min(1));
     },
-    getGameflowSessionIdentity: async () => {
-      if (fixtureMode || aramFixtureMode) return { phase: 'InProgress', gameId: 'fixture-game' };
-      const connection = await discoverLcuConnection();
-      if (!connection) return { phase: 'None', connected: false };
-      return { ...await readGameflowSessionIdentity(createLcuClient(connection)), connected: true };
-    }
+    getGameflowSessionIdentity: readIdentity
   });
   createWindow();
   // Development and fixture sessions must never pollute production statistics.
