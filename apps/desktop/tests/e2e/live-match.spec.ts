@@ -10,6 +10,8 @@ test('three tabs load personal history first and live comparison on demand', asy
 
   try {
     const page = await app.firstWindow();
+    await expect(page).toHaveTitle('峡谷雷达');
+    await expect(page.locator('.app-shell__brand')).toHaveText('峡谷雷达');
     await expect(page.getByRole('tab')).toHaveCount(3);
     await expect(page.getByRole('tab', { name: '战绩' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByTestId('personal-match')).toHaveCount(20);

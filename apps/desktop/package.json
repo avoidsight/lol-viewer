@@ -46,7 +46,7 @@
   },
   "build": {
     "appId": "cn.lolviewer.desktop",
-    "productName": "LOL Viewer",
+    "productName": "峡谷雷达",
     "directories": { "output": "dist" },
     "files": ["out/**/*", "resources/icon.png", "package.json"],
     "asar": true,
@@ -58,7 +58,7 @@
       "requestedExecutionLevel": "requireAdministrator",
       "signAndEditExecutable": true,
       "signExecutable": false,
-      "artifactName": "lol-viewer-${version}-windows-${arch}-setup.${ext}"
+      "artifactName": "峡谷雷达-${version}-windows-${arch}-setup.${ext}"
     },
     "nsis": {
       "oneClick": false,

@@ -207,7 +207,7 @@ try {
         Invoke-Pnpm -PnpmArguments @("--dir", "apps/desktop", "package:win")
 
         Write-Step 4 "整理安装包和校验文件"
-        $installer = Get-Item -LiteralPath (Join-Path $DesktopDistDirectory "lol-viewer-$Version-windows-x64-setup.exe") -ErrorAction SilentlyContinue
+        $installer = Get-Item -LiteralPath (Join-Path $DesktopDistDirectory "峡谷雷达-$Version-windows-x64-setup.exe") -ErrorAction SilentlyContinue
 
         if (-not $installer) {
             throw "打包命令已结束，但在 $DesktopDistDirectory 中没有找到安装包。"
@@ -219,7 +219,7 @@ try {
 
         $hash = (Get-FileHash -Path $releaseInstaller -Algorithm SHA256).Hash.ToLowerInvariant()
         $hashFile = "$releaseInstaller.sha256"
-        Set-Content -Path $hashFile -Value "$hash  $($installer.Name)" -Encoding ASCII
+        [System.IO.File]::WriteAllText($hashFile, "$hash  $($installer.Name)`r`n", $Utf8Encoding)
 
         Write-Host ""
         Write-Host "打包成功：" -ForegroundColor Green

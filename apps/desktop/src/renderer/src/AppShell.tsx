@@ -28,7 +28,7 @@ export default function AppShell({ active, onChange, children, liveAttention = f
     if (!target) return;
     event.preventDefault(); selectAndFocus(target);
   };
-  return <div className="app-shell"><nav className="app-shell__bar" aria-label="主导航"><strong className="app-shell__brand">LOL Viewer</strong><div className="app-shell__tabs" role="tablist" aria-label="功能页面">{tabs.map(({ id, label }) => {
+  return <div className="app-shell"><nav className="app-shell__bar" aria-label="主导航"><strong className="app-shell__brand">峡谷雷达</strong><div className="app-shell__tabs" role="tablist" aria-label="功能页面">{tabs.map(({ id, label }) => {
     const attention = liveAttention && id === 'live';
     return <button key={id} ref={(element) => { if (element) tabRefs.current[id] = element; }} id={`tab-${id}`} type="button" role="tab" className={attention ? 'app-shell__tab--attention' : undefined} aria-selected={selected === id} aria-controls={`panel-${id}`} tabIndex={selected === id ? 0 : -1} onClick={() => selectAndFocus(id)} onKeyDown={(event) => handleKeyDown(event, id)}>{label}</button>;
   })}</div><div className="app-shell__actions">{support}{onFeedback && <button type="button" className="app-shell__feedback" onClick={onFeedback}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 3h12a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-5 3v-3H3V4a1 1 0 0 1 1-1Z" /><path d="M6 7h8M6 10h5" /></svg>反馈</button>}</div></nav><div id={`panel-${active}`} role="tabpanel" aria-labelledby={`tab-${active}`}>{children}</div></div>;

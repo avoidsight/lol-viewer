@@ -357,7 +357,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
       : liveView.status === 'loading' && !liveView.match && liveView.progress.length === 0
       ? <LiveStateNotice kind="loading" title={liveView.phase && activePhases.has(liveView.phase) ? '正在读取对局阵容' : '正在检测客户端与对局状态'} detail="检测完成后会自动更新，无需手动刷新。" />
       : liveView.status === 'error'
-      ? <LiveStateNotice kind="error" alert title={liveErrorMessages[liveView.errorReason ?? 'data-unavailable']} detail={liveView.errorReason === 'client-unavailable' ? '启动客户端后会自动重新连接，无需手动刷新。' : 'LOL Viewer 会在后台低频重试，已有数据不会被清空。'} />
+      ? <LiveStateNotice kind="error" alert title={liveErrorMessages[liveView.errorReason ?? 'data-unavailable']} detail={liveView.errorReason === 'client-unavailable' ? '启动客户端后会自动重新连接，无需手动刷新。' : '峡谷雷达 会在后台低频重试，已有数据不会被清空。'} />
       : liveView.status === 'paused'
         ? <LiveStateNotice kind="paused" title="游戏已经开始，已停止后台补全战绩，避免影响游戏性能" detail="已读取的玩家数据会继续保留，下一局将自动恢复加载。" />
       : !liveView.match && liveView.progress.length === 0 && (liveView.status === 'waiting' || liveView.status === 'new-match-loading')

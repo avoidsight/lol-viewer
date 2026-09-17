@@ -64,6 +64,7 @@ function createWindow(): void {
   const window = new BrowserWindow({
     width: 1200,
     height: 800,
+    title: '峡谷雷达',
     icon: appIcon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),

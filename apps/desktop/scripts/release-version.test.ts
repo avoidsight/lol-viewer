@@ -37,7 +37,7 @@ describe('release version guard', () => {
     expect(pkg.scripts['package:win']).toMatch(/^node .*release-version.mjs check &&/);
     const script = readFileSync(resolve('../../scripts/package-windows.ps1'), 'utf8');
     expect(script).toContain('param([string]$Version)');
-    expect(script).toContain('lol-viewer-$Version-windows-x64-setup.exe');
+    expect(script).toContain('峡谷雷达-$Version-windows-x64-setup.exe');
     expect(script).not.toContain('Sort-Object LastWriteTime');
   });
 });

@@ -1,21 +1,21 @@
 @echo off
+chcp 65001 >nul 2>&1
 
 rem Double-clicking this file first opens a dedicated console window. The second
 rem invocation performs the real work inside that window and waits before exit.
 if /I not "%~1"=="--console" (
-  start "LOL Viewer - Windows Packaging" "%ComSpec%" /d /c call "%~f0" --console
+  start "峡谷雷达 - Windows 打包" "%ComSpec%" /d /c call "%~f0" --console
   exit /b 0
 )
 
 setlocal
-chcp 65001 >nul 2>&1
-title LOL Viewer - Windows Packaging
+title 峡谷雷达 - Windows 打包
 mode con cols=110 lines=34 >nul 2>&1
 
 set "PROJECT_DIR=%~dp0"
 
 echo ============================================================
-echo LOL Viewer - Windows Packaging
+echo 峡谷雷达 - Windows 打包
 echo ============================================================
 echo Source: %PROJECT_DIR%
 echo.
