@@ -30,12 +30,26 @@ describe('live history detail row', () => {
     expect(container.querySelector('.recent-match__items')).toBeNull();
   });
 
-  it('shows supplied honors, spells and only equipment with resolved icons', () => {
+  it('hides legacy MVP and multikills but keeps spells and resolved equipment', () => {
     render(<ol><RecentMatch match={{ ...match, mvp: true, multiKill: 3, summonerSpellIds: [4, 12], itemIds: [3071, 3053] }} itemIconPaths={{ 3071: '/lol-game-data/assets/ASSETS/Items/Icons2D/3071.png' }} /></ol>);
-    expect(screen.getByText('MVP')).toBeVisible();
-    expect(screen.getByText('三杀')).toBeVisible();
+    expect(screen.queryByText('MVP')).toBeNull();
+    expect(screen.queryByText('三杀')).toBeNull();
     expect(screen.getByRole('img', { name: '召唤师技能 4' })).toBeVisible();
     expect(screen.getByRole('img', { name: '装备 3071' })).toBeVisible();
     expect(screen.queryByRole('img', { name: '装备 3053' })).not.toBeInTheDocument();
+  });
+  it.each([true, false])('shows custom MVP/SVP alongside CARRY in either view (compact=%s)', compact => {
+    const data = { ...match, killParticipation: .7, teamDamageShare: .35, teamDamageTakenShare: .3, multiKill: 5 as const };
+    const { rerender } = render(<ol><RecentMatch compact={compact} match={{ ...data, performanceAward: 'MVP' }} /></ol>);
+    expect(screen.getByText('MVP')).toHaveAttribute('title', expect.stringContaining('非官方'));
+    expect(screen.getByText('CARRY')).toBeVisible();
+    expect(screen.queryByText('五杀')).toBeNull();
+    rerender(<ol><RecentMatch compact={compact} match={{ ...data, win: false, performanceAward: 'SVP' }} /></ol>);
+    expect(screen.getByText('SVP')).toHaveClass('is-svp');
+    expect(screen.queryByText('MVP')).toBeNull();
+    rerender(<ol><RecentMatch compact={compact} match={{ ...data, win: false, performanceAward: 'MVP' }} /></ol>);
+    expect(screen.queryByText('MVP')).toBeNull();
+    rerender(<ol><RecentMatch compact={compact} match={{ ...data, teamDamageTakenShare: undefined, performanceAward: 'MVP' }} /></ol>);
+    expect(screen.queryByText('MVP')).toBeNull();
   });
 });

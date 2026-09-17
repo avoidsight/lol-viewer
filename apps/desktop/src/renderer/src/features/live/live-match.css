@@ -320,6 +320,11 @@
 .recent-match--compact .recent-match__kda i { color: #8797aa; }
 .recent-match__form { padding: 0 6px; border-radius: 3px; background: #e7b549; color: #30230b; font-size: 9px; font-weight: 700; line-height: 14px; flex-shrink: 0; white-space: nowrap; }
 .recent-match__honors { display: flex; align-items: center; justify-content: center; gap: 3px; }
+.recent-match__award { padding: 0 4px; border-radius: 3px; background: #f4ce70; color: #392706; font-size: 9px; font-weight: 800; line-height: 14px; flex-shrink: 0; white-space: nowrap; }
+.recent-match__award.is-svp { background: #d4dbe4; color: #303c50; }
+.recent-match--compact .recent-match__honors { gap: 2px; }
+.recent-match--compact .recent-match__award,
+.recent-match--compact .recent-match__form { font-size: 7px; padding: 0 2px; line-height: 11px; }
 .recent-match:not(.recent-match--compact):has(.recent-match__form) { padding-top: 1px; padding-bottom: 1px; }
 .recent-match:not(.recent-match--compact):has(.recent-match__form) .recent-match__performance { gap: 0; }
 .recent-match:not(.recent-match--compact):has(.recent-match__form) .recent-match__kda { line-height: 12px; }

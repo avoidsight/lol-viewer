@@ -114,6 +114,10 @@ export function createFixturePersonalHistory(target?: PersonalHistoryTarget): Pe
 export function createFixtureLiveMatch(scope: QueueScope): LiveMatch {
   const players: PlayerSnapshot[] = Array.from({ length: 10 }, (_, index) => {
     const matches = liveMatchesFor(index);
+    // Explicit synthetic awards for layout testing, never copied by fixture mode.
+    matches[0] = { ...matches[0], queueId: 420, kills: 12, assists: 16, deaths: 2,
+      teamDamageShare: .35, teamDamageTakenShare: .3, killParticipation: .7,
+      performanceAward: matches[0].win ? 'MVP' : 'SVP' };
     const wins = matches.filter((match) => match.win).length;
     return {
       playerId: `fixture-player-${index}`,

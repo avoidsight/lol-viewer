@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Lane, MatchAchievement, MatchParticipantSummary, MatchSummary, QueueScope } from '../../shared/domain';
 import { isBuildItem } from '../../shared/items';
+import { rankedMatchForm } from '../../shared/ranked-form';
 export { describeQueue } from '../../shared/queue';
 
 const laneSchema = z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']);
@@ -144,11 +145,35 @@ function participantSummaries(
   });
 }
 
+function performanceAward(game: z.infer<typeof matchHistoryGameSchema>): 'MVP' | 'SVP' | undefined {
+  const target = game.participants[0];
+  if (target.teamId === undefined) return;
+  const team = game.participants.filter(p => p.teamId === target.teamId);
+  if (team.length !== 5 || team.some(p => p.participantId === undefined || p.stats.win !== target.stats.win || p.stats.gameEndedInEarlySurrender)
+    || new Set(team.map(p => p.participantId)).size !== 5) return;
+  const kills = team.reduce((sum, p) => sum + p.stats.kills, 0);
+  if (kills === 0) return;
+  const forms = team.map(p => rankedMatchForm({
+    matchId: String(game.gameId), queueId: game.queueId, endedAt: game.gameCreation + game.gameDuration * 1000,
+    durationSeconds: game.gameDuration, championId: p.championId, win: p.stats.win,
+    kills: p.stats.kills, deaths: p.stats.deaths, assists: p.stats.assists,
+    killParticipation: (p.stats.kills + p.stats.assists) / kills,
+    teamDamageShare: teamShare(p.stats.totalDamageDealtToChampions, team.map(entry => entry.stats.totalDamageDealtToChampions)),
+    teamDamageTakenShare: teamShare(p.stats.totalDamageTaken, team.map(entry => entry.stats.totalDamageTaken))
+  }));
+  if (forms.some(form => !form?.complete)) return;
+  const targetScore = forms[0]!.score;
+  // No arbitrary winner on capped/near-equal scores; never use array order to break ties.
+  if (forms.slice(1).some(form => form!.score >= targetScore - 1e-6)) return;
+  return target.stats.win ? 'MVP' : 'SVP';
+}
+
 function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
   const participant = game.participants[0];
   const lane = normalizeLane(participant.timeline?.lane);
   const cs = participantCs(participant);
   const mvp = participant.mvp ?? participant.isMvp ?? participant.stats.mvp ?? participant.stats.isMvp;
+  const award = performanceAward(game);
   const multiKill = participantMultiKill(participant.stats);
   const itemIds = [
     participant.stats.item0, participant.stats.item1, participant.stats.item2,
@@ -263,6 +288,7 @@ function mapGame(game: z.infer<typeof matchHistoryGameSchema>): MatchSummary {
     ...(killParticipation === undefined ? {} : { killParticipation }),
     ...(participant.stats.gameEndedInEarlySurrender === undefined ? {} : { remake: participant.stats.gameEndedInEarlySurrender }),
     ...(mvp === true ? { mvp: true } : {}),
+    ...(award ? { performanceAward: award } : {}),
     ...(multiKill === undefined ? {} : { multiKill }),
     ...(participant.stats.largestKillingSpree === undefined ? {} : { largestKillingSpree: participant.stats.largestKillingSpree }),
     ...(cs === undefined ? {} : { cs }),

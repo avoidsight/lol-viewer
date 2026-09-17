@@ -47,6 +47,7 @@ export interface MatchSummary {
   killParticipation?: number;
   remake?: boolean;
   mvp?: boolean;
+  performanceAward?: 'MVP' | 'SVP';
   multiKill?: 2 | 3 | 4 | 5;
   largestKillingSpree?: number;
   cs?: number;

@@ -3,6 +3,23 @@ import fixture from '../../../tests/fixtures/match-history.json';
 import { adaptMatchHistory, describeQueue } from './match-adapter';
 
 describe('adaptMatchHistory', () => {
+  it('derives custom MVP/SVP only for the unique highest complete teammate score', () => {
+    const team = Array.from({ length: 5 }, (_, i) => ({ participantId: i + 1, championId: i + 1, teamId: 100,
+      stats: { win: true, kills: i === 0 ? 10 : 2, assists: i === 0 ? 8 : 2, deaths: i === 0 ? 2 : 5,
+        totalDamageDealtToChampions: i === 0 ? 40000 : 10000, totalDamageTaken: 20000 } }));
+    const game = { gameId: 100, queueId: 420, gameCreation: 1000, gameDuration: 1800, participants: team };
+    const adapt = (value: unknown) => adaptMatchHistory({ games: [value] }, { scope: 'all', limit: 10 })[0];
+    expect(adapt(game).performanceAward).toBe('MVP');
+    expect(adapt({ ...game, participants: team.map(p => ({ ...p, stats: { ...p.stats, win: false } })) }).performanceAward).toBe('SVP');
+    expect(adapt({ ...game, participants: [team[1], team[0], ...team.slice(2)] }).performanceAward).toBeUndefined();
+    expect(adapt({ ...game, participants: team.slice(0, 4) }).performanceAward).toBeUndefined();
+    expect(adapt({ ...game, queueId: 450 }).performanceAward).toBeUndefined();
+    expect(adapt({ ...game, gameDuration: 599 }).performanceAward).toBeUndefined();
+    expect(adapt({ ...game, participants: team.map(p => ({ ...p, stats: { ...p.stats, totalDamageTaken: undefined } })) }).performanceAward).toBeUndefined();
+    expect(adapt({ ...game, participants: team.map(p => ({ ...p, stats: { ...team[0].stats } })) }).performanceAward).toBeUndefined();
+    expect(adapt({ ...game, participants: team.map(p => ({ ...p, participantId: 1 })) }).performanceAward).toBeUndefined();
+    expect(adapt({ ...game, participants: team.map(p => ({ ...p, stats: { ...p.stats, gameEndedInEarlySurrender: true } })) }).performanceAward).toBeUndefined();
+  });
   it('preserves actual killing spree data without inferring it from total kills', () => {
     const base = structuredClone(fixture.games[0]);
     const adapt = (stats: object) => adaptMatchHistory({ games: [{ ...base, participants: [{ ...base.participants[0], stats: { ...base.participants[0].stats, kills: 20, ...stats } }] }] }, { scope: 'all', limit: 10 })[0];

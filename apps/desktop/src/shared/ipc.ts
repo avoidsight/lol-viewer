@@ -49,6 +49,7 @@ export const matchSummarySchema = z.object({
   deaths: z.number().int().nonnegative(),
   assists: z.number().int().nonnegative(),
   mvp: z.boolean().optional(),
+  performanceAward: z.enum(['MVP', 'SVP']).optional(),
   multiKill: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(5)]).optional(),
   largestKillingSpree: z.number().int().nonnegative().optional(),
   cs: z.number().optional(),
