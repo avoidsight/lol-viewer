@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { MatchSummary } from '../../../../shared/domain';
 import { historyHighlights } from './match-highlights';
 
-const match: MatchSummary = { matchId: '1', queueId: 420, endedAt: 1, durationSeconds: 1800, championId: 1, win: true, kills: 12, deaths: 2, assists: 10 };
+const match: MatchSummary = { matchId: '1', queueId: 420, endedAt: 1, durationSeconds: 1800, championId: 1, win: true, kills: 12, deaths: 2, assists: 10, teamDamageShare: .35, teamDamageTakenShare: .25 };
 describe('personal history text highlights', () => {
   it('does not invent honors from total kills or KDA alone', () => {
     expect(historyHighlights(match)).toEqual([]);

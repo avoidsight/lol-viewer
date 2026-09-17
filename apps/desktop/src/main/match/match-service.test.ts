@@ -36,6 +36,25 @@ function deferred<T>() {
 }
 
 describe('MatchService', () => {
+  it('enriches current champion names once without changing historical champions', async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queueId: 440 } };
+      if (path === '/lol-summoner/v1/current-summoner') return { summonerId: '1', displayName: 'Local' };
+      if (path.startsWith('/lol-summoner/v1/summoners/')) return {};
+      if (path.includes('/ranked-stats/')) return { queues: [] };
+      return history;
+    });
+    const metadata = vi.fn(async () => ({ 1: { name: '安妮' } }));
+    const progress = vi.fn();
+    const match = await new MatchService({ get } as LcuClient, { staticData: {
+      getAssetVersion: async () => '16.17.1', getItemIconPaths: async () => ({}), getChampionMetadata: metadata
+    } }).loadLiveMatch('all', progress);
+    expect(metadata).toHaveBeenCalledTimes(1);
+    expect(match.players[0].championName).toBe('安妮');
+    expect(match.players[1].championName).toBeUndefined();
+    expect(match.players[0].matches[0].championId).toBe(1);
+    expect(progress.mock.calls.some(([p]) => p.championName === '安妮')).toBe(true);
+  });
   it('uses the current Riot ID during champion select even when the roster name is hidden', async () => {
     const team = participants.map((entry, index) => ({ summonerId: entry.summonerId, championId: entry.championId, cellId: index, gameName: '', playerAlias: '' }));
     const get = vi.fn(async (path: string) => {

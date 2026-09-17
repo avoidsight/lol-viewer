@@ -96,6 +96,7 @@ export interface PersonalHistorySnapshot {
 }
 
 export interface PlayerSnapshot {
+  championName?: string;
   itemIconPaths?: Record<string, string>;
   playerId: string;
   displayName: string;

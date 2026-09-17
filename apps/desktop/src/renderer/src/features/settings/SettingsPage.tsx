@@ -39,7 +39,7 @@ export default function SettingsPage({
     <section className="settings-page__section" aria-labelledby="match-settings"><h2 id="match-settings">游戏辅助</h2>
       <SettingSwitch title="自动打开对战信息" description="检测到英雄选择或进入游戏时，自动切换到实时对局。" checked={settings.autoOpenLiveMatch} onChange={onAutoOpenChange} />
       <SettingSwitch title="自动接受匹配" description="检测到准备确认后自动点击接受，可随时关闭。" checked={settings.autoAcceptReadyCheck} onChange={onAutoAcceptChange} />
-      <SettingSwitch title="自动复制敌方战绩" description="开启后，当前对局战绩加载完成时覆盖剪贴板，每局一次。排位局整理已读取的最近最多10场排位，其他模式整理全部模式；数据不足按实际场数显示。仅复制，不自动发送；若未自动进入对战页，需手动打开后加载。" checked={settings.autoCopyEnemyHistory === true} onChange={onAutoCopyEnemyHistoryChange ?? (() => {})} />
+      <SettingSwitch title="自动复制敌方战绩" description="开启后，当前对局战绩加载完成时覆盖剪贴板，每局一次。排位局按近期综合表现提示最多两名重点玩家，优先显示英雄名；样本不足会说明，其他模式保留胜负摘要。仅复制，不自动发送；若未自动进入对战页，需手动打开后加载。" checked={settings.autoCopyEnemyHistory === true} onChange={onAutoCopyEnemyHistoryChange ?? (() => {})} />
       <SettingSwitch title="显示对位差异" description="位置可靠时，标出与标准分路不一致的玩家。" checked={settings.showLaneDifferences} onChange={onLaneDifferencesChange} />
     </section>
     <section className="settings-page__section" aria-labelledby="privacy-settings"><h2 id="privacy-settings">隐私</h2>

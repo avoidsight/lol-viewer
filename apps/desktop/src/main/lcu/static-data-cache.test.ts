@@ -3,6 +3,19 @@ import type { LcuClient } from './http-client';
 import { LcuStaticDataCache } from './static-data-cache';
 
 describe('LcuStaticDataCache', () => {
+  it('deduplicates champion names and backs off after failures', async () => {
+    const get = vi.fn().mockResolvedValue([{ id: 64, name: '盲僧' }]);
+    const cache = new LcuStaticDataCache();
+    const client = { get } as LcuClient;
+    expect(await Promise.all([cache.getChampionMetadata(client), cache.getChampionMetadata(client)])).toEqual([
+      { 64: { name: '盲僧' } }, { 64: { name: '盲僧' } }
+    ]);
+    expect(get).toHaveBeenCalledTimes(1);
+    const failed = new LcuStaticDataCache(); get.mockRejectedValue(new Error('offline'));
+    await expect(failed.getChampionMetadata(client)).resolves.toEqual({});
+    await expect(failed.getChampionMetadata(client)).resolves.toEqual({});
+    expect(get).toHaveBeenCalledTimes(2);
+  });
   it('shares and reuses asset version and item metadata requests', async () => {
     const get = vi.fn(async (path: string) => path.includes('game-version')
       ? '16.17.1'

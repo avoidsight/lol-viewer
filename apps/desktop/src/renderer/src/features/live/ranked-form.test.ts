@@ -1,42 +1,68 @@
 import { describe, expect, it } from 'vitest';
 import type { MatchSummary } from '../../../../shared/domain';
 import { rankedForm, rankedMatchForm } from './ranked-form';
-
-const games = (count: number, overrides: Partial<MatchSummary> = {}): MatchSummary[] => Array.from({ length: count }, (_, i) => ({ matchId: String(i), queueId: i % 2 ? 440 : 420, endedAt: 10000 - i, durationSeconds: 1800, championId: 1, win: false, kills: 4, deaths: 5, assists: 6, killParticipation: .45, ...overrides }));
-describe('rankedForm', () => {
-  it('uses the same carry tier for match labels and the elite aggregate', () => {
-    const carry = games(10, { kills: 3, assists: 9, deaths: 4, killParticipation: .55 });
-    expect(rankedMatchForm(carry[0])?.label).toBe('Carry局');
-    const mixed = carry.map((m, i) => i < 8 ? m : { ...m, killParticipation: .4 });
-    expect(rankedForm(mixed)?.label).toBe('通天代');
-    expect(rankedForm(mixed)?.description).toContain('8场Carry局、2场正常局、0场吃力局');
-    expect(rankedForm(mixed.map((m, i) => i === 7 ? { ...m, killParticipation: .4 } : m))?.label).toBe('小代');
-    expect(rankedMatchForm({ ...carry[0], killParticipation: .54 })?.label).toBe('正常局');
+import { FORM_SCORING, metricScore } from '../../../../shared/ranked-form';
+const games = (count: number, overrides: Partial<MatchSummary> = {}): MatchSummary[] => Array.from({ length: count }, (_, i) => ({ matchId: String(i), queueId: i % 2 ? 440 : 420, endedAt: 10000 - i, durationSeconds: 1800, championId: 1, win: false, kills: 4, deaths: 4, assists: 8, killParticipation: .5, teamDamageShare: .25, teamDamageTakenShare: .25, ...overrides }));
+const strong = { kills: 10, assists: 14, deaths: 4, teamDamageShare: .35, teamDamageTakenShare: .35, killParticipation: .75 };
+describe('uniform ranked scoring', () => {
+  it('interpolates monotonically and caps all metrics', () => {
+    expect(metricScore(.275, FORM_SCORING.share)).toBeCloseTo(75);
+    expect(metricScore(.05, FORM_SCORING.share)).toBe(0);
+    expect(metricScore(1, FORM_SCORING.share)).toBe(100);
+    for (const anchors of [FORM_SCORING.share, FORM_SCORING.participation, FORM_SCORING.kda]) {
+      let previous = 0;
+      for (let x = 0; x <= 10; x += .01) {
+        const score = metricScore(x, anchors);
+        expect(score).toBeGreaterThanOrEqual(previous); expect(score).toBeLessThanOrEqual(100);
+        previous = score;
+      }
+    }
   });
-  it('requires five complete ranked samples and ignores normals and duplicate games', () => {
-    expect(rankedForm(games(4))).toBeUndefined();
-    expect(rankedForm(games(10, { queueId: 450 }))).toBeUndefined();
-    expect(rankedForm(games(10, { killParticipation: undefined }))).toBeUndefined();
-    expect(rankedForm(games(10, { matchId: 'same' }))).toBeUndefined();
-    expect(rankedForm(games(10, { remake: true }))).toBeUndefined();
-    expect(rankedForm(games(10, { durationSeconds: 599 }))).toBeUndefined();
+  it('uses the exact same weights irrespective of lane, champion or victory', () => {
+    const base = games(1, strong)[0];
+    expect(rankedMatchForm(base)?.score).toBe(100);
+    for (const lane of ['TOP', 'UTILITY', 'BOTTOM', 'MIDDLE', 'JUNGLE', 'UNKNOWN'] as const)
+      expect(rankedMatchForm({ ...base, lane, championId: 99, win: true })?.score).toBe(100);
+    expect(rankedMatchForm(games(1)[0])?.score).toBeCloseTo(61.25);
+    expect(rankedMatchForm(games(1)[0])?.tier).toBe('normal');
   });
-  it('labels ordinary games without using wins as performance', () => {
-    expect(rankedForm(games(10))?.label).toBe('本地人');
-    expect(rankedForm(games(10, { win: true }))?.label).toBe('本地人');
+  it('classifies at 75 without rounding before comparison', () => {
+    const base = games(1, { ...strong, teamDamageShare: .2 })[0]; // 79
+    expect(rankedMatchForm(base)?.score).toBeCloseTo(79);
+    expect(rankedMatchForm({ ...base, teamDamageShare: .17 })?.tier).toBe('normal');
+    expect(rankedMatchForm({ ...base, teamDamageShare: .18 })?.tier).toBe('carry');
   });
-  it('recognizes support assists and requires eight dominant games for elite', () => {
-    const strong = { kills: 0, assists: 20, deaths: 3, killParticipation: .7 };
+  it('does not reward dying just to accumulate damage taken', () => {
+    const result = rankedMatchForm(games(1, { kills: 2, assists: 8, deaths: 10, teamDamageTakenShare: .5 })[0])!;
+    expect(result.components.taken).toBe(50);
+    expect(result.tier).not.toBe('carry');
+  });
+  it('allows only the missing low-weight metric and validates ratios', () => {
+    const base = games(1, strong)[0];
+    expect(rankedMatchForm({ ...base, teamDamageTakenShare: undefined })?.score).toBeCloseTo(100);
+    expect(rankedMatchForm({ ...base, teamDamageTakenShare: undefined })?.description).toContain('85%');
+    for (const field of ['teamDamageShare', 'killParticipation'] as const)
+      expect(rankedMatchForm({ ...base, [field]: undefined })).toBeUndefined();
+    for (const field of ['teamDamageShare', 'teamDamageTakenShare', 'killParticipation'] as const)
+      for (const value of [NaN, Infinity, -.1, 1.1])
+        expect(rankedMatchForm({ ...base, [field]: value })).toBeUndefined();
+    expect(rankedMatchForm({ ...base, deaths: 0 })?.score).toBe(100);
+  });
+  it('requires five valid samples, 80% coverage, and ranked non-remakes', () => {
+    for (const data of [games(4), games(10, { queueId: 450 }), games(10, { remake: true }), games(10, { durationSeconds: 599 }), games(10, { matchId: 'same' }), games(10, { endedAt: NaN })])
+      expect(rankedForm(data)).toBeUndefined();
+    expect(rankedForm(games(10).map((m, i) => i < 3 ? { ...m, teamDamageShare: undefined } : m))).toBeUndefined();
+    expect(rankedForm(games(10).map((m, i) => i < 2 ? { ...m, teamDamageShare: undefined } : m))?.validCount).toBe(8);
+  });
+  it('uses average score and carry proportion, limits latest ten and preserves negative rule', () => {
     expect(rankedForm(games(5, strong))?.label).toBe('小代');
     expect(rankedForm(games(8, strong))?.label).toBe('通天代');
-  });
-  it('only flags repeated low involvement plus high deaths and poor KDA', () => {
+    const fourCarry = games(10).map((m, i) => i < 4 ? { ...m, ...strong } : m);
+    expect(rankedForm(fourCarry)?.label).toBe('小代');
+    expect(rankedForm(games(10).map((m, i) => i < 7 ? { ...m, ...strong } : m))?.label).toBe('通天代');
+    expect(rankedForm(games(10))?.label).toBe('本地人');
     expect(rankedForm(games(10, { kills: 1, assists: 2, deaths: 10, killParticipation: .2 }))?.label).toBe('小坑');
-    expect(rankedForm(games(10, { kills: 1, assists: 2, deaths: 10, killParticipation: .7 }))?.label).toBe('本地人');
-  });
-  it('rejects insufficient coverage and invalid data, limits to latest ten', () => {
-    expect(rankedForm([...games(5), ...games(5, { matchId: 'bad', killParticipation: NaN })])?.label).toBe('本地人');
-    expect(rankedForm(games(10).map((m, i) => i < 3 ? { ...m, killParticipation: undefined } : m))).toBeUndefined();
-    expect(rankedForm([...games(10, { kills: 0, assists: 20, deaths: 3, killParticipation: .7 }), ...games(10).map(m => ({ ...m, matchId: `old-${m.matchId}`, endedAt: 0 }))])?.label).toBe('通天代');
+    const old = games(10, strong).map(m => ({ ...m, matchId: 'old' + m.matchId, endedAt: 0 }));
+    expect(rankedForm([...games(10), ...old])?.label).toBe('本地人');
   });
 });

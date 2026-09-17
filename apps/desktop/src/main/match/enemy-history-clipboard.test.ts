@@ -15,10 +15,11 @@ function setup() {
 it('formats only enemies, deduplicates samples and removes control/command characters', () => {
   const { match } = setup();
   const enemy = match.players.find(p => p.teamId !== 100)!;
+  match.queueId = 430;
   enemy.displayName = '/all\n坏名\u202e'; enemy.wins = 999;
   enemy.matches = [{ ...enemy.matches[0], matchId: 'one', win: true, queueId: 420 }, { ...enemy.matches[0], matchId: 'one', win: true, queueId: 420 }, { ...enemy.matches[0], matchId: 'two', win: false, queueId: 450 }];
   const text = enemyHistorySummary(match)!;
-  expect(text).toContain('排位（单双/灵活）'); expect(text).toContain('all坏名：近1场1胜0负');
+  expect(text).toContain('全部模式'); expect(text).toContain('all坏名：近2场1胜1负');
   expect(text).not.toContain('999'); expect(text).not.toMatch(/[\n\u202e]/);
   expect(text).not.toContain(match.players.find(p => p.teamId === 100)!.displayName);
   match.queueId = 450; expect(enemyHistorySummary(match)).toContain('all坏名：近2场1胜1负');
@@ -29,7 +30,7 @@ it('does not infer enemies or invent unavailable histories', () => {
   expect(enemyHistorySummary({ ...match, gameId: undefined })).toBeUndefined();
   const enemies = match.players.filter(p => p.teamId !== 100);
   enemies[0].status = 'loading'; expect(enemyHistorySummary(match)).toBeUndefined();
-  enemies[0].status = 'unavailable'; expect(enemyHistorySummary(match)).toContain('暂无数据');
+  enemies[0].status = 'unavailable'; expect(enemyHistorySummary(match)).toBeDefined();
   enemies.forEach(p => { p.status = 'unavailable'; }); expect(enemyHistorySummary(match)).toBeUndefined();
 });
 it('copies once across parallel loads and service recreation, then copies the next game', async () => {

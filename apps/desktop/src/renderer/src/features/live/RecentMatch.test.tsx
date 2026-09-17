@@ -6,7 +6,7 @@ const match = { matchId: '1', queueId: 420, endedAt: 1, durationSeconds: 1800, c
 
 describe('live history detail row', () => {
   it.each([true, false])('only shows carry above KDA and keeps queue below (compact=%s)', (compact) => {
-    const { rerender, container } = render(<ol><RecentMatch compact={compact} match={{ ...match, killParticipation: .6 }} /></ol>);
+    const { rerender, container } = render(<ol><RecentMatch compact={compact} match={{ ...match, killParticipation: .6, teamDamageShare: .35, teamDamageTakenShare: .25 }} /></ol>);
     expect(screen.getByText('CARRY')).toBeVisible();
     const performance = container.querySelector('.recent-match__performance')!;
     expect([...performance.children].map(node => node.className)).toEqual(['recent-match__honors', 'recent-match__kda', 'recent-match__mode']);
