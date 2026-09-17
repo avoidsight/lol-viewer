@@ -325,9 +325,6 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     setHistoryRefreshError('');
   };
   const clearCache = async () => { setMessage('正在清理缓存…'); try { await window.lolViewer?.clearCache(); setMessage('缓存已清理'); } catch { setMessage('清理失败，请重试'); } };
-  const updateLaneSetting = async (showLaneDifferences: boolean) => {
-    try { const next = await window.lolViewer?.updateSettings({ showLaneDifferences }); if (next) { settingsRef.current = next; setSettings(next); } } catch { setMessage('设置保存失败，请重试'); }
-  };
   const updateAutoAcceptSetting = async (autoAcceptReadyCheck: boolean) => {
     try { const next = await window.lolViewer?.updateSettings({ autoAcceptReadyCheck }); if (next) { settingsRef.current = next; setSettings(next); } } catch { setMessage('设置保存失败，请重试'); }
   };
@@ -336,9 +333,6 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
       const next = await window.lolViewer?.updateSettings({ autoCopyEnemyHistory });
       if (next) { settingsRef.current = next; setSettings(next); setMessage(autoCopyEnemyHistory ? '自动复制已开启' : '自动复制已关闭'); }
     } catch { setMessage('设置保存失败，请重试'); }
-  };
-  const updateUsageStatistics = async (usageStatistics: boolean) => {
-    try { const next = await window.lolViewer?.updateSettings({ usageStatistics }); if (next) { settingsRef.current = next; setSettings(next); setMessage(usageStatistics ? '使用统计已开启' : '使用统计已关闭'); } } catch { setMessage('设置保存失败，请重试'); }
   };
   const updateAutoOpenSetting = async (autoOpenLiveMatch: boolean) => {
     try { const next = await window.lolViewer?.updateSettings({ autoOpenLiveMatch }); if (next) { settingsRef.current = next; setSettings(next); } } catch { setMessage('设置保存失败，请重试'); }
@@ -368,7 +362,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     <div hidden={page !== 'history'}><PersonalHistoryPage snapshot={history} state={historyState} onRefresh={() => void refreshHistory()} onPlayerSelect={(target) => void viewPlayerHistory(target)} onBack={historyTarget ? returnToOwnHistory : undefined} refreshing={historyRefreshing} refreshError={historyRefreshError} /></div>
     <div hidden={page !== 'live'}><LiveMatchPage match={liveView.match} players={liveView.match ? undefined : liveView.progress} loadingProgress={liveView.requesting && !liveView.match && (liveView.progress.length > 0 || (liveView.phase !== undefined && activePhases.has(liveView.phase))) ? liveView.progress.length : undefined} lifecycleStatus={liveView.status} gameflowPhase={liveView.phase} showLaneDifferences={settings.showLaneDifferences} notice={liveNotice} /></div>
     {page === 'champions' && <ChampionLibraryPage getCatalog={getChampionCatalog} getDetails={getChampionDetails} getGuide={getChampionGuide} />}
-    {page === 'settings' && <SettingsPage settings={settings} message={message} onAutoCopyEnemyHistoryChange={(checked) => void updateAutoCopySetting(checked)} onUsageStatisticsChange={(checked) => void updateUsageStatistics(checked)} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onLaneDifferencesChange={(checked) => void updateLaneSetting(checked)} onClearCache={() => void clearCache()} />}
+    {page === 'settings' && <SettingsPage settings={settings} message={message} onAutoCopyEnemyHistoryChange={(checked) => void updateAutoCopySetting(checked)} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onClearCache={() => void clearCache()} />}
     {clipboardNotice && <div role="status" className="clipboard-notice">敌方战绩已复制</div>}
   </>;
   return <><AppShell active={page} onChange={handleTabChange} liveAttention={liveAttention} support={<DonationControl api={window.lolViewer} />} onFeedback={() => setFeedbackOpen(true)}>{content}</AppShell><FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} api={window.lolViewer} /></>;

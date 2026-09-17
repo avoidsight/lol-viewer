@@ -21,8 +21,6 @@ export default function SettingsPage({
   onAutoOpenChange,
   onAutoAcceptChange,
   onAutoCopyEnemyHistoryChange,
-  onUsageStatisticsChange,
-  onLaneDifferencesChange,
   onClearCache
 }: {
   settings: AppSettings;
@@ -30,8 +28,6 @@ export default function SettingsPage({
   onAutoOpenChange: (checked: boolean) => void;
   onAutoAcceptChange: (checked: boolean) => void;
   onAutoCopyEnemyHistoryChange?: (checked: boolean) => void;
-  onUsageStatisticsChange: (checked: boolean) => void;
-  onLaneDifferencesChange: (checked: boolean) => void;
   onClearCache: () => void;
 }) {
   return <main className="settings-page"><div className="settings-page__inner">
@@ -40,10 +36,6 @@ export default function SettingsPage({
       <SettingSwitch title="自动打开对战信息" description="进入选人或游戏时，自动切到对战信息。" checked={settings.autoOpenLiveMatch} onChange={onAutoOpenChange} />
       <SettingSwitch title="自动接受匹配" checked={settings.autoAcceptReadyCheck} onChange={onAutoAcceptChange} />
       <SettingSwitch title="自动复制敌方战绩" description="在对战页加载战绩后，每局复制一次。会替换剪贴板内容，需自行粘贴发送。" checked={settings.autoCopyEnemyHistory === true} onChange={onAutoCopyEnemyHistoryChange ?? (() => {})} />
-      <SettingSwitch title="显示对位差异" description="标出分路不一致的玩家。" checked={settings.showLaneDifferences} onChange={onLaneDifferencesChange} />
-    </section>
-    <section className="settings-page__section" aria-labelledby="privacy-settings"><h2 id="privacy-settings">隐私</h2>
-      <SettingSwitch title="使用统计" description="上报设备标识、软件和系统信息，统计使用情况。不收集账号、战绩或原始硬件编号。关闭后停止上报，已有记录保留。" checked={settings.usageStatistics !== false} onChange={onUsageStatisticsChange} />
     </section>
     <section className="settings-page__section" aria-labelledby="maintenance-settings"><h2 id="maintenance-settings">本地维护</h2><div className="settings-row"><span><strong>清理缓存</strong><small>清除本地战绩缓存，不影响游戏战绩。</small></span><button type="button" onClick={onClearCache}>清理缓存</button></div></section>
     {message && <p className="settings-page__message" aria-live="polite">{message}</p>}
