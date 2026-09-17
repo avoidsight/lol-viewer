@@ -19,7 +19,7 @@ export const unavailableLabels = {
   PRIVACY_RESTRICTED: '该玩家战绩受隐私保护',
   CLIENT_UNAVAILABLE: '客户端连接中断，暂时无法读取',
   DATA_SERVICE_UNAVAILABLE: '战绩服务暂时不可用',
-  INVALID_RESPONSE: '战绩数据格式异常',
+  INVALID_RESPONSE: '战绩暂时无法显示',
   UNKNOWN: '战绩暂时无法读取'
 } as const;
 
@@ -42,7 +42,7 @@ export default function PlayerCard({ player, overview = false, groupedError = fa
   const laneLabel = displayLabel ?? laneNames[displayLane];
   const laneIcon = displayLabel || displayLane === 'UNKNOWN' ? undefined : laneIcons[displayLane];
   const championSummary = player.status === 'ready' && player.championId > 0
-    ? `近 ${visibleMatches.length} 场${historyScope === 'ranked' ? '排位' : ''}中使用该英雄 ${championMatches.length} 场，${championWins}胜${championMatches.length - championWins}负（非赛季统计）`
+    ? `近 ${visibleMatches.length} 场${historyScope === 'ranked' ? '排位' : ''}中使用该英雄 ${championMatches.length} 场，${championWins}胜${championMatches.length - championWins}负`
     : undefined;
   return <article className="player-card" data-testid="player-card" data-history-state={player.status} data-lane={displayLane} aria-labelledby={identityId}>
     <header className="player-card__header">

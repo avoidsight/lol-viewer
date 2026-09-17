@@ -41,7 +41,7 @@ describe('live history detail row', () => {
   it.each([true, false])('prioritizes custom MVP/SVP in overview and keeps both in detail (compact=%s)', compact => {
     const data = { ...match, killParticipation: .7, teamDamageShare: .35, teamDamageTakenShare: .3, multiKill: 5 as const };
     const { rerender } = render(<ol><RecentMatch compact={compact} match={{ ...data, performanceAward: 'MVP' }} /></ol>);
-    expect(screen.getByText('MVP')).toHaveAttribute('title', expect.stringContaining('非官方'));
+    expect(screen.getByText('MVP')).toHaveAttribute('title', expect.stringContaining('峡谷雷达评选'));
     if (compact) expect(screen.queryByText('CARRY')).toBeNull();
     else expect(screen.getByText('CARRY')).toBeVisible();
     expect(screen.queryByText('五杀')).toBeNull();

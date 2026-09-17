@@ -1,6 +1,6 @@
 .settings-page { min-height: calc(100vh - 58px); padding: 28px; color: var(--ui-text); background: var(--ui-page-bg); }
 .settings-page__inner { width: min(780px, 100%); margin: 0 auto; }
-.settings-page__heading { margin-bottom: 22px; }.settings-page__heading > span { color: var(--ui-accent); font-size: 10px; font-weight: 800; letter-spacing: .18em; }.settings-page__heading h1 { margin: 6px 0; font-size: 26px; }.settings-page__heading p { margin: 0; color: var(--ui-muted); }
+.settings-page__heading { margin-bottom: 22px; }.settings-page__heading h1 { margin: 0; font-size: 26px; }
 .settings-page__section { overflow: hidden; margin-bottom: 14px; border: 1px solid var(--ui-border); border-radius: var(--ui-radius-lg); background: var(--ui-surface); box-shadow: var(--ui-shadow); }.settings-page__section h2 { margin: 0; padding: 13px 18px; border-bottom: 1px solid var(--ui-border); color: var(--ui-text-soft); font-size: 13px; }
 .settings-row { display: flex; min-height: 78px; align-items: center; justify-content: space-between; gap: 24px; padding: 15px 18px; }.settings-row + .settings-row { border-top: 1px solid var(--ui-border); }.settings-row > span:first-child { display: grid; gap: 5px; }.settings-row strong { font-size: 15px; }.settings-row small { color: var(--ui-muted); font-size: 12px; line-height: 1.5; }
 .settings-switch { position: relative; display: block; width: 46px; height: 26px; flex: 0 0 auto; }

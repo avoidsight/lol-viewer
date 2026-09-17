@@ -32,10 +32,10 @@ function LiveStateNotice({
 }: {
   kind: 'waiting' | 'loading' | 'paused' | 'error';
   title: string;
-  detail: string;
+  detail?: string;
   alert?: boolean;
 }) {
-  return <div role={alert ? 'alert' : 'status'} className={`live-match-page__notice live-match-page__notice--${kind}`}><span className="live-match-page__notice-icon" aria-hidden="true"><i /></span><div><strong>{title}</strong><p>{detail}</p></div></div>;
+  return <div role={alert ? 'alert' : 'status'} className={`live-match-page__notice live-match-page__notice--${kind}`}><span className="live-match-page__notice-icon" aria-hidden="true"><i /></span><div><strong>{title}</strong>{detail && <p>{detail}</p>}</div></div>;
 }
 
 export default function App({ initialTab = 'history' }: { initialTab?: AppTab } = {}) {
@@ -324,44 +324,44 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     setHistoryState(ownHistoryRef.current ? 'ready' : 'loading');
     setHistoryRefreshError('');
   };
-  const clearCache = async () => { setMessage('Clearing cache…'); try { await window.lolViewer?.clearCache(); setMessage('Cache cleared'); } catch { setMessage('Cache could not be cleared'); } };
+  const clearCache = async () => { setMessage('正在清理缓存…'); try { await window.lolViewer?.clearCache(); setMessage('缓存已清理'); } catch { setMessage('清理失败，请重试'); } };
   const updateLaneSetting = async (showLaneDifferences: boolean) => {
-    try { const next = await window.lolViewer?.updateSettings({ showLaneDifferences }); if (next) { settingsRef.current = next; setSettings(next); } } catch { setMessage('Settings could not be saved'); }
+    try { const next = await window.lolViewer?.updateSettings({ showLaneDifferences }); if (next) { settingsRef.current = next; setSettings(next); } } catch { setMessage('设置保存失败，请重试'); }
   };
   const updateAutoAcceptSetting = async (autoAcceptReadyCheck: boolean) => {
-    try { const next = await window.lolViewer?.updateSettings({ autoAcceptReadyCheck }); if (next) { settingsRef.current = next; setSettings(next); } } catch { setMessage('Settings could not be saved'); }
+    try { const next = await window.lolViewer?.updateSettings({ autoAcceptReadyCheck }); if (next) { settingsRef.current = next; setSettings(next); } } catch { setMessage('设置保存失败，请重试'); }
   };
   const updateAutoCopySetting = async (autoCopyEnemyHistory: boolean) => {
     try {
       const next = await window.lolViewer?.updateSettings({ autoCopyEnemyHistory });
-      if (next) { settingsRef.current = next; setSettings(next); setMessage(autoCopyEnemyHistory ? '已开启：下次对局战绩加载完成后自动复制' : '自动复制已关闭'); }
+      if (next) { settingsRef.current = next; setSettings(next); setMessage(autoCopyEnemyHistory ? '自动复制已开启' : '自动复制已关闭'); }
     } catch { setMessage('设置保存失败，请重试'); }
   };
   const updateUsageStatistics = async (usageStatistics: boolean) => {
     try { const next = await window.lolViewer?.updateSettings({ usageStatistics }); if (next) { settingsRef.current = next; setSettings(next); setMessage(usageStatistics ? '使用统计已开启' : '使用统计已关闭'); } } catch { setMessage('设置保存失败，请重试'); }
   };
   const updateAutoOpenSetting = async (autoOpenLiveMatch: boolean) => {
-    try { const next = await window.lolViewer?.updateSettings({ autoOpenLiveMatch }); if (next) { settingsRef.current = next; setSettings(next); } } catch { setMessage('Settings could not be saved'); }
+    try { const next = await window.lolViewer?.updateSettings({ autoOpenLiveMatch }); if (next) { settingsRef.current = next; setSettings(next); } } catch { setMessage('设置保存失败，请重试'); }
   };
   const getChampionGuide = useCallback((id: Parameters<LolViewerApi['getChampionGuide']>[0], lane: Parameters<LolViewerApi['getChampionGuide']>[1]) =>
     window.lolViewer?.getChampionGuide(id, lane) ?? Promise.reject(new Error('unavailable')), []);
   const getChampionCatalog = useCallback(() => window.lolViewer?.getChampionCatalog() ?? Promise.reject(new Error('unavailable')), []);
   const getChampionDetails = useCallback((id: number) => window.lolViewer?.getChampionDetails(id) ?? Promise.reject(new Error('unavailable')), []);
   const liveErrorMessages: Record<LiveMatchErrorReason, string> = {
-    'client-unavailable': '未连接到英雄联盟客户端，请先启动客户端',
-    'not-in-match': '暂未检测到可读取的对局阵容',
-    'data-unavailable': '对战数据暂时无法读取，正在自动重试'
+    'client-unavailable': '未连接英雄联盟客户端',
+    'not-in-match': '暂未获取到对局信息',
+    'data-unavailable': '对战信息暂时无法读取'
   };
   const liveNotice = liveView.status === 'disconnected'
-      ? <LiveStateNotice kind="waiting" title="未连接英雄联盟客户端" detail="请先启动并登录英雄联盟客户端，进入英雄选择后将自动展示对局信息。" />
+      ? <LiveStateNotice kind="waiting" title="未连接英雄联盟客户端" detail="请先启动并登录英雄联盟客户端。" />
       : liveView.status === 'loading' && !liveView.match && liveView.progress.length === 0
-      ? <LiveStateNotice kind="loading" title={liveView.phase && activePhases.has(liveView.phase) ? '正在读取对局阵容' : '正在检测客户端与对局状态'} detail="检测完成后会自动更新，无需手动刷新。" />
+      ? <LiveStateNotice kind="loading" title={liveView.phase && activePhases.has(liveView.phase) ? '正在读取对局阵容' : '正在检测客户端与对局状态'} />
       : liveView.status === 'error'
-      ? <LiveStateNotice kind="error" alert title={liveErrorMessages[liveView.errorReason ?? 'data-unavailable']} detail={liveView.errorReason === 'client-unavailable' ? '启动客户端后会自动重新连接，无需手动刷新。' : '峡谷雷达 会在后台低频重试，已有数据不会被清空。'} />
+      ? <LiveStateNotice kind="error" alert title={liveErrorMessages[liveView.errorReason ?? 'data-unavailable']} detail={liveView.errorReason === 'client-unavailable' ? '请先启动并登录英雄联盟客户端。' : '正在重试，请稍候。'} />
       : liveView.status === 'paused'
-        ? <LiveStateNotice kind="paused" title="游戏已经开始，已停止后台补全战绩，避免影响游戏性能" detail="已读取的玩家数据会继续保留，下一局将自动恢复加载。" />
+        ? <LiveStateNotice kind="paused" title="游戏中，战绩更新已暂停" detail="已加载的战绩仍可查看，下局恢复更新。" />
       : !liveView.match && liveView.progress.length === 0 && (liveView.status === 'waiting' || liveView.status === 'new-match-loading')
-        ? <LiveStateNotice kind={liveView.status === 'new-match-loading' ? 'loading' : 'waiting'} title={liveView.status === 'new-match-loading' ? '检测到新对局，正在加载阵容' : '等待进入英雄选择或游戏'} detail={liveView.status === 'new-match-loading' ? '正在识别双方玩家与英雄选择。' : '进入英雄选择后，这里会自动展示双方阵容。'} />
+        ? <LiveStateNotice kind={liveView.status === 'new-match-loading' ? 'loading' : 'waiting'} title={liveView.status === 'new-match-loading' ? '检测到新对局，正在加载阵容' : '等待进入英雄选择或游戏'} />
         : null;
 
   const content = <>
@@ -369,7 +369,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     <div hidden={page !== 'live'}><LiveMatchPage match={liveView.match} players={liveView.match ? undefined : liveView.progress} loadingProgress={liveView.requesting && !liveView.match && (liveView.progress.length > 0 || (liveView.phase !== undefined && activePhases.has(liveView.phase))) ? liveView.progress.length : undefined} lifecycleStatus={liveView.status} gameflowPhase={liveView.phase} showLaneDifferences={settings.showLaneDifferences} notice={liveNotice} /></div>
     {page === 'champions' && <ChampionLibraryPage getCatalog={getChampionCatalog} getDetails={getChampionDetails} getGuide={getChampionGuide} />}
     {page === 'settings' && <SettingsPage settings={settings} message={message} onAutoCopyEnemyHistoryChange={(checked) => void updateAutoCopySetting(checked)} onUsageStatisticsChange={(checked) => void updateUsageStatistics(checked)} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onLaneDifferencesChange={(checked) => void updateLaneSetting(checked)} onClearCache={() => void clearCache()} />}
-    {clipboardNotice && <div role="status" className="clipboard-notice">敌方战绩已复制，可在队伍聊天中粘贴发送</div>}
+    {clipboardNotice && <div role="status" className="clipboard-notice">敌方战绩已复制</div>}
   </>;
   return <><AppShell active={page} onChange={handleTabChange} liveAttention={liveAttention} support={<DonationControl api={window.lolViewer} />} onFeedback={() => setFeedbackOpen(true)}>{content}</AppShell><FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} api={window.lolViewer} /></>;
 }

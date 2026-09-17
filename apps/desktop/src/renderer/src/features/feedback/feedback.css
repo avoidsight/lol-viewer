@@ -2,7 +2,6 @@
 .feedback-dialog::backdrop { background: #02060cba; }
 .feedback-dialog__header { display: flex; align-items: flex-start; justify-content: space-between; padding: 22px 26px 16px; border-bottom: 1px solid #263448; }
 .feedback-dialog h2 { margin: 0; font-size: 20px; }
-.feedback-dialog__header p { margin: 7px 0 0; font-size: 12px; color: #9aabc1; }
 .feedback-dialog button { cursor: pointer; font: inherit; }
 .feedback-icon-button { background: transparent; border: 0; color: #a9b7ca; font-size: 25px !important; line-height: 1; }
 .feedback-form { padding: 20px 26px 22px; font-size: 13px; }
@@ -35,16 +34,14 @@
 .feedback-context dl { display: grid; grid-template-columns: 65px 1fr; gap: 8px; padding: 12px; background: #0c1420; border-radius: 6px; }
 .feedback-context dd { margin: 0; overflow-wrap: anywhere; font-family: monospace; }
 .feedback-privacy-note { margin: 12px 0 0; color: #a8b7cb; font-size: 11px; line-height: 1.6; }
-.feedback-form footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 20px; }
-.feedback-form footer > span { font-size: 10px; color: #8a9cb3; }
+.feedback-form footer { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 20px; }
 .feedback-form button[type=submit], .feedback-success button { padding: 10px 22px; border: 0; border-radius: 7px; background: #39c6f4; color: #062234; font-weight: 700; white-space: nowrap; }
 .feedback-dialog button:disabled { opacity: .5; cursor: not-allowed; }
 .feedback-error { color: #ff9baf; line-height: 1.5; font-size: 12px; }
 .feedback-error button { background: none; color: #93dfff; border: 0; text-decoration: underline; }
 .feedback-success { padding: 38px 26px; text-align: center; }
 .feedback-success > span { display: block; color: #4bd8ba; font-size: 36px; }
-.feedback-success p { font-size: 13px; color: #a8b7cb; }
 .feedback-success code { display: block; margin: 22px 0; color: #cee3f7; overflow-wrap: anywhere; }
 .app-shell__feedback { margin-left: auto; align-self: center; display: flex; align-items: center; gap: 7px; padding: 7px 12px; border: 1px solid #344258; border-radius: 7px; color: #b5c5d8; background: #142033; cursor: pointer; font: inherit; font-size: 12px; }
 .app-shell__feedback svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; }
-@media (max-width: 560px) { .feedback-form { padding: 18px; } .feedback-dialog__header { padding: 18px; } .feedback-types { gap: 6px; } .feedback-types label { padding: 8px; } .feedback-form footer > span { max-width: 150px; } }
+@media (max-width: 560px) { .feedback-form { padding: 18px; } .feedback-dialog__header { padding: 18px; } .feedback-types { gap: 6px; } .feedback-types label { padding: 8px; } }

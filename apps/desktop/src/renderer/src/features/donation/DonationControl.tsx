@@ -52,9 +52,8 @@ export function DonationControl({ api }: { api?: LolViewerApi }) {
     <dialog ref={dialog} className="donation-dialog" aria-labelledby="donation-title" onCancel={(e) => { e.preventDefault(); close(); }}>
       <button autoFocus type="button" className="donation-close" aria-label="关闭赞赏" onClick={close}>×</button>
       <div className="donation-heart" aria-hidden="true">♡</div><h2 id="donation-title">谢谢你的支持</h2>
-      <p>如果 峡谷雷达 对你有帮助，可以请作者喝杯咖啡。</p>
       <div className="donation-code" aria-live="polite">{loading ? <span>正在加载赞赏码…</span> : image ? <img src={image} alt="微信赞赏码" onError={() => setImage(null)} /> : <span>赞赏暂不可用，请关闭后重试。</span>}</div>
-      <strong>微信扫一扫</strong><small>自愿支持，不影响任何功能</small>
+      <strong>微信扫码赞赏</strong><small>自愿赞赏，不影响使用</small>
     </dialog>
   </>;
 }

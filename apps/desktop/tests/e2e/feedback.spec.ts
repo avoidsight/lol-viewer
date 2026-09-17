@@ -52,7 +52,7 @@ test('feedback selects screenshots, preserves failed drafts and retries with one
     const bytes = await readFile(join(process.cwd(), 'resources/icon.png'));
     await modal.getByLabel('添加截图', { exact: true }).setInputFiles({ name: 'private-original-name.png', mimeType: 'image/png', buffer: bytes });
     await expect(modal.getByRole('img', { name: '反馈截图 1' })).toBeVisible();
-    await modal.getByText('自动附带设备 ID、软件与系统版本').click();
+    await modal.getByText('随反馈发送的设备信息').click();
     await expect(modal.getByText('f'.repeat(64), { exact: true })).toBeVisible();
     await submit.click();
     await expect(modal.getByRole('alert')).toContainText('暂不可用');

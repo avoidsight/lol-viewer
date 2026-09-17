@@ -246,13 +246,13 @@ describe('App tab lifecycle', () => {
     const request = deferred<LiveMatch>(); install(() => request.promise); render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: '对战信息' }));
     await act(async () => request.reject(new Error('offline')));
-    expect(screen.getByRole('alert')).toHaveTextContent('对战数据暂时无法读取，正在自动重试');
+    expect(screen.getByRole('alert')).toHaveTextContent('对战信息暂时无法读取正在重试，请稍候。');
   });
 
   it('explains when the League client is not connected', async () => {
     install(vi.fn().mockRejectedValue(new Error('League client is unavailable')));
     render(<App initialTab="live" />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('未连接到英雄联盟客户端，请先启动客户端');
+    expect(await screen.findByRole('alert')).toHaveTextContent('未连接英雄联盟客户端请先启动并登录英雄联盟客户端。');
   });
 
   it('shows an error without exposing manual live controls', async () => {
@@ -323,7 +323,7 @@ describe('App tab lifecycle', () => {
 
       expect(api.cancelLiveMatch).toHaveBeenCalledOnce();
       expect(screen.getByText('Player One')).toBeVisible();
-      expect(screen.getByText('游戏已经开始，已停止后台补全战绩，避免影响游戏性能')).toBeVisible();
+      expect(screen.getByText('游戏中，战绩更新已暂停')).toBeVisible();
       await act(async () => { vi.advanceTimersByTime(30_000); await Promise.resolve(); });
       expect(api.getLiveMatch).toHaveBeenCalledOnce();
     } finally {

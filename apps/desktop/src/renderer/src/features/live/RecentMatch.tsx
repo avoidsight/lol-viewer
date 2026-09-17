@@ -34,7 +34,7 @@ export default function RecentMatch({ match, itemIconPaths = {}, compact = false
       {spellIds.length > 0 && <span className="recent-match__spells">{spellIds.map((id, index) => <OptionalIcon key={index} src={`lol-asset://spell-icons/${spells[id]}`} label={`召唤师技能 ${id}`} />)}</span>}
       <span className="recent-match__performance">
         {(form?.tier === 'carry' || award) && <span className="recent-match__honors">
-          {award && <span className={`recent-match__award${award === 'SVP' ? ' is-svp' : ''}`} title={`${award} · 本工具自定义评分 · 该场己方五人中综合分唯一最高，非官方评级`}>{award}</span>}
+          {award && <span className={`recent-match__award${award === 'SVP' ? ' is-svp' : ''}`} title={`${award} · 本场队内表现最佳（峡谷雷达评选）`}>{award}</span>}
           {form?.tier === 'carry' && (!compact || !award) && <span className="recent-match__form" title={form.description}>CARRY</span>}
         </span>}
         <span className="recent-match__kda" aria-hidden="true"><b>{match.kills}</b><i>/</i><b>{match.deaths}</b><i>/</i><b>{match.assists}</b></span>

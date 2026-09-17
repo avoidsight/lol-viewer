@@ -45,7 +45,7 @@ export function rankedMatchForm(match: MatchSummary) {
     : match.killParticipation < .35 && kda < 1.5 && deathsPerTen >= 3 ? 'rough' : 'normal';
   const label = { carry: 'Carry局', normal: '正常局', rough: '吃力局' }[tier];
   return { tier, label, score, complete, components,
-    description: `${label} · 综合分${score.toFixed(1)} · 伤害${Math.round(match.teamDamageShare * 100)}% · 承伤${complete ? `${Math.round(match.teamDamageTakenShare! * 100)}%` : '缺失（按85%权重折算）'} · 参团${Math.round(match.killParticipation * 100)}% · KDA ${kda.toFixed(1)} · 非官方评分` };
+    description: `${label} · 伤害${Math.round(match.teamDamageShare * 100)}% · 承伤${complete ? `${Math.round(match.teamDamageTakenShare! * 100)}%` : '暂无数据'} · 参团${Math.round(match.killParticipation * 100)}% · KDA ${kda.toFixed(1)}` };
 }
 
 export function rankedForm(matches: MatchSummary[]) {
@@ -64,8 +64,7 @@ export function rankedForm(matches: MatchSummary[]) {
     : averageScore >= 70 && carry / n >= .4 ? 'strong'
       : struggling / n >= .6 && carry / n <= .2 ? 'rough' : 'regular';
   const label = { elite: '通天代', strong: '小代', regular: '本地人', rough: '小坑' }[tier];
-  const incomplete = valid.filter(form => !form.complete).length;
   return { tier, label, averageScore, carry, sampleSize: recent.length, validCount: n,
     wins: recent.filter(m => m.win).length,
-    description: `已获取的最近${recent.length}场排位中，${n}场有效（单双排/灵活排位）。综合均分${averageScore.toFixed(1)}；${carry}场Carry局、${n - carry - struggling}场正常局、${struggling}场吃力局。${incomplete ? `${incomplete}场缺承伤，按85%权重折算。` : ''}统一权重：伤害35%、承伤15%、参团25%、KDA25%；低KDA衰减承伤得分。仅反映近期表现，非官方评分，不代表实际段位或代练判断。` };
+    description: `近${recent.length}场排位${n < recent.length ? `（${n}场可评估）` : ''}：${carry}场Carry、${n - carry - struggling}场正常、${struggling}场吃力。根据近期表现评估，不代表实际段位。` };
 }

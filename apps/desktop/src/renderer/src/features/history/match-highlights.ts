@@ -12,11 +12,11 @@ const metrics: Array<[MatchAchievementType, string, string]> = [
 export function historyHighlights(match: MatchSummary): HistoryHighlight[] {
   const badges: HistoryHighlight[] = [];
   const form = rankedMatchForm(match);
-  if (form?.tier === 'carry') badges.push({ key: 'carry', label: 'CARRY', tone: 'gold', description: `本应用排位表现评估，非官方评分。${form.description}` });
-  if (Number.isInteger(match.largestKillingSpree) && match.largestKillingSpree! >= 8) badges.push({ key: 'legendary', label: '超神', tone: 'legendary', description: '本场曾达成连续击杀至少 8 人，期间未死亡' });
-  if (match.multiKill && match.multiKill >= 3 && multiKills[match.multiKill]) badges.push({ key: 'multi', label: multiKills[match.multiKill], tone: 'multi', description: '本场最高多杀（三杀及以上），以客户端记录为准' });
+  if (form?.tier === 'carry') badges.push({ key: 'carry', label: 'CARRY', tone: 'gold', description: form.description });
+  if (Number.isInteger(match.largestKillingSpree) && match.largestKillingSpree! >= 8) badges.push({ key: 'legendary', label: '超神', tone: 'legendary', description: '连续击杀 8 人及以上，期间未阵亡' });
+  if (match.multiKill && match.multiKill >= 3 && multiKills[match.multiKill]) badges.push({ key: 'multi', label: multiKills[match.multiKill], tone: 'multi', description: '本场最高多杀' });
   for (const [type, label, tone] of metrics) {
-    if (match.achievements?.some(achievement => achievement.type === type)) badges.push({ key: type, label, tone, description: `${label}（本场双方玩家比较，含并列）` });
+    if (match.achievements?.some(achievement => achievement.type === type)) badges.push({ key: type, label, tone, description: `${label}（含并列）` });
   }
   return badges.slice(0, 3);
 }

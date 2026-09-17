@@ -40,7 +40,7 @@ describe('uniform ranked scoring', () => {
   it('allows only the missing low-weight metric and validates ratios', () => {
     const base = games(1, strong)[0];
     expect(rankedMatchForm({ ...base, teamDamageTakenShare: undefined })?.score).toBeCloseTo(100);
-    expect(rankedMatchForm({ ...base, teamDamageTakenShare: undefined })?.description).toContain('85%');
+    expect(rankedMatchForm({ ...base, teamDamageTakenShare: undefined })?.description).toContain('承伤暂无数据');
     for (const field of ['teamDamageShare', 'killParticipation'] as const)
       expect(rankedMatchForm({ ...base, [field]: undefined })).toBeUndefined();
     for (const field of ['teamDamageShare', 'teamDamageTakenShare', 'killParticipation'] as const)

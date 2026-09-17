@@ -19,7 +19,7 @@ test('enemy summary opt-in persists and copy notice is passive; fixture never wr
     await expect(toggle).not.toBeChecked();
     await toggle.click();
     await expect(toggle).toBeChecked();
-    await expect(page.getByText('已开启：下次对局战绩加载完成后自动复制')).toBeVisible();
+    await expect(page.getByText('自动复制已开启')).toBeVisible();
     await page.reload();
     await page.getByRole('tab', { name: '设置' }).click();
     await expect(toggle).toBeChecked();

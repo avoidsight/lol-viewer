@@ -31,7 +31,7 @@ function statusLabel(status: LiveMatchStatus, phase: string | undefined): string
   if (status === 'last-match') return '上一局记录';
   if (status === 'new-match-loading') return '新对局加载中';
   if (status === 'error') return '数据暂不可用';
-  if (status === 'paused') return '游戏中已停止补全';
+  if (status === 'paused') return '战绩更新已暂停';
   if (phase === 'ChampSelect') return '英雄选择中';
   if (phase === 'GameStart') return '正在进入游戏';
   if (phase === 'InProgress' || phase === 'Reconnect') return '游戏进行中';
@@ -65,7 +65,7 @@ export default function LiveMatchPage({ match, players = [], loadingProgress, no
       {visiblePlayers.length > 0 && <div className="live-match-page__controls">
       <div className="live-match-page__scope" role="group" aria-label="显示方式">
         <button type="button" aria-pressed={viewMode === 'detail'} onClick={() => setViewMode('detail')}>详细</button>
-        <button type="button" title="左列最近第 1–5 场，右列第 6–10 场；悬停查看详情" aria-pressed={viewMode === 'overview'} onClick={() => setViewMode('overview')}>总览</button>
+        <button type="button" aria-pressed={viewMode === 'overview'} onClick={() => setViewMode('overview')}>总览</button>
       </div>
       <div className="live-match-page__scope" role="group" aria-label="战绩范围">
         <button type="button" aria-label="全部对局" title="全部对局" aria-pressed={historyScope === 'all'} onClick={() => setHistoryScope('all')}><i className="is-all" aria-hidden="true" />全部</button>

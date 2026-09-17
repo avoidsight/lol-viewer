@@ -8,11 +8,11 @@ function SettingSwitch({
   onChange
 }: {
   title: string;
-  description: string;
+  description?: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
 }) {
-  return <label className="settings-row"><span><strong>{title}</strong><small>{description}</small></span><span className="settings-switch"><input type="checkbox" role="switch" checked={checked} onChange={(event) => onChange(event.target.checked)} /><span className="settings-switch__track" aria-hidden="true"><i /></span></span></label>;
+  return <label className="settings-row"><span><strong>{title}</strong>{description && <small>{description}</small>}</span><span className="settings-switch"><input type="checkbox" role="switch" checked={checked} onChange={(event) => onChange(event.target.checked)} /><span className="settings-switch__track" aria-hidden="true"><i /></span></span></label>;
 }
 
 export default function SettingsPage({
@@ -35,17 +35,17 @@ export default function SettingsPage({
   onClearCache: () => void;
 }) {
   return <main className="settings-page"><div className="settings-page__inner">
-    <header className="settings-page__heading"><span>PREFERENCES</span><h1>设置</h1><p>管理匹配确认、隐私和本地缓存。</p></header>
+    <header className="settings-page__heading"><h1>设置</h1></header>
     <section className="settings-page__section" aria-labelledby="match-settings"><h2 id="match-settings">游戏辅助</h2>
-      <SettingSwitch title="自动打开对战信息" description="检测到英雄选择或进入游戏时，自动切换到实时对局。" checked={settings.autoOpenLiveMatch} onChange={onAutoOpenChange} />
-      <SettingSwitch title="自动接受匹配" description="检测到准备确认后自动点击接受，可随时关闭。" checked={settings.autoAcceptReadyCheck} onChange={onAutoAcceptChange} />
-      <SettingSwitch title="自动复制敌方战绩" description="开启后，当前对局战绩加载完成时覆盖剪贴板，每局一次。排位局按近期综合表现提示最多两名重点玩家，优先显示英雄名；样本不足会说明，其他模式保留胜负摘要。仅复制，不自动发送；若未自动进入对战页，需手动打开后加载。" checked={settings.autoCopyEnemyHistory === true} onChange={onAutoCopyEnemyHistoryChange ?? (() => {})} />
-      <SettingSwitch title="显示对位差异" description="位置可靠时，标出与标准分路不一致的玩家。" checked={settings.showLaneDifferences} onChange={onLaneDifferencesChange} />
+      <SettingSwitch title="自动打开对战信息" description="进入选人或游戏时，自动切到对战信息。" checked={settings.autoOpenLiveMatch} onChange={onAutoOpenChange} />
+      <SettingSwitch title="自动接受匹配" checked={settings.autoAcceptReadyCheck} onChange={onAutoAcceptChange} />
+      <SettingSwitch title="自动复制敌方战绩" description="在对战页加载战绩后，每局复制一次。会替换剪贴板内容，需自行粘贴发送。" checked={settings.autoCopyEnemyHistory === true} onChange={onAutoCopyEnemyHistoryChange ?? (() => {})} />
+      <SettingSwitch title="显示对位差异" description="标出分路不一致的玩家。" checked={settings.showLaneDifferences} onChange={onLaneDifferencesChange} />
     </section>
     <section className="settings-page__section" aria-labelledby="privacy-settings"><h2 id="privacy-settings">隐私</h2>
-      <SettingSwitch title="使用统计" description="启动及跨天时上报应用专属设备标识、客户端版本、系统版本和架构，用于统计设备数量和版本使用情况。不收集玩家账号、战绩或原始硬件编号。可随时关闭，不影响使用和反馈；关闭后停止新上报，已有统计不会自动删除。" checked={settings.usageStatistics !== false} onChange={onUsageStatisticsChange} />
+      <SettingSwitch title="使用统计" description="上报设备标识、软件和系统信息，统计使用情况。不收集账号、战绩或原始硬件编号。关闭后停止上报，已有记录保留。" checked={settings.usageStatistics !== false} onChange={onUsageStatisticsChange} />
     </section>
-    <section className="settings-page__section" aria-labelledby="maintenance-settings"><h2 id="maintenance-settings">本地维护</h2><div className="settings-row"><span><strong>清理缓存</strong><small>移除本地战绩缓存，下次打开时重新读取。</small></span><button type="button" onClick={onClearCache}>清理缓存</button></div></section>
+    <section className="settings-page__section" aria-labelledby="maintenance-settings"><h2 id="maintenance-settings">本地维护</h2><div className="settings-row"><span><strong>清理缓存</strong><small>清除本地战绩缓存，不影响游戏战绩。</small></span><button type="button" onClick={onClearCache}>清理缓存</button></div></section>
     {message && <p className="settings-page__message" aria-live="polite">{message}</p>}
   </div></main>;
 }

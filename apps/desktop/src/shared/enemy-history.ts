@@ -20,16 +20,16 @@ export function enemyHistorySummary(match: LiveMatch): string | undefined {
       const form = rankedForm(player.matches);
       return form ? [{ player, form }] : [];
     }).sort((a, b) => b.form.averageScore - a.form.averageScore);
-    if (evaluated.length < 3) return '对面战绩样本不足，暂时无法判断重点人物。仅供参考。';
+    if (evaluated.length < 3) return '对面近期排位战绩不足，暂无法判断。';
     const candidates = evaluated.filter(entry => entry.form.averageScore >= 70).slice(0, 2);
-    if (!candidates.length) return `对面近期暂无明显突出选手${evaluated.length < 5 ? '（部分玩家数据不足）' : ''}，仅供参考。`;
+    if (!candidates.length) return `对面近期暂无明显突出选手${evaluated.length < 5 ? '（部分玩家战绩缺失）' : ''}。`;
     if (candidates.length === 2 && candidates[0].form.averageScore - candidates[1].form.averageScore >= 8) candidates.pop();
     const parts = candidates.map(({ player, form }) => {
       const name = player.championName?.trim() || player.displayName;
       const tag = form.tier === 'elite' || form.tier === 'strong' ? `【${form.label}】` : '';
       return `${cleanName(name)}${tag}近${form.sampleSize}场${form.wins}胜，${form.carry}场CARRY`;
     });
-    return `对面重点${evaluated.length < 5 ? '（仅比较已知战绩）' : ''}：${parts.join('；')}。仅供参考。`;
+    return `对面重点${evaluated.length < 5 ? '（部分玩家战绩缺失）' : ''}：${parts.join('；')}。`;
   }
   let available = 0;
   const ordered = match.positionOrderReliable ? [...enemies].sort((a, b) => lanes.indexOf(a.lane) - lanes.indexOf(b.lane)) : enemies;
@@ -46,5 +46,5 @@ export function enemyHistorySummary(match: LiveMatch): string | undefined {
     return `${prefix}${cleanName(player.displayName)}：近${recent.length}场${wins}胜${recent.length - wins}负`;
   });
   if (!available) return;
-  return `敌方近期${ranked ? '排位（单双/灵活）' : '全部模式'}战绩（已读取样本）：${lines.join('；')}`;
+  return `敌方近期${ranked ? '排位（单双/灵活）' : '全部模式'}战绩：${lines.join('；')}`;
 }

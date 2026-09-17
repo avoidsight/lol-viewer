@@ -30,10 +30,10 @@ it('sanitizes fallback player names and discloses missing opponents', () => {
   enemies[0].championName = undefined; enemies[0].displayName = '/all\n玩家\u202e';
   enemies[4].status = 'unavailable';
   const text = enemyHistorySummary(match)!;
-  expect(text).toContain('仅比较已知战绩'); expect(text).toContain('all玩家');
+  expect(text).toContain('部分玩家战绩缺失'); expect(text).toContain('all玩家');
   expect(text).not.toMatch(/[\n\u202e/]/);
   enemies[3].status = 'unavailable'; enemies[2].status = 'unavailable';
-  expect(enemyHistorySummary(match)).toContain('样本不足');
+  expect(enemyHistorySummary(match)).toContain('战绩不足');
 });
 it('does not force a leader among ordinary records or rate non-ranked games', () => {
   const { match, enemies } = fixture();

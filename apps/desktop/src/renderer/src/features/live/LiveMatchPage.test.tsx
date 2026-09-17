@@ -64,7 +64,7 @@ describe('LiveMatchPage', () => {
   it('keeps ranked labels in all and ranked views but hides labels for unavailable histories', () => {
     const rated = { ...fixtureLiveMatch, players: [player(0, { matches: matches(0).map(m => ({ ...m, kills: 2, assists: 20, deaths: 3, killParticipation: .7, teamDamageShare: .35, teamDamageTakenShare: .25 })) })] };
     const { rerender } = render(<LiveMatchPage match={rated} />);
-    expect(screen.getByText('通天代')).toHaveAttribute('title', expect.stringContaining('不代表实际段位或代练判断'));
+    expect(screen.getByText('通天代')).toHaveAttribute('title', expect.stringContaining('不代表实际段位'));
     fireEvent.click(screen.getByRole('button', { name: '全部对局' }));
     fireEvent.click(screen.getByRole('button', { name: '总览' }));
     expect(screen.getByText('通天代')).toBeVisible();
@@ -237,7 +237,7 @@ describe('LiveMatchPage', () => {
 
     const firstCard = screen.getAllByTestId('player-card')[0];
     expect(within(firstCard).getByRole('group', { name: '近 10 场，5胜5负' })).toBeVisible();
-    expect(within(firstCard).getByRole('img', { name: '当前英雄 1' })).toHaveAttribute('title', '近 10 场排位中使用该英雄 1 场，1胜0负（非赛季统计）');
+    expect(within(firstCard).getByRole('img', { name: '当前英雄 1' })).toHaveAttribute('title', '近 10 场排位中使用该英雄 1 场，1胜0负');
     expect(firstCard.querySelector('.player-card__metric')).toBeNull();
     expect(firstCard.querySelector('.player-card__summary')).toBeNull();
     expect(firstCard.querySelector('.player-card__identity .player-card__recent-record')).toHaveTextContent(/^5胜5负$/);
@@ -248,7 +248,7 @@ describe('LiveMatchPage', () => {
     render(<LiveMatchPage match={{ ...fixtureLiveMatch, players: [player(0, { matches: [] })] }} />);
     expect(screen.getByText('暂无战绩')).toBeVisible();
     fireEvent.error(screen.getByRole('img', { name: '当前英雄 1' }));
-    expect(screen.getByRole('img', { name: '当前英雄 1图标不可用' })).toHaveAttribute('title', '近 0 场排位中使用该英雄 0 场，0胜0负（非赛季统计）');
+    expect(screen.getByRole('img', { name: '当前英雄 1图标不可用' })).toHaveAttribute('title', '近 0 场排位中使用该英雄 0 场，0胜0负');
   });
 
   it('defaults to ranked history in solo and flex queues', () => {
