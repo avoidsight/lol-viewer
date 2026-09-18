@@ -30,8 +30,11 @@ test('personal history uses readable bounded honors and ID-only player tooltips'
         const rect = node.getBoundingClientRect();
         const row = node.parentElement!.getBoundingClientRect();
         const siblings = [...node.parentElement!.children].filter(child => child !== node);
-        return row.right - rect.right < 16 && rect.right <= window.innerWidth &&
-          siblings.every(child => child.getBoundingClientRect().top >= rect.bottom);
+        return rect.left >= row.left && rect.right <= window.innerWidth &&
+          siblings.every(child => {
+            const bounds = child.getBoundingClientRect();
+            return bounds.top >= rect.bottom && Math.abs(bounds.left + bounds.right - rect.left - rect.right) < 2;
+          });
       })).toBe(true);
     }
     await page.setViewportSize({ width: 1184, height: 735 });
