@@ -44,7 +44,7 @@ describe('live history detail row', () => {
     expect(screen.queryByText('MVP')).toBeNull();
     expect(screen.getByText('CARRY')).toBeVisible();
     expect(screen.getByTestId('match-score')).toHaveAttribute('title', expect.stringContaining('非官方'));
-    expect(screen.getByTestId('match-score').parentElement).toHaveClass('recent-match');
+    expect(screen.getByTestId('match-score').parentElement).toHaveClass('recent-match__honors');
     expect(screen.getByTestId('match-score')).toHaveClass('is-win');
     rerender(<ol><RecentMatch compact={compact} match={{ ...data, win: false, performanceAward: 'SVP', kills: 1, assists: 0, deaths: 5, killParticipation: .1, teamDamageShare: .05, teamDamageTakenShare: .05 }} /></ol>);
     expect(screen.queryByText('SVP')).toBeNull(); expect(screen.queryByText('CARRY')).toBeNull();

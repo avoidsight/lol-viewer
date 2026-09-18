@@ -13,7 +13,7 @@ test('live detail and overview only show custom awards and carry without overflo
     for (const mode of ['详细', '总览']) {
       await page.getByRole('button', { name: mode, exact: true }).click();
       const firstRow = page.getByTestId('player-card').first().getByTestId('recent-match').first();
-      await expect(firstRow.locator('.recent-match__honors > span')).toHaveText(['CARRY']);
+      await expect(firstRow.locator('.recent-match__form')).toHaveText('CARRY');
       await expect(firstRow.getByTestId('match-score')).toBeVisible();
       if (mode === '总览') {
         await firstRow.hover();
@@ -28,10 +28,12 @@ test('live detail and overview only show custom awards and carry without overflo
         ))).toBe(true);
         expect(await page.locator('.recent-match__score').evaluateAll(nodes => nodes.every(node => {
           const score = node.getBoundingClientRect();
-          const performance = node.parentElement!.getBoundingClientRect();
-          const kda = node.parentElement!.querySelector('.recent-match__kda')!.getBoundingClientRect();
-          return score.left >= kda.right && performance.right - score.right <= 5 &&
-            Math.abs((score.top + score.bottom - performance.top - performance.bottom) / 2) < 1;
+          const performance = node.closest('.recent-match__performance')!;
+          const kda = performance.querySelector('.recent-match__kda')!.getBoundingClientRect();
+          const honors = node.parentElement!.getBoundingClientRect();
+          const bounds = performance.getBoundingClientRect();
+          return score.bottom <= kda.top + 1 &&
+            Math.abs(honors.left + honors.right - bounds.left - bounds.right) < 2;
         }))).toBe(true);
         expect(await page.locator('.recent-match__stats').evaluateAll(nodes => nodes.every(node => {
           const row = node.closest('.recent-match')!.getBoundingClientRect();
@@ -42,7 +44,7 @@ test('live detail and overview only show custom awards and carry without overflo
           const row = node.closest('.recent-match')!.getBoundingClientRect();
           return [...node.children].every(badge => {
             const rect = badge.getBoundingClientRect();
-            return rect.left >= row.left && rect.right <= row.right && ['MVP', 'SVP', 'CARRY'].includes(badge.textContent!);
+            return rect.left >= row.left && rect.right <= row.right && (badge.classList.contains('match-score') || badge.textContent === 'CARRY');
           });
         }))).toBe(true);
       }

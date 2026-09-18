@@ -83,13 +83,13 @@ const snapshot: PersonalHistorySnapshot = {
 };
 
 describe('PersonalHistoryPage', () => {
-  it('shows the shared rating as a trailing column, hides missing data, and preserves zero', () => {
+  it('shows the shared rating above time, hides missing data, and preserves zero', () => {
     const scored = { ...snapshot.matches[0], killParticipation: .7 };
     const { rerender } = render(<PersonalHistoryPage snapshot={{ ...snapshot, matches: [scored] }} state="ready" />);
     const score = screen.getByTestId('match-score');
     expect(score).toHaveClass('is-win');
-    expect(score.parentElement).toBe(screen.getByTestId('personal-match'));
-    expect(score).toBe(score.parentElement!.lastElementChild);
+    expect(score.parentElement!.tagName).toBe('TIME');
+    expect(score).toBe(score.parentElement!.firstElementChild);
     rerender(<PersonalHistoryPage snapshot={{ ...snapshot, matches: [{ ...scored, win: false, kills: 0, assists: 0, deaths: 5, teamDamageShare: 0, teamDamageTakenShare: 0, killParticipation: 0 }] }} state="ready" />);
     expect(screen.getByTestId('match-score')).toHaveTextContent('0');
     expect(screen.getByTestId('match-score')).toHaveClass('is-loss');

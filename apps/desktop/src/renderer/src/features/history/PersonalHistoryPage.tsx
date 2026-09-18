@@ -165,10 +165,10 @@ function MatchRow({ match, assetVersion, itemIconPaths, viewerPlayerId, onPlayer
     </div>
     <TeamComposition match={match} assetVersion={assetVersion} viewerPlayerId={viewerPlayerId} onPlayerSelect={onPlayerSelect} />
     <time dateTime={new Date(match.endedAt).toISOString()}>
+      <MatchScore form={rankedMatchForm(match)} win={match.win} className="personal-history__score" />
       <b>{formatEndedAt(match.endedAt)}</b>
       <span>时长 {Math.round(match.durationSeconds / 60)} 分钟</span>
     </time>
-    <MatchScore form={rankedMatchForm(match)} win={match.win} className="personal-history__score" />
   </article>;
 }
 

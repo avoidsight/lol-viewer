@@ -333,12 +333,14 @@
 .recent-match__stats { display:flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; }
 .recent-match__score { padding:1px 5px; border-radius:999px; font-size:10px; font-weight:650; font-variant-numeric:tabular-nums; line-height:1.2; flex-shrink:0; }
 .recent-match__stats { min-width:0; }
-.recent-match__score { align-self:center; margin-left:auto; text-align:center; }
+.recent-match__score { align-self:center; text-align:center; }
 .recent-match--compact .recent-match__performance { container-type:inline-size; }
 .recent-match--compact .recent-match__stats { gap:0; font-size:clamp(7px, 18cqw, 10px); }
 .recent-match--compact .recent-match__kda { font-size:inherit; gap:1px; }
 .recent-match--compact .recent-match__kda i { font-size:.75em; }
-.recent-match--compact .recent-match__score { font-size:9px; padding:3px; border-radius:5px; min-width:17px; box-sizing:border-box; }
+.recent-match--compact .recent-match__score { font-size:8px; padding:0 3px; line-height:11px; border-radius:3px; min-width:17px; box-sizing:border-box; }
+.recent-match__honors .recent-match__score { padding-block:0; line-height:14px; }
+.recent-match--compact .recent-match__honors .recent-match__score { line-height:11px; }
 @media (max-height: 880px) {
   .player-card__placeholder-header { min-height: 38px; }
   .live-match-grid { gap: 8px; }
