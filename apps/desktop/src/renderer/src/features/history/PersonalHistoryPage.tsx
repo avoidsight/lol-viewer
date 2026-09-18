@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { MatchParticipantSummary, MatchSummary, PersonalHistorySnapshot } from '../../../../shared/domain';
 import { historyHighlights } from './match-highlights';
+import { rankedMatchForm } from '../live/ranked-form';
+import MatchScore from '../../components/MatchScore';
 import type { PersonalHistoryTarget } from '../../../../shared/ipc';
 import { localizeRank } from '../../../../shared/rank';
 import { isBuildItem } from '../../../../shared/items';
@@ -166,6 +168,7 @@ function MatchRow({ match, assetVersion, itemIconPaths, viewerPlayerId, onPlayer
       <b>{formatEndedAt(match.endedAt)}</b>
       <span>时长 {Math.round(match.durationSeconds / 60)} 分钟</span>
     </time>
+    <MatchScore form={rankedMatchForm(match)} win={match.win} className="personal-history__score" />
   </article>;
 }
 

@@ -24,8 +24,15 @@ test('live detail and overview only show custom awards and carry without overflo
         await page.setViewportSize({ width, height: 735 });
         await expect(page.locator('.recent-match__award')).toHaveCount(0);
         expect(await page.getByTestId('match-score').evaluateAll(nodes => nodes.every(node =>
-          getComputedStyle(node).backgroundColor === (node.classList.contains('is-win') ? 'rgb(176, 204, 223)' : 'rgb(209, 182, 181)')
+          getComputedStyle(node).backgroundColor === (node.classList.contains('is-win') ? 'rgb(223, 237, 245)' : 'rgb(244, 226, 226)')
         ))).toBe(true);
+        expect(await page.locator('.recent-match__score').evaluateAll(nodes => nodes.every(node => {
+          const score = node.getBoundingClientRect();
+          const performance = node.parentElement!.getBoundingClientRect();
+          const kda = node.parentElement!.querySelector('.recent-match__kda')!.getBoundingClientRect();
+          return score.left >= kda.right && performance.right - score.right <= 5 &&
+            Math.abs((score.top + score.bottom - performance.top - performance.bottom) / 2) < 1;
+        }))).toBe(true);
         expect(await page.locator('.recent-match__stats').evaluateAll(nodes => nodes.every(node => {
           const row = node.closest('.recent-match')!.getBoundingClientRect();
           const rect = node.getBoundingClientRect();

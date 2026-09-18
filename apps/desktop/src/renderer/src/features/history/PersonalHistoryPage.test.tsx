@@ -83,6 +83,19 @@ const snapshot: PersonalHistorySnapshot = {
 };
 
 describe('PersonalHistoryPage', () => {
+  it('shows the shared rating as a trailing column, hides missing data, and preserves zero', () => {
+    const scored = { ...snapshot.matches[0], killParticipation: .7 };
+    const { rerender } = render(<PersonalHistoryPage snapshot={{ ...snapshot, matches: [scored] }} state="ready" />);
+    const score = screen.getByTestId('match-score');
+    expect(score).toHaveClass('is-win');
+    expect(score.parentElement).toBe(screen.getByTestId('personal-match'));
+    expect(score).toBe(score.parentElement!.lastElementChild);
+    rerender(<PersonalHistoryPage snapshot={{ ...snapshot, matches: [{ ...scored, win: false, kills: 0, assists: 0, deaths: 5, teamDamageShare: 0, teamDamageTakenShare: 0, killParticipation: 0 }] }} state="ready" />);
+    expect(screen.getByTestId('match-score')).toHaveTextContent('0');
+    expect(screen.getByTestId('match-score')).toHaveClass('is-loss');
+    rerender(<PersonalHistoryPage snapshot={{ ...snapshot, matches: [snapshot.matches[0]] }} state="ready" />);
+    expect(screen.queryByTestId('match-score')).toBeNull();
+  });
   it('renders the rich twenty-match dashboard with spells and team compositions', () => {
     render(<PersonalHistoryPage snapshot={snapshot} state="ready" />);
 

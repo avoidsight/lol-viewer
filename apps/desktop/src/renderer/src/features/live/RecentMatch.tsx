@@ -4,6 +4,7 @@ import type { MatchSummary } from '../../../../shared/domain';
 import { describeQueue } from '../../../../shared/queue';
 import { isBuildItem } from '../../../../shared/items';
 import { rankedMatchForm } from './ranked-form';
+import MatchScore from '../../components/MatchScore';
 
 const spells: Record<number, string> = { 1: 'summoner_boost.png', 3: 'summoner_exhaust.png', 4: 'summoner_flash.png', 6: 'summoner_haste.png', 7: 'summoner_heal.png', 11: 'summoner_smite.png', 12: 'summoner_teleport_new.png', 13: 'summonermana.png', 14: 'summonerignite.png', 21: 'summonerbarrier.png', 32: 'summoner_mark.png' };
 function OptionalIcon({ src, label }: { src: string; label: string }) {
@@ -37,11 +38,11 @@ export default function RecentMatch({ match, itemIconPaths = {}, compact = false
         </span>}
         <span className="recent-match__stats">
         <span className="recent-match__kda" aria-hidden="true"><b>{match.kills}</b><i>/</i><b>{match.deaths}</b><i>/</i><b>{match.assists}</b></span>
-        {form && <span className={`recent-match__score ${match.win ? 'is-win' : 'is-loss'}`} data-testid="match-score" aria-label={`综合评分 ${Math.round(form.score)}/100`} title={`综合评分 ${Math.round(form.score)}/100 · 自定义综合评分，非官方\n${form.description}`}>{Math.round(form.score)}</span>}
         </span>
         <small className="recent-match__mode">{describeQueue(match.queueId)}</small>
       </span>
       {itemIds.length > 0 && <span className="recent-match__items">{itemIds.map((id, index) => <OptionalIcon key={index} src={`lol-asset://game-data/${encodeURIComponent(itemIconPaths[String(id)])}`} label={`装备 ${id}`} />)}</span>}
+      <MatchScore form={form} win={match.win} className="recent-match__score" />
       {compact && preview && createPortal(<div className="recent-match-preview" role="tooltip" style={preview}>
         <div>{match.win ? '胜利' : '失败'} · {describeQueue(match.queueId)}</div>
         <small>{date} · {Math.round(match.durationSeconds / 60)}分钟</small>

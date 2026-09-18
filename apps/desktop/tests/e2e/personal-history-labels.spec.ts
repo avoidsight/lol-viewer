@@ -24,6 +24,16 @@ test('personal history uses readable bounded honors and ID-only player tooltips'
         });
       }));
       expect(fits).toBe(true);
+      const score = rows.nth(2).getByTestId('match-score');
+      await expect(score).toBeVisible();
+      expect(await score.evaluate(node => {
+        const rect = node.getBoundingClientRect();
+        const row = node.parentElement!.getBoundingClientRect();
+        const siblings = [...node.parentElement!.children].filter(child => child !== node);
+        return row.right - rect.right < 16 && rect.right <= window.innerWidth &&
+          Math.abs(rect.top + rect.bottom - row.top - row.bottom) < 2 &&
+          siblings.every(child => child.getBoundingClientRect().right <= rect.left);
+      })).toBe(true);
     }
     await page.setViewportSize({ width: 1184, height: 735 });
     await page.screenshot({ path: '/private/tmp/lol-personal-history-text-labels.png' });
