@@ -4,6 +4,7 @@ import type { MatchSummary } from '../../../../shared/domain';
 import { describeQueue } from '../../../../shared/queue';
 import { isBuildItem } from '../../../../shared/items';
 import { rankedMatchForm } from './ranked-form';
+import { scoreColor } from './score-color';
 
 const spells: Record<number, string> = { 1: 'summoner_boost.png', 3: 'summoner_exhaust.png', 4: 'summoner_flash.png', 6: 'summoner_haste.png', 7: 'summoner_heal.png', 11: 'summoner_smite.png', 12: 'summoner_teleport_new.png', 13: 'summonermana.png', 14: 'summonerignite.png', 21: 'summonerbarrier.png', 32: 'summoner_mark.png' };
 function OptionalIcon({ src, label }: { src: string; label: string }) {
@@ -22,7 +23,6 @@ export default function RecentMatch({ match, itemIconPaths = {}, compact = false
   };
   const championLabel = `英雄 ${match.championId}`;
   const form = rankedMatchForm(match);
-  const award = form?.complete && match.performanceAward === (match.win ? 'MVP' : 'SVP') ? match.performanceAward : undefined;
   const matchLabel = `${match.win ? '胜利' : '失败'} · ${describeQueue(match.queueId)} · KDA ${match.kills}/${match.deaths}/${match.assists}`;
   const date = new Date(match.endedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
   const spellIds = (match.summonerSpellIds ?? []).filter((id) => spells[id]);
@@ -33,11 +33,13 @@ export default function RecentMatch({ match, itemIconPaths = {}, compact = false
         <img className="recent-match__champion" src={`lol-asset://champion-icons/${match.championId}.png`} alt={championLabel} loading="lazy" onError={() => setImageUnavailable(true)} />}
       {spellIds.length > 0 && <span className="recent-match__spells">{spellIds.map((id, index) => <OptionalIcon key={index} src={`lol-asset://spell-icons/${spells[id]}`} label={`召唤师技能 ${id}`} />)}</span>}
       <span className="recent-match__performance">
-        {(form?.tier === 'carry' || award) && <span className="recent-match__honors">
-          {award && <span className={`recent-match__award${award === 'SVP' ? ' is-svp' : ''}`} title={`${award} · 本场队内表现最佳（峡谷雷达评选）`}>{award}</span>}
-          {form?.tier === 'carry' && (!compact || !award) && <span className="recent-match__form" title={form.description}>CARRY</span>}
+        {form?.tier === 'carry' && <span className="recent-match__honors">
+          <span className="recent-match__form" title={form.description}>CARRY</span>
         </span>}
+        <span className="recent-match__stats">
         <span className="recent-match__kda" aria-hidden="true"><b>{match.kills}</b><i>/</i><b>{match.deaths}</b><i>/</i><b>{match.assists}</b></span>
+        {form && <span className="recent-match__score" data-testid="match-score" style={{ color: scoreColor(form.score) }} aria-label={`综合评分 ${Math.round(form.score)}/100`} title={`综合评分 ${Math.round(form.score)}/100 · 自定义综合评分，非官方\n${form.description}`}>{Math.round(form.score)}</span>}
+        </span>
         <small className="recent-match__mode">{describeQueue(match.queueId)}</small>
       </span>
       {itemIds.length > 0 && <span className="recent-match__items">{itemIds.map((id, index) => <OptionalIcon key={index} src={`lol-asset://game-data/${encodeURIComponent(itemIconPaths[String(id)])}`} label={`装备 ${id}`} />)}</span>}

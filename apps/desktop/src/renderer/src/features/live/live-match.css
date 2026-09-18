@@ -320,10 +320,7 @@
 .recent-match--compact .recent-match__kda i { color: #8797aa; }
 .recent-match__form { padding: 0 6px; border-radius: 3px; background: #e7b549; color: #30230b; font-size: 9px; font-weight: 700; line-height: 14px; flex-shrink: 0; white-space: nowrap; }
 .recent-match__honors { display: flex; align-items: center; justify-content: center; gap: 3px; }
-.recent-match__award { padding: 0 4px; border-radius: 3px; background: #f4ce70; color: #392706; font-size: 9px; font-weight: 800; line-height: 14px; flex-shrink: 0; white-space: nowrap; }
-.recent-match__award.is-svp { background: #d4dbe4; color: #303c50; }
 .recent-match--compact .recent-match__honors { gap: 2px; }
-.recent-match--compact .recent-match__award,
 .recent-match--compact .recent-match__form { font-size: 7px; padding: 0 2px; line-height: 11px; }
 .recent-match:not(.recent-match--compact):has(.recent-match__form) { padding-top: 1px; padding-bottom: 1px; }
 .recent-match:not(.recent-match--compact):has(.recent-match__form) .recent-match__performance { gap: 0; }
@@ -332,6 +329,13 @@
 .recent-match--compact .recent-match__kda { line-height: 12px; }
 .recent-match--compact .recent-match__mode { color: #9aaabd; opacity: 1; font-size: 8px; line-height: 9px; }
 .recent-match-preview__form { margin-top: 3px; font-size: 10px; color: #b8c7d8; }
+.recent-match__stats { display:flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; }
+.recent-match__score { font-size:10px; font-weight:750; font-variant-numeric:tabular-nums; line-height:1; }
+.recent-match--compact .recent-match__performance { container-type:inline-size; }
+.recent-match--compact .recent-match__stats { gap:3px; font-size:clamp(7px, 13cqw, 10px); }
+.recent-match--compact .recent-match__kda { font-size:inherit; gap:1px; }
+.recent-match--compact .recent-match__kda i { font-size:.75em; }
+.recent-match--compact .recent-match__score { font-size:.9em; }
 @media (max-height: 880px) {
   .player-card__placeholder-header { min-height: 38px; }
   .live-match-grid { gap: 8px; }

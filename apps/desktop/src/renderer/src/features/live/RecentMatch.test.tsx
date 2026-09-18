@@ -9,7 +9,7 @@ describe('live history detail row', () => {
     const { rerender, container } = render(<ol><RecentMatch compact={compact} match={{ ...match, killParticipation: .6, teamDamageShare: .35, teamDamageTakenShare: .25 }} /></ol>);
     expect(screen.getByText('CARRY')).toBeVisible();
     const performance = container.querySelector('.recent-match__performance')!;
-    expect([...performance.children].map(node => node.className)).toEqual(['recent-match__honors', 'recent-match__kda', 'recent-match__mode']);
+    expect([...performance.children].map(node => node.className)).toEqual(['recent-match__honors', 'recent-match__stats', 'recent-match__mode']);
     expect(screen.getByText('单双排')).toBeVisible();
     rerender(<ol><RecentMatch compact={compact} match={{ ...match, kills: 1, assists: 2, deaths: 10, killParticipation: .2 }} /></ol>);
     expect(container.querySelector('.recent-match__form')).toBeNull();
@@ -38,21 +38,17 @@ describe('live history detail row', () => {
     expect(screen.getByRole('img', { name: '装备 3071' })).toBeVisible();
     expect(screen.queryByRole('img', { name: '装备 3053' })).not.toBeInTheDocument();
   });
-  it.each([true, false])('prioritizes custom MVP/SVP in overview and keeps both in detail (compact=%s)', compact => {
-    const data = { ...match, killParticipation: .7, teamDamageShare: .35, teamDamageTakenShare: .3, multiKill: 5 as const };
+  it.each([true, false])('shows independent score and carry, never MVP/SVP (compact=%s)', compact => {
+    const data = { ...match, killParticipation: .7, teamDamageShare: .35, teamDamageTakenShare: .3 };
     const { rerender } = render(<ol><RecentMatch compact={compact} match={{ ...data, performanceAward: 'MVP' }} /></ol>);
-    expect(screen.getByText('MVP')).toHaveAttribute('title', expect.stringContaining('峡谷雷达评选'));
-    if (compact) expect(screen.queryByText('CARRY')).toBeNull();
-    else expect(screen.getByText('CARRY')).toBeVisible();
-    expect(screen.queryByText('五杀')).toBeNull();
-    rerender(<ol><RecentMatch compact={compact} match={{ ...data, win: false, performanceAward: 'SVP' }} /></ol>);
-    expect(screen.getByText('SVP')).toHaveClass('is-svp');
-    if (compact) expect(screen.queryByText('CARRY')).toBeNull();
-    else expect(screen.getByText('CARRY')).toBeVisible();
     expect(screen.queryByText('MVP')).toBeNull();
-    rerender(<ol><RecentMatch compact={compact} match={{ ...data, win: false, performanceAward: 'MVP' }} /></ol>);
-    expect(screen.queryByText('MVP')).toBeNull();
-    rerender(<ol><RecentMatch compact={compact} match={{ ...data, teamDamageTakenShare: undefined, performanceAward: 'MVP' }} /></ol>);
-    expect(screen.queryByText('MVP')).toBeNull();
+    expect(screen.getByText('CARRY')).toBeVisible();
+    expect(screen.getByTestId('match-score')).toHaveAttribute('title', expect.stringContaining('非官方'));
+    expect(screen.getByTestId('match-score').previousElementSibling).toHaveClass('recent-match__kda');
+    rerender(<ol><RecentMatch compact={compact} match={{ ...data, win: false, performanceAward: 'SVP', kills: 1, assists: 0, deaths: 5, killParticipation: .1, teamDamageShare: .05, teamDamageTakenShare: .05 }} /></ol>);
+    expect(screen.queryByText('SVP')).toBeNull(); expect(screen.queryByText('CARRY')).toBeNull();
+    expect(screen.getByTestId('match-score')).toHaveTextContent('0');
+    rerender(<ol><RecentMatch compact={compact} match={match} /></ol>);
+    expect(screen.queryByTestId('match-score')).toBeNull();
   });
 });

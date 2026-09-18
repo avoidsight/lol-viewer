@@ -13,15 +13,21 @@ test('live detail and overview only show custom awards and carry without overflo
     for (const mode of ['详细', '总览']) {
       await page.getByRole('button', { name: mode, exact: true }).click();
       const firstRow = page.getByTestId('player-card').first().getByTestId('recent-match').first();
-      await expect(firstRow.locator('.recent-match__honors > span')).toHaveCount(mode === '总览' ? 1 : 2);
+      await expect(firstRow.locator('.recent-match__honors > span')).toHaveText(['CARRY']);
+      await expect(firstRow.getByTestId('match-score')).toBeVisible();
       if (mode === '总览') {
         await firstRow.hover();
-        await expect(page.getByRole('tooltip').locator('.recent-match__honors > span')).toHaveCount(2);
+        await expect(page.getByRole('tooltip').getByTestId('match-score')).toBeVisible();
         await page.getByRole('button', { name: '总览', exact: true }).hover();
       }
       for (const width of [1184, 900]) {
         await page.setViewportSize({ width, height: 735 });
-        await expect(page.locator('.recent-match__award').first()).toBeVisible();
+        await expect(page.locator('.recent-match__award')).toHaveCount(0);
+        expect(await page.locator('.recent-match__stats').evaluateAll(nodes => nodes.every(node => {
+          const row = node.closest('.recent-match')!.getBoundingClientRect();
+          const rect = node.getBoundingClientRect();
+          return rect.left >= row.left && rect.right <= row.right;
+        }))).toBe(true);
         expect(await page.locator('.recent-match__honors').evaluateAll(nodes => nodes.every(node => {
           const row = node.closest('.recent-match')!.getBoundingClientRect();
           return [...node.children].every(badge => {
@@ -31,7 +37,7 @@ test('live detail and overview only show custom awards and carry without overflo
         }))).toBe(true);
       }
       await page.setViewportSize({ width: 1184, height: 735 });
-      await page.screenshot({ path: `/private/tmp/lol-live-awards-${mode === '详细' ? 'detail' : 'overview'}.png` });
+      await page.screenshot({ path: `/private/tmp/lol-live-score-${mode === '详细' ? 'detail' : 'overview'}.png` });
     }
   } finally { await app.close(); await rm(dir, { recursive: true, force: true }); }
 });
