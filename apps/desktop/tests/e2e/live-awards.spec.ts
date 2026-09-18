@@ -23,6 +23,9 @@ test('live detail and overview only show custom awards and carry without overflo
       for (const width of [1184, 900]) {
         await page.setViewportSize({ width, height: 735 });
         await expect(page.locator('.recent-match__award')).toHaveCount(0);
+        expect(await page.getByTestId('match-score').evaluateAll(nodes => nodes.every(node =>
+          getComputedStyle(node).backgroundColor === (node.classList.contains('is-win') ? 'rgb(176, 204, 223)' : 'rgb(209, 182, 181)')
+        ))).toBe(true);
         expect(await page.locator('.recent-match__stats').evaluateAll(nodes => nodes.every(node => {
           const row = node.closest('.recent-match')!.getBoundingClientRect();
           const rect = node.getBoundingClientRect();
