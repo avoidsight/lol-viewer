@@ -6,3 +6,8 @@
 .player-search button { padding:8px 15px; border:1px solid #329dc2; border-radius:7px; color:#dff5ff; background:#15384a; cursor:pointer; }
 .player-search button:disabled { opacity:.6; cursor:wait; }
 .player-search [role=alert] { width:100%; color:#ff91a1; text-align:right; font-size:12px; }
+.player-search { max-width:1320px; margin:0 auto; }
+.player-search .player-search__back { display:inline-flex; align-items:center; gap:7px; margin-right:auto; min-height:34px; padding:0 11px; border-color:#33465f; color:#c5d4e5; background:#142136; font-size:12px; font-weight:600; }
+.player-search__back svg { width:16px; height:16px; flex-shrink:0; }
+.player-search .player-search__back:hover { color:#e6f6ff; border-color:#4a8da9; background:#1b3048; }
+.player-search button:focus-visible { outline:2px solid #39c6f4; outline-offset:3px; }

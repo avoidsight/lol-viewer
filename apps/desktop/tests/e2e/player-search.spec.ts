@@ -23,6 +23,8 @@ test('search by full player ID opens history and can return', async () => {
       const heroBounds = await page.locator('.personal-history__hero').boundingBox();
       expect(buttonBounds!.y + buttonBounds!.height).toBeLessThan(heroBounds!.y);
       expect(buttonBounds!.height).toBeGreaterThanOrEqual(34);
+      const searchBounds = await page.getByRole('button', { name: '搜索', exact: true }).boundingBox();
+      expect(Math.abs(buttonBounds!.y + buttonBounds!.height / 2 - searchBounds!.y - searchBounds!.height / 2)).toBeLessThan(1);
     }
     await page.setViewportSize({ width: 1184, height: 735 });
     await page.screenshot({ path: '/private/tmp/lol-player-search.png' });

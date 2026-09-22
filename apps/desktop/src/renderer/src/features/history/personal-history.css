@@ -37,12 +37,6 @@
 .personal-history__name-row { display: flex; align-items: center; gap: 9px; }
 .personal-history__name-row h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .personal-history__cached { padding: 3px 7px; border: 1px solid #d7b45a; border-radius: 999px; color: #d7b45a; font-size: 10px; white-space: nowrap; }
-.personal-history__navigation { display:flex; align-items:center; margin-bottom:10px; }
-.personal-history__back { display:inline-flex; align-items:center; gap:7px; min-height:34px; padding:0 11px; border:1px solid #33465f; border-radius:8px; color:#c5d4e5; background:#142136; cursor:pointer; font-size:12px; font-weight:600; transition:background-color 120ms ease, border-color 120ms ease; }
-.personal-history__back svg { width:16px; height:16px; flex-shrink:0; }
-.personal-history__back:hover { color:#e6f6ff; border-color:#4a8da9; background:#1b3048; }
-.personal-history__back:focus-visible { outline:2px solid #39c6f4; outline-offset:3px; }
-.personal-history__back:active { background:#102036; }
 
 .personal-history__summary {
   display: grid;

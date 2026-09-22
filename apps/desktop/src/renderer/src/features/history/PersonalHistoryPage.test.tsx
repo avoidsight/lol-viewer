@@ -4,6 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { PersonalHistorySnapshot } from '../../../../shared/domain';
 import PersonalHistoryPage from './PersonalHistoryPage';
+import PlayerSearch from './PlayerSearch';
 
 const snapshot: PersonalHistorySnapshot = {
   playerId: 'me',
@@ -165,7 +166,7 @@ describe('PersonalHistoryPage', () => {
 
   it('shows a return action while viewing another player', () => {
     const onBack = vi.fn();
-    render(<PersonalHistoryPage snapshot={snapshot} state="ready" onBack={onBack} />);
+    render(<PlayerSearch onSelect={vi.fn()} onBack={onBack} />);
     fireEvent.click(screen.getByRole('button', { name: /返回我的战绩/ }));
     expect(onBack).toHaveBeenCalledOnce();
   });
