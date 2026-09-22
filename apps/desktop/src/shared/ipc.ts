@@ -30,6 +30,7 @@ const matchParticipantSummarySchema = z.object({
 }).strict();
 export const queueScopeSchema = z.enum(['ranked-solo', 'all']);
 export const appSettingsSchema = z.object({
+  gameTextInput: z.boolean().optional(),
   autoCopyEnemyHistory: z.boolean().optional(),
   autoOpenLiveMatch: z.boolean(),
   showLaneDifferences: z.boolean(),

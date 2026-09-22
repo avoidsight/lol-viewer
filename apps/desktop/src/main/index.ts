@@ -1,3 +1,5 @@
+import { GameInputController, GAME_INPUT_SHORTCUT } from './game-input/controller';
+import { typeWithWindowsHelper } from './game-input/windows-helper';
 import { join } from 'node:path';
 import { release } from 'node:os';
 import { readFileSync } from 'node:fs';
@@ -7,7 +9,7 @@ import { DonationService } from './donation/service';
 import { createDeviceIdProvider } from './feedback/device-id';
 import { FeedbackService, feedbackEndpoint } from './feedback/feedback-service';
 import Database from 'better-sqlite3';
-import { app, BrowserWindow, protocol, powerMonitor, clipboard, shell } from 'electron';
+import { app, BrowserWindow, protocol, powerMonitor, clipboard, shell, globalShortcut, Notification } from 'electron';
 import { UpdateService } from './updates/service';
 import { registerUpdateIpc } from './ipc/register-update-ipc';
 import { EnemyHistoryClipboard } from './match/enemy-history-clipboard';
@@ -44,6 +46,7 @@ protocol.registerSchemesAsPrivileged([{
   privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true }
 }]);
 
+let gameInput: GameInputController | undefined;
 let database: Database.Database | undefined;
 let coordinator: GameflowCoordinator | undefined;
 let readyCheckAutoAcceptor: ReadyCheckAutoAcceptor | undefined;
@@ -135,7 +138,10 @@ void app.whenReady().then(() => {
     get: () => settingsService.get(),
     clearCache: () => settingsService.clearCache(),
     update: patch => {
-      const settings = settingsService.update(patch);
+      if (patch.gameTextInput !== undefined) configureGameInput(patch.gameTextInput);
+      let settings;
+      try { settings = settingsService.update(patch); }
+      catch (error) { configureGameInput(settingsService.get().gameTextInput === true); throw error; }
       usageReporter?.setEnabled(settings.usageStatistics !== false);
       return settings;
     }
@@ -183,6 +189,29 @@ void app.whenReady().then(() => {
     if (!connection) return { phase: 'None', connected: false };
     return { ...await readGameflowSessionIdentity(createLcuClient(connection)), connected: true };
   };
+  const notifyInput = (body: string) => {
+    if (Notification.isSupported()) new Notification({ title: '峡谷雷达', body, silent: true }).show();
+  };
+  gameInput = new GameInputController({ identity: readIdentity, type: typeWithWindowsHelper, notify: notifyInput });
+  function configureGameInput(enabled: boolean): void {
+    if (!enabled) {
+      globalShortcut.unregister(GAME_INPUT_SHORTCUT);
+      gameInput?.setEnabled(false);
+      return;
+    }
+    if (process.platform !== 'win32' || fixtureMode || process.env.LOL_VIEWER_DISABLE_GAME_INPUT === '1') {
+      throw new Error('Game input is unavailable');
+    }
+    if (!globalShortcut.isRegistered(GAME_INPUT_SHORTCUT)
+      && !globalShortcut.register(GAME_INPUT_SHORTCUT, () => { void gameInput?.trigger(); })) {
+      throw new Error('Game input shortcut is unavailable');
+    }
+    gameInput?.setEnabled(true);
+  }
+  if (settingsService.get().gameTextInput === true) {
+    try { configureGameInput(true); }
+    catch { configureGameInput(false); settingsService.update({ gameTextInput: false }); notifyInput('游戏内填入未开启，请检查快捷键是否被占用。'); }
+  }
   const enemyClipboard = new EnemyHistoryClipboard(database, {
     enabled: () => !fixtureMode && settingsService.get().autoCopyEnemyHistory === true,
     identity: readIdentity,
@@ -200,6 +229,7 @@ void app.whenReady().then(() => {
         ? createSgpClient(lcu, connection.rsoPlatformId)
         : undefined;
       const match = await new MatchService(lcu, { cache, staticData, ...(sgp ? { sgp } : {}) }).loadLiveMatch(scope, onPlayer, signal);
+      gameInput?.observe(match, signal);
       await enemyClipboard.copy(match, signal);
       return match;
   });
@@ -239,6 +269,9 @@ void app.whenReady().then(() => {
 });
 
 app.on('before-quit', () => {
+  globalShortcut.unregister(GAME_INPUT_SHORTCUT);
+  gameInput?.dispose();
+  gameInput = undefined;
   usageReporter?.dispose();
   usageReporter = undefined;
   readyCheckAutoAcceptor?.dispose();

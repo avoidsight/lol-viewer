@@ -333,6 +333,13 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   const updateAutoAcceptSetting = async (autoAcceptReadyCheck: boolean) => {
     try { const next = await window.lolViewer?.updateSettings({ autoAcceptReadyCheck }); if (next) { settingsRef.current = next; setSettings(next); } } catch { setMessage('设置保存失败，请重试'); }
   };
+  const updateGameTextInputSetting = async (gameTextInput: boolean) => {
+    try {
+      const next = await window.lolViewer?.updateSettings({ gameTextInput });
+      if (next) { settingsRef.current = next; setSettings(next); setMessage(gameTextInput ? '游戏内填入已开启' : '游戏内填入已关闭'); }
+    } catch { setMessage('无法开启：仅支持 Windows，请检查快捷键是否被占用。'); }
+  };
+
   const updateAutoCopySetting = async (autoCopyEnemyHistory: boolean) => {
     try {
       const next = await window.lolViewer?.updateSettings({ autoCopyEnemyHistory });
@@ -367,7 +374,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     <div hidden={page !== 'history'}><PlayerSearch onSelect={viewPlayerHistory} onBack={historyTarget ? returnToOwnHistory : undefined} /><PersonalHistoryPage snapshot={history} state={historyState} onRefresh={() => void refreshHistory()} onPlayerSelect={(target) => void viewPlayerHistory(target)} onBack={historyTarget ? returnToOwnHistory : undefined} refreshing={historyRefreshing} refreshError={historyRefreshError} /></div>
     <div hidden={page !== 'live'}><LiveMatchPage match={liveView.match} players={liveView.match ? undefined : liveView.progress} loadingProgress={liveView.requesting && !liveView.match && (liveView.progress.length > 0 || (liveView.phase !== undefined && activePhases.has(liveView.phase))) ? liveView.progress.length : undefined} lifecycleStatus={liveView.status} gameflowPhase={liveView.phase} showLaneDifferences={settings.showLaneDifferences} notice={liveNotice} /></div>
     {page === 'champions' && <ChampionLibraryPage getCatalog={getChampionCatalog} getDetails={getChampionDetails} getGuide={getChampionGuide} />}
-    {page === 'settings' && <SettingsPage settings={settings} message={message} onAutoCopyEnemyHistoryChange={(checked) => void updateAutoCopySetting(checked)} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onClearCache={() => void clearCache()} />}
+    {page === 'settings' && <SettingsPage onGameTextInputChange={(checked) => void updateGameTextInputSetting(checked)} settings={settings} message={message} onAutoCopyEnemyHistoryChange={(checked) => void updateAutoCopySetting(checked)} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onClearCache={() => void clearCache()} />}
     {clipboardNotice && <div role="status" className="clipboard-notice">敌方战绩已复制</div>}
   </>;
 return <><AppShell active={page} onChange={handleTabChange} liveAttention={liveAttention} support={<><UpdateControl api={window.lolViewer} canAutoPrompt={!feedbackOpen && ['None', 'Lobby', 'EndOfGame'].includes(updatePhase ?? '')} /><DonationControl api={window.lolViewer} /></>} onFeedback={() => setFeedbackOpen(true)}>{content}</AppShell><FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} api={window.lolViewer} /></>;

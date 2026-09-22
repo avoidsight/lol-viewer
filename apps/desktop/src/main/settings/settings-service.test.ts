@@ -4,6 +4,18 @@ import { ChampionGuideCache, MatchCache, migrateDatabase, PersonalHistoryCache }
 import { SettingsService } from './settings-service';
 
 describe('SettingsService', () => {
+  it('persists input opt-in and leaves the old explicit SQL column contract usable', () => {
+    const database = new Database(':memory:'); migrateDatabase(database); migrateDatabase(database);
+    const service = new SettingsService(database, new MatchCache(database));
+    expect(service.get().gameTextInput).toBe(false);
+    service.update({ gameTextInput: true }); service.clearCache();
+    expect(new SettingsService(database, new MatchCache(database)).get().gameTextInput).toBe(true);
+    database.prepare('UPDATE app_settings SET auto_copy_enemy_history = 1 WHERE id = 1').run();
+    expect(service.get().autoCopyEnemyHistory).toBe(true);
+    service.update({ gameTextInput: false });
+    expect(service.get().gameTextInput).toBe(false);
+    database.close();
+  });
   it('keeps auto copy opt-in and persists it through cache cleanup', () => {
     const database = new Database(':memory:'); migrateDatabase(database);
     const service = new SettingsService(database, new MatchCache(database));
@@ -30,6 +42,7 @@ describe('SettingsService', () => {
       showLaneDifferences: true,
       autoAcceptReadyCheck: false,
       usageStatistics: true,
+      gameTextInput: false,
       autoCopyEnemyHistory: false
     });
     expect(new SettingsService(database, new MatchCache(database)).get().autoOpenLiveMatch).toBe(false);

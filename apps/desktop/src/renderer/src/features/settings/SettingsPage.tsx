@@ -21,12 +21,14 @@ export default function SettingsPage({
   onAutoOpenChange,
   onAutoAcceptChange,
   onAutoCopyEnemyHistoryChange,
+  onGameTextInputChange,
   onClearCache
 }: {
   settings: AppSettings;
   message: string;
   onAutoOpenChange: (checked: boolean) => void;
   onAutoAcceptChange: (checked: boolean) => void;
+  onGameTextInputChange?: (checked: boolean) => void;
   onAutoCopyEnemyHistoryChange?: (checked: boolean) => void;
   onClearCache: () => void;
 }) {
@@ -36,6 +38,7 @@ export default function SettingsPage({
       <SettingSwitch title="自动打开对战信息" description="进入选人或游戏时，自动切到对战信息。" checked={settings.autoOpenLiveMatch} onChange={onAutoOpenChange} />
       <SettingSwitch title="自动接受匹配" checked={settings.autoAcceptReadyCheck} onChange={onAutoAcceptChange} />
       <SettingSwitch title="自动复制敌方战绩" description="在对战页加载战绩后，每局复制一次。会替换剪贴板内容，需自行粘贴发送。" checked={settings.autoCopyEnemyHistory === true} onChange={onAutoCopyEnemyHistoryChange ?? (() => {})} />
+      <SettingSwitch title="游戏内填入战绩（实验）" description="先在对战页加载战绩，再在游戏内按 Enter 打开聊天框，按 Ctrl + Alt + V 填入后自行发送。仅 Windows；切出游戏可中止。" checked={settings.gameTextInput === true} onChange={onGameTextInputChange ?? (() => {})} />
     </section>
     <section className="settings-page__section" aria-labelledby="maintenance-settings"><h2 id="maintenance-settings">本地维护</h2><div className="settings-row"><span><strong>清理缓存</strong><small>清除本地战绩缓存，不影响游戏战绩。</small></span><button type="button" onClick={onClearCache}>清理缓存</button></div></section>
     {message && <p className="settings-page__message" aria-live="polite">{message}</p>}

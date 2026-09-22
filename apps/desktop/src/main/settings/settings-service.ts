@@ -4,6 +4,7 @@ import { type AppSettings, appSettingsPatchSchema, appSettingsSchema } from '../
 import type { MatchCache } from '../cache/database';
 
 const DEFAULT_SETTINGS: AppSettings = {
+  gameTextInput: false,
   autoCopyEnemyHistory: false,
   autoOpenLiveMatch: true,
   showLaneDifferences: true,
@@ -12,6 +13,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 const settingsRowSchema = z.object({
+  game_text_input: z.union([z.literal(0), z.literal(1)]),
   auto_copy_enemy_history: z.union([z.literal(0), z.literal(1)]),
   auto_open_live_match: z.union([z.literal(0), z.literal(1)]),
   show_lane_differences: z.union([z.literal(0), z.literal(1)]),
@@ -29,12 +31,13 @@ export class SettingsService {
 
   get(): AppSettings {
     const rawRow = this.database.prepare(`
-      SELECT auto_open_live_match, show_lane_differences, auto_accept_ready_check, usage_statistics, auto_copy_enemy_history
+      SELECT game_text_input, auto_open_live_match, show_lane_differences, auto_accept_ready_check, usage_statistics, auto_copy_enemy_history
       FROM app_settings WHERE id = ?
     `).get(1);
     if (!rawRow) return { ...DEFAULT_SETTINGS };
     const row = settingsRowSchema.parse(rawRow);
     return appSettingsSchema.parse({
+      gameTextInput: row.game_text_input === 1,
       autoCopyEnemyHistory: row.auto_copy_enemy_history === 1,
       autoOpenLiveMatch: row.auto_open_live_match === 1,
       showLaneDifferences: row.show_lane_differences === 1,
@@ -47,15 +50,16 @@ export class SettingsService {
     const next = appSettingsSchema.parse({ ...this.get(), ...appSettingsPatchSchema.parse(patch) });
     this.database.prepare(`
       INSERT INTO app_settings (
-        id, queue_scope, auto_open_live_match, show_lane_differences, auto_accept_ready_check, usage_statistics, auto_copy_enemy_history
-      ) VALUES (?, 'all', ?, ?, ?, ?, ?)
+        id, queue_scope, auto_open_live_match, show_lane_differences, auto_accept_ready_check, usage_statistics, auto_copy_enemy_history, game_text_input
+      ) VALUES (?, 'all', ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         auto_open_live_match = excluded.auto_open_live_match,
         show_lane_differences = excluded.show_lane_differences,
         auto_accept_ready_check = excluded.auto_accept_ready_check,
         usage_statistics = excluded.usage_statistics,
-        auto_copy_enemy_history = excluded.auto_copy_enemy_history
-    `).run(1, Number(next.autoOpenLiveMatch), Number(next.showLaneDifferences), Number(next.autoAcceptReadyCheck), Number(next.usageStatistics !== false), Number(next.autoCopyEnemyHistory === true));
+        auto_copy_enemy_history = excluded.auto_copy_enemy_history,
+        game_text_input = excluded.game_text_input
+    `).run(1, Number(next.autoOpenLiveMatch), Number(next.showLaneDifferences), Number(next.autoAcceptReadyCheck), Number(next.usageStatistics !== false), Number(next.autoCopyEnemyHistory === true), Number(next.gameTextInput === true));
     return next;
   }
 
