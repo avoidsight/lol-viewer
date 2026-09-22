@@ -16,6 +16,7 @@ export type HttpsRequest = (
 export interface LcuClient {
   get<T>(path: string, schema: z.ZodType<T>): Promise<T>;
   post?(path: string): Promise<void>;
+  postJson?<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>;
 }
 
 export interface LcuWritableClient extends LcuClient {
@@ -35,7 +36,8 @@ export function createLcuClient(
   request: HttpsRequest = httpsRequest,
   maxResponseBytes = 2 * 1024 * 1024
 ): LcuWritableClient {
-  function send<T>(method: 'GET' | 'POST', path: string, schema?: z.ZodType<T>): Promise<T | void> {
+  function send<T>(method: 'GET' | 'POST', path: string, schema?: z.ZodType<T>, payload?: unknown): Promise<T | void> {
+    const json = payload === undefined ? undefined : JSON.stringify(payload);
     if (!validPath(path)) {
       return Promise.reject(lcuError('LCU_INVALID_RESPONSE', 'LCU request path is invalid'));
     }
@@ -59,6 +61,7 @@ export function createLcuClient(
             rejectUnauthorized: false,
             headers: {
               Accept: 'application/json',
+              ...(json === undefined ? {} : { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(json) }),
               Authorization: `Basic ${authorization}`
             }
           },
@@ -122,11 +125,14 @@ export function createLcuClient(
           invalidateLcuConnection(connection);
           finish(() => reject(lcuError('LCU_UNAVAILABLE', 'LCU is unavailable')));
         });
-        req.end();
+        req.end(json);
       });
   }
 
   return {
+    postJson<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
+      return send('POST', path, schema, body) as Promise<T>;
+    },
     get<T>(path: string, schema: z.ZodType<T>): Promise<T> {
       return send('GET', path, schema) as Promise<T>;
     },

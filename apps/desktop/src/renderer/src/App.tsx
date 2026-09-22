@@ -6,6 +6,7 @@ import { DonationControl } from './features/donation/DonationControl';
 import { UpdateControl } from './features/updates/UpdateControl';
 import ChampionLibraryPage from './features/champions/ChampionLibraryPage';
 import PersonalHistoryPage from './features/history/PersonalHistoryPage';
+import PlayerSearch from './features/history/PlayerSearch';
 import LiveMatchPage from './features/live/LiveMatchPage';
 import { initialLiveMatchState, liveMatchReducer, type LiveMatchAction, type LiveMatchErrorReason } from './features/live/live-match-state';
 import SettingsPage from './features/settings/SettingsPage';
@@ -363,7 +364,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
         : null;
 
   const content = <>
-    <div hidden={page !== 'history'}><PersonalHistoryPage snapshot={history} state={historyState} onRefresh={() => void refreshHistory()} onPlayerSelect={(target) => void viewPlayerHistory(target)} onBack={historyTarget ? returnToOwnHistory : undefined} refreshing={historyRefreshing} refreshError={historyRefreshError} /></div>
+    <div hidden={page !== 'history'}><PlayerSearch onSelect={viewPlayerHistory} /><PersonalHistoryPage snapshot={history} state={historyState} onRefresh={() => void refreshHistory()} onPlayerSelect={(target) => void viewPlayerHistory(target)} onBack={historyTarget ? returnToOwnHistory : undefined} refreshing={historyRefreshing} refreshError={historyRefreshError} /></div>
     <div hidden={page !== 'live'}><LiveMatchPage match={liveView.match} players={liveView.match ? undefined : liveView.progress} loadingProgress={liveView.requesting && !liveView.match && (liveView.progress.length > 0 || (liveView.phase !== undefined && activePhases.has(liveView.phase))) ? liveView.progress.length : undefined} lifecycleStatus={liveView.status} gameflowPhase={liveView.phase} showLaneDifferences={settings.showLaneDifferences} notice={liveNotice} /></div>
     {page === 'champions' && <ChampionLibraryPage getCatalog={getChampionCatalog} getDetails={getChampionDetails} getGuide={getChampionGuide} />}
     {page === 'settings' && <SettingsPage settings={settings} message={message} onAutoCopyEnemyHistoryChange={(checked) => void updateAutoCopySetting(checked)} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onClearCache={() => void clearCache()} />}

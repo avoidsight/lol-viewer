@@ -226,6 +226,7 @@ export interface LolViewerApi {
   getFeedbackContext?: import('./feedback').FeedbackApi['getFeedbackContext'];
   submitFeedback?: import('./feedback').FeedbackApi['submitFeedback'];
   getPersonalHistory(target?: PersonalHistoryTarget): Promise<PersonalHistorySnapshot>;
+  searchPlayer?(input: string): Promise<import('./player-search').PlayerSearchResult>;
   getLiveMatch(scope: QueueScope, generation?: number): Promise<LiveMatch>;
   getLiveRoster(): Promise<LiveRoster>;
   getGameflowPhase(): Promise<string>;

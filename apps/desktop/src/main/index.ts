@@ -20,6 +20,7 @@ import { createLcuClient } from './lcu/http-client';
 import { registerMatchIpc } from './ipc/register-match-ipc';
 import { registerSettingsIpc } from './ipc/register-settings-ipc';
 import { registerHistoryIpc } from './ipc/register-history-ipc';
+import { searchPlayer } from './history/player-search';
 import { MatchService } from './match/match-service';
 import { ChampionGuideCache, MatchCache, migrateDatabase, PersonalHistoryCache } from './cache/database';
 import { ChampionGuideClient } from './champions/champion-guide-client';
@@ -159,6 +160,12 @@ void app.whenReady().then(() => {
     readyCheckAutoAcceptor.start();
   }
   registerHistoryIpc({
+    search: async input => {
+      if (fixtureMode) return { ok: true, target: { playerId: 'fixture-search', puuid: 'fixture-search', displayName: input, profileIconId: 29 } };
+      const connection = await discoverLcuConnection();
+      if (!connection) return { ok: false, error: 'unavailable' };
+      return searchPlayer(createLcuClient(connection), input);
+    },
     load: async (target) => {
       if (fixtureMode) return createFixturePersonalHistory(target);
       const connection = await discoverLcuConnection();

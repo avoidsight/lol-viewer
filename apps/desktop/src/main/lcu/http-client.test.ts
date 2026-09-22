@@ -32,6 +32,15 @@ function requestDouble(
 }
 
 describe('createLcuClient', () => {
+  it('posts a JSON payload and validates the response', async () => {
+    const transport = requestDouble({ statusCode: 200, body: '[{"id":1}]' });
+    const client = createLcuClient({ port: 53122, password: 'secret', protocol: 'https' }, transport.request);
+    const body = [{ gameName: '测试', tagLine: '123' }];
+    await expect(client.postJson!('/lol-summoner/v1/summoners/aliases', body, z.array(z.object({ id: z.number() })))).resolves.toEqual([{ id: 1 }]);
+    expect(transport.options().headers).toMatchObject({ 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(JSON.stringify(body)) });
+    const req = vi.mocked(transport.request).mock.results[0].value as ClientRequest;
+    expect(req.end).toHaveBeenCalledWith(JSON.stringify(body));
+  });
   it('uses loopback HTTPS, five-second timeout, and Basic riot authentication', async () => {
     const transport = requestDouble({ statusCode: 200, body: '{"phase":"Lobby"}' });
     const client = createLcuClient(

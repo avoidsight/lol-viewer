@@ -63,6 +63,7 @@ const api: LolViewerApi = Object.freeze({
       ? ipcRenderer.invoke(PERSONAL_HISTORY_GET_CHANNEL)
       : ipcRenderer.invoke(PERSONAL_HISTORY_GET_CHANNEL, input)));
   },
+  searchPlayer: async (input: string) => playerSearchResultSchema.parse(await ipcRenderer.invoke(PLAYER_SEARCH, playerSearchInputSchema.parse(input))),
   getLiveMatch: async (scope: QueueScope, generation = 0): Promise<LiveMatch> => {
     const input = liveMatchRequestSchema.parse({ scope: queueScopeSchema.parse(scope), generation });
     return liveMatchSchema.parse(await ipcRenderer.invoke(MATCH_GET_CHANNEL, input));
@@ -106,3 +107,4 @@ const api: LolViewerApi = Object.freeze({
 });
 
 contextBridge.exposeInMainWorld('lolViewer', api);
+import { PLAYER_SEARCH, playerSearchInputSchema, playerSearchResultSchema } from '../shared/player-search';
