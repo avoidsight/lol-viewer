@@ -191,19 +191,25 @@ export default function PersonalHistoryPage({ snapshot, state, onRefresh, onPlay
     .filter((match) => queueScope === 'all' || isRankedQueue(match.queueId))
     .filter((match) => resultScope === 'all' || (resultScope === 'wins' ? match.win : !match.win)), [queueScope, resultScope, snapshot?.matches]);
 
+  const backNavigation = onBack && <nav className="personal-history__navigation" aria-label="战绩导航">
+    <button className="personal-history__back" type="button" onClick={onBack} aria-label="返回我的战绩">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m10 6-6 6 6 6M4 12h16" /></svg>
+      <span>我的战绩</span>
+    </button>
+  </nav>;
   if (state === 'loading') {
-    return <main className="personal-history"><div className="personal-history__unavailable">{onBack && <button type="button" onClick={onBack}>返回我的战绩</button>}<p role="status">正在加载个人战绩…</p></div></main>;
+    return <main className="personal-history"><div className="personal-history__inner">{backNavigation}<div className="personal-history__unavailable"><p role="status">正在加载个人战绩…</p></div></div></main>;
   }
   if (state === 'unavailable' || !snapshot) {
-    return <main className="personal-history"><div className="personal-history__unavailable">{onBack && <button type="button" onClick={onBack}>返回我的战绩</button>}<p role="alert">{onBack ? '该玩家战绩暂时无法读取' : '请先启动英雄联盟客户端'}</p></div></main>;
+    return <main className="personal-history"><div className="personal-history__inner">{backNavigation}<div className="personal-history__unavailable"><p role="alert">{onBack ? '该玩家战绩暂时无法读取' : '请先启动英雄联盟客户端'}</p></div></div></main>;
   }
 
   return <main className="personal-history">
     <div className="personal-history__inner">
+      {backNavigation}
       <header className="personal-history__hero">
         <img className="personal-history__hero-avatar" src={profileIconUrl(snapshot.assetVersion, snapshot.profileIconId)} alt={`${snapshot.displayName}头像`} />
         <div className="personal-history__identity">
-          {onBack && <button className="personal-history__back" type="button" onClick={onBack}>← 返回我的战绩</button>}
           <div className="personal-history__name-row">
             <h1>{snapshot.displayName}</h1>
             {snapshot.cached && <strong className="personal-history__cached">缓存数据</strong>}
