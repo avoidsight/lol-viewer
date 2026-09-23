@@ -33,10 +33,15 @@ export default function PlayerSearch({ onSelect, onBack }: { onSelect: (target: 
       <span>我的战绩</span>
     </button>}
     <span className="player-search__scope">当前大区</span>
+    <div className={`player-search__field${error ? ' is-invalid' : ''}`} aria-busy={busy}>
     <input aria-label="玩家名字和编号" aria-invalid={!!error} aria-describedby={error ? 'player-search-error' : undefined}
-      placeholder="搜索玩家：名字#编号" maxLength={100} value={query} disabled={busy}
+      placeholder="搜索召唤师：名字#编号" maxLength={100} value={query} disabled={busy}
       onChange={event => { setQuery(event.target.value); setError(''); }} />
-    <button type="submit" disabled={busy}>{busy ? '查询中…' : '搜索'}</button>
+    <button className="player-search__submit" type="submit" disabled={busy} aria-label={busy ? '查询中' : '搜索'} title={busy ? '查询中' : '搜索'}>
+      {busy ? <svg className="player-search__spinner" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-8-8" /></svg> :
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>}
+    </button>
+    </div>
     {error && <span id="player-search-error" role="alert">{error}</span>}
   </form>;
 }
