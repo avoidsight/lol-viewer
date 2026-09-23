@@ -80,6 +80,8 @@ function createWindow(): void {
     }
   });
 
+  window.setMenu(null);
+  window.setMenuBarVisibility(false);
   if (is.dev && process.env.ELECTRON_RENDERER_URL) {
     void window.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {

@@ -15,6 +15,7 @@ export const CHAMPION_GUIDE_GET_CHANNEL = 'champions:get-guide' as const;
 export const CHAMPION_CATALOG_GET_CHANNEL = 'champions:get-catalog' as const;
 export const CHAMPION_DETAILS_GET_CHANNEL = 'champions:get-details' as const;
 export const PERSONAL_HISTORY_GET_CHANNEL = 'history:get-personal' as const;
+export const APP_VERSION_CHANNEL = 'app:get-version' as const;
 
 const laneSchema = z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'UNKNOWN']);
 const matchAchievementSchema = z.object({
@@ -227,6 +228,7 @@ export interface LolViewerApi {
   getFeedbackContext?: import('./feedback').FeedbackApi['getFeedbackContext'];
   submitFeedback?: import('./feedback').FeedbackApi['submitFeedback'];
   getPersonalHistory(target?: PersonalHistoryTarget): Promise<PersonalHistorySnapshot>;
+  getAppVersion?(): Promise<string>;
   searchPlayer?(input: string): Promise<import('./player-search').PlayerSearchResult>;
   getLiveMatch(scope: QueueScope, generation?: number): Promise<LiveMatch>;
   getLiveRoster(): Promise<LiveRoster>;

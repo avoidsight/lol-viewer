@@ -14,3 +14,5 @@
 .settings-switch input:focus-visible + .settings-switch__track { outline: 2px solid var(--ui-warning); outline-offset: 3px; }
 .settings-row button { min-height: 40px; padding: 0 16px; border: 1px solid var(--ui-border-strong); border-radius: var(--ui-radius-sm); color: var(--ui-text); background: var(--ui-surface-raised); cursor: pointer; }.settings-row button:hover { border-color: var(--ui-accent); background: var(--ui-surface-hover); }.settings-row button:focus-visible { outline: 2px solid var(--ui-warning); outline-offset: 3px; }.settings-page__message { color: var(--ui-accent); font-size: 13px; }
 @media (prefers-reduced-motion: reduce) { .settings-switch__track, .settings-switch__track i { transition: none; } }
+.settings-page__version { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:28px; color:#8291a6; font-size:12px; }
+.settings-page__version span { color:#aebdce; font-variant-numeric:tabular-nums; }

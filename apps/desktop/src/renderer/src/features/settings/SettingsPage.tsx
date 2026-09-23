@@ -1,4 +1,5 @@
 import type { AppSettings } from '../../../../shared/ipc';
+import { useEffect, useState } from 'react';
 import './settings.css';
 
 function SettingSwitch({
@@ -32,6 +33,12 @@ export default function SettingsPage({
   onAutoCopyEnemyHistoryChange?: (checked: boolean) => void;
   onClearCache: () => void;
 }) {
+  const [version, setVersion] = useState<string>();
+  useEffect(() => {
+    let disposed = false;
+    void window.lolViewer?.getAppVersion?.().then(value => { if (!disposed) setVersion(value); }).catch(() => {});
+    return () => { disposed = true; };
+  }, []);
   return <main className="settings-page"><div className="settings-page__inner">
     <header className="settings-page__heading"><h1>设置</h1></header>
     <section className="settings-page__section" aria-labelledby="match-settings"><h2 id="match-settings">游戏辅助</h2>
@@ -42,5 +49,6 @@ export default function SettingsPage({
     </section>
     <section className="settings-page__section" aria-labelledby="maintenance-settings"><h2 id="maintenance-settings">本地维护</h2><div className="settings-row"><span><strong>清理缓存</strong><small>清除本地战绩缓存，不影响游戏战绩。</small></span><button type="button" onClick={onClearCache}>清理缓存</button></div></section>
     {message && <p className="settings-page__message" aria-live="polite">{message}</p>}
+    <footer className="settings-page__version">峡谷雷达 <span>{version ? `v${version}` : '版本信息不可用'}</span></footer>
   </div></main>;
 }

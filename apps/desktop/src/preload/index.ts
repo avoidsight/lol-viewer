@@ -7,6 +7,7 @@ import { FEEDBACK_CONTEXT_CHANNEL, FEEDBACK_SUBMIT_CHANNEL, feedbackContextSchem
 import type { PersonalHistorySnapshot, PlayerSnapshot, QueueScope } from '../shared/domain';
 import {
   MATCH_GET_CHANNEL,
+  APP_VERSION_CHANNEL,
   MATCH_ROSTER_GET_CHANNEL,
   MATCH_CANCEL_CHANNEL,
   MATCH_RETRY_CHANNEL,
@@ -63,6 +64,7 @@ const api: LolViewerApi = Object.freeze({
       ? ipcRenderer.invoke(PERSONAL_HISTORY_GET_CHANNEL)
       : ipcRenderer.invoke(PERSONAL_HISTORY_GET_CHANNEL, input)));
   },
+  getAppVersion: async () => z.string().min(1).max(100).parse(await ipcRenderer.invoke(APP_VERSION_CHANNEL)),
   searchPlayer: async (input: string) => playerSearchResultSchema.parse(await ipcRenderer.invoke(PLAYER_SEARCH, playerSearchInputSchema.parse(input))),
   getLiveMatch: async (scope: QueueScope, generation = 0): Promise<LiveMatch> => {
     const input = liveMatchRequestSchema.parse({ scope: queueScopeSchema.parse(scope), generation });

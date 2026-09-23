@@ -69,7 +69,7 @@ export function UpdateControl({ api, canAutoPrompt = false }: { api?: LolViewerA
     finally { setBusy(false); }
   }
   return <>
-    {update && <button className="update-trigger" type="button" onClick={() => { prompted.current.add(update.version); setError(''); setOpen(true); }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m-5 5 5-5 5 5M5 16v4h14v-4" /></svg>新版本<span className="update-trigger__dot" /></button>}
+    {update && <button className="update-trigger" type="button" onClick={() => { prompted.current.add(update.version); setError(''); setOpen(true); }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12m-5-5 5 5 5-5M5 17v3h14v-3" /></svg>新版本<span className="update-trigger__dot" /></button>}
     <dialog ref={dialog} className="update-dialog" aria-labelledby="update-title" onCancel={event => { event.preventDefault(); setOpen(false); }}>
       <span className="update-dialog__badge">{update?.important ? '重要更新' : '版本更新'}</span>
       <h2 id="update-title">新版本 {update?.version}</h2>

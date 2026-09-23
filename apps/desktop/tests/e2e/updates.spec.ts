@@ -7,6 +7,11 @@ test('important update button is passive, offers notes, download, cancel and per
   const app = await electron.launch({ args: [join(process.cwd(), 'out/main/index.js'), '--fixture-live-match', `--user-data-dir=${dir}`], env: { ...process.env, PLAYWRIGHT_TEST: '1' } });
   try {
     const page = await app.firstWindow();
+    const version = await app.evaluate(({ app }) => app.getVersion());
+    await page.getByRole('tab', { name: '设置', exact: true }).click();
+    await expect(page.locator('.settings-page__version')).toHaveText(`峡谷雷达 v${version}`);
+    await page.screenshot({ path: '/private/tmp/lol-settings-version.png' });
+    await page.getByRole('tab', { name: '战绩', exact: true }).click();
     await expect(page.getByRole('button', { name: '新版本' })).toHaveCount(0);
     await app.evaluate(({ ipcMain }) => {
       (globalThis as any).updateVersion = '1.1.0'; (globalThis as any).downloads = [];
@@ -16,6 +21,7 @@ test('important update button is passive, offers notes, download, cancel and per
     });
     await page.reload(); await page.setViewportSize({ width: 1184, height: 735 });
     const trigger = page.getByRole('button', { name: '新版本' });
+    await expect(trigger.locator('svg path')).toHaveAttribute('d', 'M12 4v12m-5-5 5 5 5-5M5 17v3h14v-3');
     await expect(trigger).toBeVisible(); await expect(page.getByRole('dialog')).not.toBeVisible();
     await trigger.click(); const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('重要更新')).toBeVisible();
