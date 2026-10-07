@@ -66,6 +66,10 @@ const api: LolViewerApi = Object.freeze({
   },
   getAppVersion: async () => z.string().min(1).max(100).parse(await ipcRenderer.invoke(APP_VERSION_CHANNEL)),
   searchPlayer: async (input: string) => playerSearchResultSchema.parse(await ipcRenderer.invoke(PLAYER_SEARCH, playerSearchInputSchema.parse(input))),
+  readClipboardPlayerId: async () => {
+    const value: unknown = await ipcRenderer.invoke(PLAYER_SEARCH_CLIPBOARD);
+    return typeof value === 'string' ? clipboardPlayerId(value) : undefined;
+  },
   getLiveMatch: async (scope: QueueScope, generation = 0): Promise<LiveMatch> => {
     const input = liveMatchRequestSchema.parse({ scope: queueScopeSchema.parse(scope), generation });
     return liveMatchSchema.parse(await ipcRenderer.invoke(MATCH_GET_CHANNEL, input));
@@ -109,4 +113,4 @@ const api: LolViewerApi = Object.freeze({
 });
 
 contextBridge.exposeInMainWorld('lolViewer', api);
-import { PLAYER_SEARCH, playerSearchInputSchema, playerSearchResultSchema } from '../shared/player-search';
+import { PLAYER_SEARCH, PLAYER_SEARCH_CLIPBOARD, clipboardPlayerId, playerSearchInputSchema, playerSearchResultSchema } from '../shared/player-search';

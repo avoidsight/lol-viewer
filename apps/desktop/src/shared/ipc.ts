@@ -230,6 +230,7 @@ export interface LolViewerApi {
   getPersonalHistory(target?: PersonalHistoryTarget): Promise<PersonalHistorySnapshot>;
   getAppVersion?(): Promise<string>;
   searchPlayer?(input: string): Promise<import('./player-search').PlayerSearchResult>;
+  readClipboardPlayerId?(): Promise<string | undefined>;
   getLiveMatch(scope: QueueScope, generation?: number): Promise<LiveMatch>;
   getLiveRoster(): Promise<LiveRoster>;
   getGameflowPhase(): Promise<string>;

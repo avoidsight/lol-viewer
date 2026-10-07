@@ -2,6 +2,12 @@ import { z } from 'zod';
 import { personalHistoryTargetSchema } from './ipc';
 
 export const PLAYER_SEARCH = 'history:search-player';
+export const PLAYER_SEARCH_CLIPBOARD = 'history:clipboard-player-id';
+// Conservative auto-fill only; manual search retains the broader Riot ID validator.
+export function clipboardPlayerId(text: string): string | undefined {
+  const value = text.trim();
+  return /^[\p{L}\p{N}][\p{L}\p{N} _·.-]{0,31}#[0-9]{3,10}$/u.test(value) ? value : undefined;
+}
 export const playerSearchInputSchema = z.string().trim().min(3).max(100)
   .refine(value => !/[\u0000-\u001f\u007f]/.test(value) && /^[^#]+#[^#]+$/.test(value) && value.split('#').every(part => part.trim().length > 0), '请输入完整的名字#编号');
 export const playerSearchResultSchema = z.discriminatedUnion('ok', [

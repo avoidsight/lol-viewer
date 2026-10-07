@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { PersonalHistoryTarget } from '../../../../shared/ipc';
-import { playerSearchInputSchema } from '../../../../shared/player-search';
+import { clipboardPlayerId, playerSearchInputSchema } from '../../../../shared/player-search';
 import './player-search.css';
 
 const errors = { unavailable: '请先登录英雄联盟客户端', 'not-found': '当前大区未找到该玩家，请检查名字和编号', failed: '查询失败，请稍后重试', busy: '正在查询，请稍候' };
@@ -10,6 +10,7 @@ export default function PlayerSearch({ onSelect, onBack }: { onSelect: (target: 
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   const generation = useRef(0);
+  const edits = useRef(0);
   return <form className="player-search" aria-label="搜索玩家" onSubmit={async event => {
     event.preventDefault();
     if (lock.current) return;
@@ -27,16 +28,26 @@ export default function PlayerSearch({ onSelect, onBack }: { onSelect: (target: 
     finally { if (requestId === generation.current) { lock.current = false; setBusy(false); } }
   }}>
     {onBack && <button className="player-search__back" type="button" aria-label="返回我的战绩" onClick={() => {
-      generation.current++; lock.current = false; setBusy(false); setError(''); setQuery(''); onBack();
+      generation.current++; edits.current++; lock.current = false; setBusy(false); setError(''); setQuery(''); onBack();
     }}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m10 6-6 6 6 6M4 12h16" /></svg>
       <span>我的战绩</span>
     </button>}
-    <span className="player-search__scope">当前大区</span>
     <div className={`player-search__field${error ? ' is-invalid' : ''}`} aria-busy={busy}>
     <input aria-label="玩家名字和编号" aria-invalid={!!error} aria-describedby={error ? 'player-search-error' : undefined}
-      placeholder="搜索召唤师：名字#编号" maxLength={100} value={query} disabled={busy}
-      onChange={event => { setQuery(event.target.value); setError(''); }} />
+      placeholder="搜索本区召唤师：名字#编号" maxLength={100} value={query} disabled={busy}
+      onFocus={async event => {
+        if (query || lock.current) return;
+        const input = event.currentTarget;
+        const edit = ++edits.current;
+        try {
+          const value = await window.lolViewer?.readClipboardPlayerId?.();
+          if (edit === edits.current && document.activeElement === input && !lock.current && value && clipboardPlayerId(value)) {
+            setQuery(value); setError('');
+          }
+        } catch { /* Clipboard access is optional; manual search remains available. */ }
+      }}
+      onChange={event => { edits.current++; setQuery(event.target.value); setError(''); }} />
     <button className="player-search__submit" type="submit" disabled={busy} aria-label={busy ? '查询中' : '搜索'} title={busy ? '查询中' : '搜索'}>
       {busy ? <svg className="player-search__spinner" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-8-8" /></svg> :
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>}

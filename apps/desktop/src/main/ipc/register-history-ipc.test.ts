@@ -1,14 +1,31 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const { handle, getAllWindows } = vi.hoisted(() => ({ handle: vi.fn(), getAllWindows: vi.fn() }));
-vi.mock('electron', () => ({ ipcMain: { handle }, BrowserWindow: { getAllWindows } }));
+const { handle, getAllWindows, readText } = vi.hoisted(() => ({ handle: vi.fn(), getAllWindows: vi.fn(), readText: vi.fn() }));
+vi.mock('electron', () => ({ ipcMain: { handle }, BrowserWindow: { getAllWindows }, clipboard: { readText } }));
 
 import { PERSONAL_HISTORY_GET_CHANNEL } from '../../shared/ipc';
 import { createFixturePersonalHistory } from '../fixtures/live-match';
 import { registerHistoryIpc } from './register-history-ipc';
-import { PLAYER_SEARCH } from '../../shared/player-search';
+import { PLAYER_SEARCH, PLAYER_SEARCH_CLIPBOARD } from '../../shared/player-search';
 
 describe('registerHistoryIpc', () => {
+  it('returns only recognizable player IDs and never reads for unauthorized senders', () => {
+    handle.mockClear(); readText.mockClear();
+    const sender = {};
+    getAllWindows.mockReturnValue([{ webContents: sender, isDestroyed: () => false }]);
+    registerHistoryIpc({ load: vi.fn() });
+    const handler = handle.mock.calls.find(([channel]) => channel === PLAYER_SEARCH_CLIPBOARD)![1];
+    expect(() => handler({ sender: {} })).toThrow('Unauthorized');
+    expect(readText).not.toHaveBeenCalled();
+    readText.mockReturnValue(' 测试玩家#12345 ');
+    expect(handler({ sender })).toBe('测试玩家#12345');
+    for (const value of ['普通内容', 'https://example.com/#12345', '你好\n玩家#12345', '玩家#12345\n其他内容', '玩家#12345#678']) {
+      readText.mockReturnValue(value); expect(handler({ sender })).toBeUndefined();
+    }
+    readText.mockImplementationOnce(() => { throw new Error('unavailable'); });
+    expect(handler({ sender })).toBeUndefined();
+    handle.mockClear();
+  });
   it('authorizes and validates searches and rejects overlapping requests', async () => {
     handle.mockClear();
     const sender = {};

@@ -1,8 +1,8 @@
-import { ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { clipboard, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import type { PersonalHistorySnapshot } from '../../shared/domain';
 import { PERSONAL_HISTORY_GET_CHANNEL, personalHistorySchema, personalHistoryTargetSchema, type PersonalHistoryTarget } from '../../shared/ipc';
 import { assertAuthorizedRenderer } from './authorization';
-import { PLAYER_SEARCH, playerSearchInputSchema, playerSearchResultSchema, type PlayerSearchResult } from '../../shared/player-search';
+import { PLAYER_SEARCH, PLAYER_SEARCH_CLIPBOARD, clipboardPlayerId, playerSearchInputSchema, playerSearchResultSchema, type PlayerSearchResult } from '../../shared/player-search';
 
 export interface PersonalHistoryLoader {
   load(target?: PersonalHistoryTarget): Promise<PersonalHistorySnapshot>;
@@ -10,6 +10,10 @@ export interface PersonalHistoryLoader {
 }
 
 export function registerHistoryIpc(service: PersonalHistoryLoader): void {
+  ipcMain.handle(PLAYER_SEARCH_CLIPBOARD, (event: IpcMainInvokeEvent) => {
+    assertAuthorizedRenderer(event);
+    try { return clipboardPlayerId(clipboard.readText()); } catch { return undefined; }
+  });
   let searching = false;
   ipcMain.handle(PLAYER_SEARCH, async (event: IpcMainInvokeEvent, input: unknown) => {
     assertAuthorizedRenderer(event);
