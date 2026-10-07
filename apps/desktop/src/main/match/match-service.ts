@@ -94,6 +94,7 @@ interface LoadedRoster {
 }
 
 export interface MatchServiceOptions {
+  onSnapshot?: (match: LiveMatch) => void;
   sleep?: (milliseconds: number) => Promise<void>;
   cache?: MatchSnapshotCache;
   sgp?: SgpClient;
@@ -153,12 +154,14 @@ async function mapLimit<T, R>(items: T[], limit: number, mapper: (item: T) => Pr
 }
 
 export class MatchService {
+  private readonly onSnapshot: MatchServiceOptions['onSnapshot'];
   private readonly sleep: (milliseconds: number) => Promise<void>;
   private readonly cache: MatchSnapshotCache | undefined;
   private readonly sgp: SgpClient | undefined;
   private readonly staticData: LcuStaticDataProvider;
 
   constructor(private readonly client: LcuClient, options: MatchServiceOptions = {}) {
+    this.onSnapshot = options.onSnapshot;
     this.sleep = options.sleep ?? ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
     this.cache = options.cache;
     this.sgp = options.sgp;
@@ -188,6 +191,7 @@ export class MatchService {
   }
 
   async loadLiveMatch(_scope: QueueScope, onPlayer: (player: PlayerSnapshot) => void, signal?: AbortSignal): Promise<LiveMatch> {
+    const completedPlayers: PlayerSnapshot[] = [];
     const roster = await this.loadRoster(signal);
     const {
       participants,
@@ -332,6 +336,8 @@ export class MatchService {
       checkCancelled(signal);
       try {
         onPlayer(player);
+        completedPlayers.push(player);
+        this.onSnapshot?.({ players: [...completedPlayers], ...(roster.gameId ? { gameId: roster.gameId } : {}), localTeamId, queueId, modeName, positionOrderReliable });
       } catch {
         // A stale or faulty renderer listener must not affect match loading.
       }

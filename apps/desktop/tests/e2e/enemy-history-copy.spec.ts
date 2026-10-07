@@ -15,7 +15,7 @@ test('enemy summary opt-in persists and copy notice is passive; fixture never wr
     const page = await app.firstWindow();
     await page.setViewportSize({ width: 1184, height: 735 });
     await page.getByRole('tab', { name: '设置' }).click();
-    const toggle = page.getByRole('switch', { name: /自动复制敌方战绩/ });
+    const toggle = page.getByRole('switch', { name: /自动复制双方战绩/ });
     await expect(toggle).not.toBeChecked();
     await toggle.click();
     await expect(toggle).toBeChecked();
@@ -28,7 +28,7 @@ test('enemy summary opt-in persists and copy notice is passive; fixture never wr
     await expect(page.getByTestId('player-card')).toHaveCount(10);
     expect(await app.evaluate(() => (globalThis as any).testClipboardWrites)).toBe(0);
     await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].webContents.send('match:enemy-history-copied'); });
-    await expect(page.getByRole('status').filter({ hasText: '敌方战绩已复制' })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: '对局战绩已复制' })).toBeVisible();
     await expect(page.getByRole('tab', { name: '对战信息' })).toBeFocused();
   } finally { await app.close(); await rm(dir, { recursive: true, force: true }); }
 });

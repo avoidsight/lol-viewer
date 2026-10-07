@@ -46,7 +46,8 @@ describe('MatchService', () => {
     });
     const metadata = vi.fn(async () => ({ 1: { name: '安妮' } }));
     const progress = vi.fn();
-    const match = await new MatchService({ get } as LcuClient, { staticData: {
+    const onSnapshot = vi.fn();
+    const match = await new MatchService({ get } as LcuClient, { onSnapshot, staticData: {
       getAssetVersion: async () => '16.17.1', getItemIconPaths: async () => ({}), getChampionMetadata: metadata
     } }).loadLiveMatch('all', progress);
     expect(metadata).toHaveBeenCalledTimes(1);
@@ -54,6 +55,9 @@ describe('MatchService', () => {
     expect(match.players[1].championName).toBeUndefined();
     expect(match.players[0].matches[0].championId).toBe(1);
     expect(progress.mock.calls.some(([p]) => p.championName === '安妮')).toBe(true);
+    expect(onSnapshot.mock.calls.map(([snapshot]) => snapshot.players.length)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(onSnapshot.mock.calls[4][0].players.every((p: PlayerSnapshot) => p.teamId === 100)).toBe(true);
+    expect(onSnapshot.mock.calls[4][0]).toMatchObject({ localTeamId: 100, queueId: 440 });
   });
   it('uses the current Riot ID during champion select even when the roster name is hidden', async () => {
     const team = participants.map((entry, index) => ({ summonerId: entry.summonerId, championId: entry.championId, cellId: index, gameName: '', playerAlias: '' }));

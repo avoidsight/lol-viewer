@@ -14,7 +14,7 @@ test('input experiment defaults off and fixture cannot register a real shortcut'
     await input.click();
     await expect(page.getByText('无法开启：仅支持 Windows，请检查快捷键是否被占用。')).toBeVisible();
     await expect(input).not.toBeChecked();
-    await expect(page.getByRole('switch', { name: /自动复制敌方战绩/ })).not.toBeChecked();
+    await expect(page.getByRole('switch', { name: /自动复制双方战绩/ })).not.toBeChecked();
     await page.screenshot({ path: '/private/tmp/radar-game-input-settings.png' });
   } finally { await app.close(); await rm(dir, { recursive: true, force: true }); }
 });

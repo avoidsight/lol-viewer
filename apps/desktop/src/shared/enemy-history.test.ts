@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { createFixtureLiveMatch } from '../main/fixtures/live-match';
-import { enemyHistorySummary } from './enemy-history';
+import { alliedHistorySummary, enemyHistorySummary } from './enemy-history';
 
 function fixture() {
   const match = { ...createFixtureLiveMatch('all'), gameId: '123', localTeamId: 100, queueId: 420 };
@@ -18,6 +18,15 @@ it('highlights at most two current champions using shared player labels', () => 
   const text = enemyHistorySummary(match)!;
   expect(text).toContain('英雄0【通天代】近10场10胜，10场CARRY');
   expect(text).toContain('英雄1'); expect(text).not.toContain('英雄2');
+  expect(text).toContain('平均100.0分');
+});
+it('summarizes allies with real ranked average scores, rejecting incomplete rosters', () => {
+  const { match } = fixture();
+  const own = { ...match, localTeamId: 200 };
+  expect(alliedHistorySummary(own)).toContain('英雄0：10胜0负，平均100.0分');
+  own.players.find(p => p.teamId === 200)!.matches = [];
+  expect(alliedHistorySummary(own)).toContain('英雄0：暂无数据');
+  expect(alliedHistorySummary({ ...own, players: own.players.slice(0, 1) })).toBeUndefined();
 });
 it('highlights only the leader with an eight point lead', () => {
   const { match, enemies } = fixture();

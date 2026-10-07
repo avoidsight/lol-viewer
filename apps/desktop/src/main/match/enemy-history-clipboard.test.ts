@@ -41,6 +41,20 @@ it('copies once across parallel loads and service recreation, then copies the ne
   match.gameId = '124'; deps.identity.mockResolvedValue({ phase: 'InProgress', gameId: '124' });
   expect(await copier.copy(match)).toBe(true); expect(deps.write).toHaveBeenCalledTimes(2);
 });
+it('copies allies first then both teams once, and never regresses to allies-only', async () => {
+  const { db, match, deps, copier } = setup();
+  const partial = { ...match, players: match.players.filter(p => p.teamId === 100) };
+  deps.identity.mockResolvedValue({ phase: 'ChampSelect', gameId: '123' });
+  expect(await copier.copy(partial)).toBe(true);
+  expect(deps.write.mock.calls[0][0]).toContain('己方近期');
+  expect(await new EnemyHistoryClipboard(db, deps).copy(partial)).toBe(false);
+  deps.identity.mockResolvedValue({ phase: 'InProgress', gameId: '123' });
+  expect(await copier.copy(match)).toBe(true);
+  expect(deps.write.mock.calls[1][0]).toContain('\n');
+  expect(await copier.copy(partial)).toBe(false);
+  expect(await copier.copy(match)).toBe(false);
+  expect(deps.write).toHaveBeenCalledTimes(2);
+});
 it('disabled, stale, ended or aborted requests never overwrite clipboard', async () => {
   const { match, deps, copier } = setup();
   deps.enabled.mockReturnValue(false); expect(await copier.copy(match)).toBe(false); expect(deps.identity).not.toHaveBeenCalled();
@@ -50,6 +64,15 @@ it('disabled, stale, ended or aborted requests never overwrite clipboard', async
   const controller = new AbortController();
   deps.identity.mockImplementation(async () => { controller.abort(); return { phase: 'InProgress', gameId: '123' }; });
   expect(await copier.copy(match, controller.signal)).toBe(false); expect(deps.write).not.toHaveBeenCalled();
+});
+it('preserves enemy-only copying when own history is unavailable and later upgrades to both', async () => {
+  const { match, deps, copier } = setup();
+  const unavailable = { ...match, players: match.players.map(p => p.teamId === 100 ? { ...p, status: 'unavailable' as const, matches: [] } : p) };
+  expect(await copier.copy(unavailable)).toBe(true);
+  expect(deps.write.mock.calls[0][0]).not.toContain('己方近期');
+  expect(await copier.copy(match)).toBe(true);
+  expect(deps.write.mock.calls[1][0]).toContain('己方近期');
+  expect(await copier.copy(unavailable)).toBe(false);
 });
 it('rechecks opt-out after await and isolates clipboard failures', async () => {
   const { match, deps, copier } = setup();

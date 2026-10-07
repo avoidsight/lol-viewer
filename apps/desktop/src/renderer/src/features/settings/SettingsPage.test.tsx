@@ -7,8 +7,8 @@ describe('SettingsPage', () => {
     const onAutoAcceptChange = vi.fn();
     const onCopy = vi.fn();
     render(<SettingsPage settings={{ autoOpenLiveMatch: true, autoAcceptReadyCheck: false, showLaneDifferences: true }} message="" onAutoCopyEnemyHistoryChange={onCopy} onAutoOpenChange={vi.fn()} onAutoAcceptChange={onAutoAcceptChange} onClearCache={vi.fn()} />);
-    expect(screen.getByRole('switch', { name: /自动复制敌方战绩/ })).not.toBeChecked();
-    fireEvent.click(screen.getByRole('switch', { name: /自动复制敌方战绩/ }));
+    expect(screen.getByRole('switch', { name: /自动复制双方战绩/ })).not.toBeChecked();
+    fireEvent.click(screen.getByRole('switch', { name: /自动复制双方战绩/ }));
     expect(onCopy).toHaveBeenCalledWith(true);
 
     const autoAccept = screen.getByRole('switch', { name: /自动接受匹配/ });

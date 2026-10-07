@@ -27,7 +27,7 @@ export function enemyHistorySummary(match: LiveMatch): string | undefined {
     const parts = candidates.map(({ player, form }) => {
       const name = player.championName?.trim() || player.displayName;
       const tag = form.tier === 'elite' || form.tier === 'strong' ? `【${form.label}】` : '';
-      return `${cleanName(name)}${tag}近${form.sampleSize}场${form.wins}胜，${form.carry}场CARRY`;
+      return `${cleanName(name)}${tag}近${form.sampleSize}场${form.wins}胜，${form.carry}场CARRY，平均${form.averageScore.toFixed(1)}分`;
     });
     return `对面重点${evaluated.length < 5 ? '（部分玩家战绩缺失）' : ''}：${parts.join('；')}。`;
   }
@@ -47,4 +47,27 @@ export function enemyHistorySummary(match: LiveMatch): string | undefined {
   });
   if (!available) return;
   return `敌方近期${ranked ? '排位（单双/灵活）' : '全部模式'}战绩：${lines.join('；')}`;
+}
+
+/** Own-team histories are useful even while opposing identities are unavailable. */
+export function alliedHistorySummary(match: LiveMatch): string | undefined {
+  if (!match.gameId || match.gameId === '0' || match.localTeamId == null) return;
+  const allies = match.players.filter(p => p.teamId === match.localTeamId);
+  if (allies.length !== 5 || new Set(allies.map(p => p.playerId)).size !== 5 || allies.some(p => p.status === 'loading')) return;
+  if (!allies.some(p => p.status === 'ready' && p.matches.length)) return;
+  const ranked = isRankedQueue(match.queueId);
+  const ordered = match.positionOrderReliable ? [...allies].sort((a, b) => lanes.indexOf(a.lane) - lanes.indexOf(b.lane)) : allies;
+  const lines = ordered.map(player => {
+    const seen = new Set<string>();
+    const recent = player.status === 'ready' ? [...player.matches]
+      .filter(m => !m.remake && (!ranked || isRankedQueue(m.queueId)))
+      .sort((a, b) => b.endedAt - a.endedAt)
+      .filter(m => { if (seen.has(m.matchId)) return false; seen.add(m.matchId); return true; }).slice(0, 10) : [];
+    const name = cleanName(player.championName?.trim() || player.displayName);
+    if (!recent.length) return `${name}：暂无数据`;
+    const form = ranked ? rankedForm(recent) : undefined;
+    const wins = recent.filter(m => m.win).length;
+    return `${name}：${wins}胜${recent.length - wins}负${ranked ? form ? `，平均${form.averageScore.toFixed(1)}分` : '，评分不足' : ''}`;
+  });
+  return `己方近期${ranked ? '排位' : '全部模式'}：${lines.join('；')}`;
 }

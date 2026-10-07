@@ -38,7 +38,7 @@ import { ReadyCheckAutoAcceptor } from './match/ready-check-auto-acceptor';
 import { createSgpClient } from './sgp/sgp-client';
 import { registerLcuAssetProtocol } from './lcu/asset-protocol';
 import { readGameflowSessionIdentity } from './lcu/gameflow-session';
-import type { LiveMatch, LiveRoster } from '../shared/ipc';
+import type { LiveMatch, LiveRoster, GameflowSessionIdentity } from '../shared/ipc';
 import { LcuStaticDataCache } from './lcu/static-data-cache';
 
 protocol.registerSchemesAsPrivileged([{
@@ -185,7 +185,7 @@ void app.whenReady().then(() => {
       return new PersonalHistoryService(lcu, personalHistoryCache, sgp, staticData).load(target);
     }
   });
-  const readIdentity = async () => {
+  const readIdentity = async (): Promise<GameflowSessionIdentity> => {
     if (fixtureMode || aramFixtureMode) return { phase: 'InProgress', gameId: 'fixture-game' };
     const connection = await discoverLcuConnection();
     if (!connection) return { phase: 'None', connected: false };
@@ -214,6 +214,7 @@ void app.whenReady().then(() => {
     try { configureGameInput(true); }
     catch { configureGameInput(false); settingsService.update({ gameTextInput: false }); notifyInput('游戏内填入未开启，请检查快捷键是否被占用。'); }
   }
+  let clipboardMatch: LiveMatch | undefined;
   const enemyClipboard = new EnemyHistoryClipboard(database, {
     enabled: () => !fixtureMode && settingsService.get().autoCopyEnemyHistory === true,
     identity: readIdentity,
@@ -230,7 +231,9 @@ void app.whenReady().then(() => {
       const sgp = connection.region?.toUpperCase() === 'TENCENT' && connection.rsoPlatformId
         ? createSgpClient(lcu, connection.rsoPlatformId)
         : undefined;
-      const match = await new MatchService(lcu, { cache, staticData, ...(sgp ? { sgp } : {}) }).loadLiveMatch(scope, onPlayer, signal);
+      const match = await new MatchService(lcu, { cache, staticData, ...(sgp ? { sgp } : {}),
+        onSnapshot: snapshot => { if (!signal.aborted) clipboardMatch = snapshot; }
+      }).loadLiveMatch(scope, onPlayer, signal);
       gameInput?.observe(match, signal);
       await enemyClipboard.copy(match, signal);
       return match;
@@ -252,7 +255,15 @@ void app.whenReady().then(() => {
       if (!connection) throw new Error('League client is unavailable');
       return createLcuClient(connection).get('/lol-gameflow/v1/gameflow-phase', z.string().min(1));
     },
-    getGameflowSessionIdentity: readIdentity
+    getGameflowSessionIdentity: async () => {
+      const identity = await readIdentity();
+      // Reuse already-loaded records when entering the game; never resume history fetching.
+      if (clipboardMatch && identity.gameId === clipboardMatch.gameId && ['ChampSelect', 'GameStart', 'InProgress', 'Reconnect'].includes(identity.phase)) {
+        await enemyClipboard.copy(clipboardMatch);
+      } else if (identity.connected === false || ['None', 'Lobby', 'EndOfGame'].includes(identity.phase)
+        || (identity.gameId && identity.gameId !== clipboardMatch?.gameId)) clipboardMatch = undefined;
+      return identity;
+    }
   });
   createWindow();
   // Development and fixture sessions must never pollute production statistics.
