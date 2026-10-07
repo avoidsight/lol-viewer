@@ -37,5 +37,16 @@ test('search by full player ID opens history and can return', async () => {
     await page.getByRole('tab', { name: '战绩', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Fixture Personal Player', exact: true })).toBeVisible();
     await expect(input).toHaveValue('');
+    for (const mode of ['详细', '总览']) {
+      await page.getByRole('tab', { name: '对战信息' }).click();
+      await page.getByRole('button', { name: mode, exact: true }).click();
+      const playerName = page.locator('.player-card__name-link').nth(mode === '详细' ? 1 : 6);
+      const name = await playerName.textContent();
+      await playerName.click();
+      await expect(page.getByRole('tab', { name: '战绩', exact: true })).toHaveAttribute('aria-selected', 'true');
+      await expect(page.getByRole('heading', { name: name!, exact: true })).toBeVisible();
+      await page.getByRole('tab', { name: '战绩', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Fixture Personal Player', exact: true })).toBeVisible();
+    }
   } finally { await app.close(); await rm(dir, { recursive: true, force: true }); }
 });

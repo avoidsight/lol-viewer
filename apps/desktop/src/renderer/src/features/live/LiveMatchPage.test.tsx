@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Lane, MatchSummary, PlayerSnapshot } from '../../../../shared/domain';
 import type { LiveMatch } from '../../../../shared/ipc';
 import LiveMatchPage, { teamSlots } from './LiveMatchPage';
@@ -56,6 +56,16 @@ const fixtureLiveMatch: LiveMatch = {
 };
 
 describe('LiveMatchPage', () => {
+  it('opens player histories from names in both views, excluding anonymous identities', () => {
+    const select = vi.fn();
+    render(<LiveMatchPage match={fixtureLiveMatch} onPlayerSelect={select} />);
+    expect(screen.queryByRole('button', { name: 'Player 0' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Player 1' }));
+    expect(select).toHaveBeenLastCalledWith({ playerId: '1', displayName: 'Player 1' });
+    fireEvent.click(screen.getByRole('button', { name: '总览' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Player 6' }));
+    expect(select).toHaveBeenLastCalledWith({ playerId: '6', displayName: 'Player 6' });
+  });
   it('hides the regular player label even with enough complete ranked history', () => {
     render(<LiveMatchPage match={{ ...fixtureLiveMatch, players: [player(0, { matches: matches(0).map(m => ({ ...m, killParticipation: .45 })) })] }} />);
     expect(screen.queryByText('本地人')).toBeNull();

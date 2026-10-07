@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import type { PlayerSnapshot } from '../../../../shared/domain';
+import type { PersonalHistoryTarget } from '../../../../shared/ipc';
 import { localizeRank } from '../../../../shared/rank';
 import { isRankedQueue } from '../../../../shared/queue';
 import bottomLaneIcon from '../../assets/positions/position-bottom-light.svg';
@@ -27,8 +28,9 @@ export function HistorySkeleton({ overview = false }: { overview?: boolean }) {
   return <div className="player-card__state player-card__skeleton" role="status" aria-label="正在加载战绩"><span className="player-card__sr-only">正在加载战绩…</span>{Array.from({ length: overview ? 10 : 5 }, (_, index) => <div className="player-card__skeleton-row" key={index} aria-hidden="true"><i /><span><i /><i /></span></div>)}</div>;
 }
 
-export default function PlayerCard({ player, overview = false, groupedError = false, historyScope = 'all', displayLane = player.lane, displayLabel, uncertain = false }: { player: PlayerSnapshot; overview?: boolean; groupedError?: boolean; historyScope?: LiveHistoryScope; displayLane?: keyof typeof laneNames; displayLabel?: string; uncertain?: boolean }) {
+export default function PlayerCard({ player, onPlayerSelect, overview = false, groupedError = false, historyScope = 'all', displayLane = player.lane, displayLabel, uncertain = false }: { player: PlayerSnapshot; onPlayerSelect?: (target: PersonalHistoryTarget) => void; overview?: boolean; groupedError?: boolean; historyScope?: LiveHistoryScope; displayLane?: keyof typeof laneNames; displayLabel?: string; uncertain?: boolean }) {
   const identityId = useId();
+  const canOpenHistory = onPlayerSelect && player.playerId.trim() && !/^(?:0+|-\d+)$/.test(player.playerId);
   const analyzedForm = player.status === 'ready' ? rankedForm(player.matches) : undefined;
   const form = analyzedForm?.tier === 'regular' ? undefined : analyzedForm;
   const [championImageUnavailable, setChampionImageUnavailable] = useState(false);
@@ -54,7 +56,9 @@ export default function PlayerCard({ player, overview = false, groupedError = fa
       <div className={`player-card__identity${form ? ' player-card__identity--rated' : ''}`}>
         {laneIcon && <span className="player-card__lane" aria-label={laneLabel} title={laneLabel}><img src={laneIcon} alt="" aria-hidden="true" /></span>}
         <div className="player-card__name-row">
-        <h3 id={identityId} title={player.displayName}>{player.displayName}</h3>
+        <h3 id={identityId} title={player.displayName}>{canOpenHistory
+          ? <button type="button" className="player-card__name-link" onClick={() => onPlayerSelect?.({ playerId: player.playerId, displayName: player.displayName })}>{player.displayName}</button>
+          : player.displayName}</h3>
         {form && <span className={`player-form player-form--${form.tier}`} tabIndex={0} title={form.description} aria-label={`${form.label}：${form.description}`}><svg viewBox="0 0 16 16" aria-hidden="true"><path d={form.tier === 'elite' ? 'M2 5l3 2 3-5 3 5 3-2-2 8H4Z' : form.tier === 'strong' ? 'M9 1 3 9h4l-1 6 7-9H9Z' : form.tier === 'rough' ? 'm3 5 5 5 5-5M3 12h10' : 'm8 2 6 6-6 6-6-6Z'} /></svg>{form.label}</span>}
         </div>
         <span className="player-card__rank">{localizeRank(player.rank) ?? '段位未知'}</span>

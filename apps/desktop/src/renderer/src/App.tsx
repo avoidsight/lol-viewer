@@ -309,6 +309,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     }
   };
   const viewPlayerHistory = async (target: PersonalHistoryTarget): Promise<void> => {
+    setPage('history');
     const api = window.lolViewer;
     if (!api || target.playerId === history?.playerId) return;
     const requestId = ++historyNavigation.current;
@@ -376,7 +377,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
 
   const content = <>
     <div hidden={page !== 'history'}><PersonalHistoryPage snapshot={history} state={historyState} onRefresh={() => void refreshHistory()} onPlayerSelect={(target) => void viewPlayerHistory(target)} onBack={historyTarget ? returnToOwnHistory : undefined} refreshing={historyRefreshing} refreshError={historyRefreshError} /></div>
-    <div hidden={page !== 'live'}><LiveMatchPage match={liveView.match} players={liveView.match ? undefined : liveView.progress} loadingProgress={liveView.requesting && !liveView.match && (liveView.progress.length > 0 || (liveView.phase !== undefined && activePhases.has(liveView.phase))) ? liveView.progress.length : undefined} lifecycleStatus={liveView.status} gameflowPhase={liveView.phase} showLaneDifferences={settings.showLaneDifferences} notice={liveNotice} /></div>
+    <div hidden={page !== 'live'}><LiveMatchPage onPlayerSelect={target => void viewPlayerHistory(target)} match={liveView.match} players={liveView.match ? undefined : liveView.progress} loadingProgress={liveView.requesting && !liveView.match && (liveView.progress.length > 0 || (liveView.phase !== undefined && activePhases.has(liveView.phase))) ? liveView.progress.length : undefined} lifecycleStatus={liveView.status} gameflowPhase={liveView.phase} showLaneDifferences={settings.showLaneDifferences} notice={liveNotice} /></div>
     {page === 'champions' && <ChampionLibraryPage getCatalog={getChampionCatalog} getDetails={getChampionDetails} getGuide={getChampionGuide} />}
     {page === 'settings' && <SettingsPage onGameTextInputChange={(checked) => void updateGameTextInputSetting(checked)} settings={settings} message={message} onAutoCopyEnemyHistoryChange={(checked) => void updateAutoCopySetting(checked)} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onClearCache={() => void clearCache()} />}
     {clipboardNotice && <div role="status" className="clipboard-notice">对局战绩已复制</div>}

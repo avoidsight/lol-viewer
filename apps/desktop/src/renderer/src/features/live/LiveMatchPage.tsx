@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import type { Lane, PlayerSnapshot } from '../../../../shared/domain';
-import type { LiveMatch } from '../../../../shared/ipc';
+import type { LiveMatch, PersonalHistoryTarget } from '../../../../shared/ipc';
 import { isRankedQueue } from '../../../../shared/queue';
 import PlayerCard, { HistorySkeleton, unavailableLabels } from './PlayerCard';
 import type { LiveMatchStatus } from './live-match-state';
@@ -23,7 +23,7 @@ export function teamSlots(players: PlayerSnapshot[], reliable: boolean): Slot[] 
   return slots;
 }
 
-interface Props { match?: LiveMatch; players?: PlayerSnapshot[]; loadingProgress?: number; notice?: ReactNode; showLaneDifferences?: boolean; lifecycleStatus?: LiveMatchStatus; gameflowPhase?: string }
+interface Props { match?: LiveMatch; players?: PlayerSnapshot[]; loadingProgress?: number; notice?: ReactNode; showLaneDifferences?: boolean; lifecycleStatus?: LiveMatchStatus; gameflowPhase?: string; onPlayerSelect?: (target: PersonalHistoryTarget) => void }
 export type LiveHistoryScope = 'all' | 'ranked';
 
 function statusLabel(status: LiveMatchStatus, phase: string | undefined): string {
@@ -39,7 +39,7 @@ function statusLabel(status: LiveMatchStatus, phase: string | undefined): string
   return status === 'current' ? '当前对局' : '等待对局';
 }
 
-export default function LiveMatchPage({ match, players = [], loadingProgress, notice, showLaneDifferences = true, lifecycleStatus = match ? 'current' : 'waiting', gameflowPhase }: Props) {
+export default function LiveMatchPage({ match, players = [], loadingProgress, notice, showLaneDifferences = true, lifecycleStatus = match ? 'current' : 'waiting', gameflowPhase, onPlayerSelect }: Props) {
   const [viewMode, setViewMode] = useState<'detail' | 'overview'>('detail');
   const [historyScope, setHistoryScope] = useState<LiveHistoryScope>(() =>
     match && isRankedQueue(match.queueId) ? 'ranked' : 'all');
@@ -87,7 +87,7 @@ export default function LiveMatchPage({ match, players = [], loadingProgress, no
           <div className="team-row">
             {/* LCU may repeat a player ID; include the unique roster slot to avoid orphaned cards on mode changes. */}
             {slots.map((slot) => slot.player
-              ? <PlayerCard key={slot.lane} player={slot.player} overview={viewMode === 'overview'} groupedError={groupedError} historyScope={historyScope} displayLane={slot.lane} displayLabel={slot.label} uncertain={positionOrderReliable && showLaneDifferences && slot.uncertain} />
+              ? <PlayerCard key={slot.lane} player={slot.player} onPlayerSelect={onPlayerSelect} overview={viewMode === 'overview'} groupedError={groupedError} historyScope={historyScope} displayLane={slot.lane} displayLabel={slot.label} uncertain={positionOrderReliable && showLaneDifferences && slot.uncertain} />
               : <article key={slot.lane} className="player-card player-card--placeholder" data-testid="player-slot" data-lane={slot.lane} aria-label="玩家加载中"><header className="player-card__placeholder-header"><span className="player-card__champion-static" aria-hidden="true">◇</span><strong>等待玩家信息</strong></header><HistorySkeleton overview={viewMode === 'overview'} /></article>)}
           </div>
         </section>;
