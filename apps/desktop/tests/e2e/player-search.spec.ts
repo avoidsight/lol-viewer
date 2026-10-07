@@ -21,16 +21,10 @@ test('search by full player ID opens history and can return', async () => {
     await input.fill('测试玩家#12345');
     await input.press('Enter');
     await expect(page.getByRole('heading', { name: '测试玩家#12345', exact: true })).toBeVisible();
-    const back = page.getByRole('button', { name: '返回我的战绩' });
-    await expect(back).toHaveText('我的战绩');
+    await expect(page.getByRole('button', { name: '返回我的战绩' })).toHaveCount(0);
     for (const width of [1184, 900]) {
       await page.setViewportSize({ width, height: 735 });
-      const buttonBounds = await back.boundingBox();
-      const heroBounds = await page.locator('.personal-history__hero').boundingBox();
-      expect(buttonBounds!.y + buttonBounds!.height).toBeLessThan(heroBounds!.y);
-      expect(buttonBounds!.height).toBeGreaterThanOrEqual(34);
       const searchBounds = await page.getByRole('button', { name: '搜索', exact: true }).boundingBox();
-      expect(Math.abs(buttonBounds!.y + buttonBounds!.height / 2 - searchBounds!.y - searchBounds!.height / 2)).toBeLessThan(1);
       const field = await page.locator('.player-search__field').boundingBox();
       expect(field!.width).toBeLessThanOrEqual(240);
       expect(searchBounds!.x + searchBounds!.width).toBeLessThanOrEqual(field!.x + field!.width);
@@ -40,7 +34,8 @@ test('search by full player ID opens history and can return', async () => {
     }
     await page.setViewportSize({ width: 1184, height: 735 });
     await page.screenshot({ path: '/private/tmp/lol-player-search.png' });
-    await page.getByRole('button', { name: '返回我的战绩' }).click();
+    await page.getByRole('tab', { name: '战绩', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Fixture Personal Player', exact: true })).toBeVisible();
+    await expect(input).toHaveValue('');
   } finally { await app.close(); await rm(dir, { recursive: true, force: true }); }
 });

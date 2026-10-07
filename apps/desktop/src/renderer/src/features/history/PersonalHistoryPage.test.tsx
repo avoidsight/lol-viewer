@@ -164,11 +164,9 @@ describe('PersonalHistoryPage', () => {
     expect(css).toMatch(/\.personal-history__team-player--link:focus-visible\s*\{[^}]*outline:\s*2px solid #fbbf24;/s);
   });
 
-  it('shows a return action while viewing another player', () => {
-    const onBack = vi.fn();
-    render(<PlayerSearch onSelect={vi.fn()} onBack={onBack} />);
-    fireEvent.click(screen.getByRole('button', { name: /返回我的战绩/ }));
-    expect(onBack).toHaveBeenCalledOnce();
+  it('keeps search free of a separate return action', () => {
+    render(<PlayerSearch onSelect={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /返回我的战绩/ })).not.toBeInTheDocument();
   });
 
   it('renders an accessible refresh action and inline refresh failure', () => {

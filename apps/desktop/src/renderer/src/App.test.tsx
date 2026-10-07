@@ -148,8 +148,15 @@ describe('App tab lifecycle', () => {
       playerId: 'other', puuid: 'other-puuid', displayName: '对手'
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /返回我的战绩/ }));
+    expect(screen.queryByRole('button', { name: /返回我的战绩/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '战绩' }));
     expect(await screen.findByRole('heading', { name: '召唤师' })).toBeVisible();
+    const pending = deferred<PersonalHistorySnapshot>();
+    vi.mocked(api.getPersonalHistory).mockReturnValueOnce(pending.promise);
+    fireEvent.click(screen.getByRole('button', { name: '对手' }));
+    fireEvent.click(screen.getByRole('tab', { name: '战绩' }));
+    await act(async () => pending.resolve(otherHistory));
+    expect(screen.getByRole('heading', { name: '召唤师' })).toBeVisible();
   });
 
   it('subscribes before requesting all modes, then cancels on exit', async () => {

@@ -44,6 +44,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   const [page, setPage] = useState<AppTab>(initialTab);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [clipboardNotice, setClipboardNotice] = useState(false);
+  const [searchReset, setSearchReset] = useState(0);
   const [history, setHistory] = useState<PersonalHistorySnapshot>();
   const [historyTarget, setHistoryTarget] = useState<PersonalHistoryTarget>();
   const [historyState, setHistoryState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
@@ -283,6 +284,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
 
   const handleTabChange = (tab: AppTab): void => {
     setPage(tab);
+    if (tab === 'history') { returnToOwnHistory(); setSearchReset(value => value + 1); }
     if (tab === 'live') setLiveAttention(false);
   };
 
@@ -291,14 +293,16 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     historyRefreshingRef.current = true;
     setHistoryRefreshing(true);
     setHistoryRefreshError('');
+    const requestId = historyNavigation.current;
     try {
       const snapshot = await window.lolViewer.getPersonalHistory(historyTarget);
+      if (requestId !== historyNavigation.current) return;
       if (!snapshot) throw new Error('History unavailable');
       if (!historyTarget) ownHistoryRef.current = snapshot;
       setHistory(snapshot);
       setHistoryState('ready');
     } catch {
-      setHistoryRefreshError('刷新失败，请重试');
+      if (requestId === historyNavigation.current) setHistoryRefreshError('刷新失败，请重试');
     } finally {
       historyRefreshingRef.current = false;
       setHistoryRefreshing(false);
@@ -377,5 +381,5 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     {page === 'settings' && <SettingsPage onGameTextInputChange={(checked) => void updateGameTextInputSetting(checked)} settings={settings} message={message} onAutoCopyEnemyHistoryChange={(checked) => void updateAutoCopySetting(checked)} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onClearCache={() => void clearCache()} />}
     {clipboardNotice && <div role="status" className="clipboard-notice">对局战绩已复制</div>}
   </>;
-return <><AppShell active={page} onChange={handleTabChange} liveAttention={liveAttention} search={<PlayerSearch onSelect={async target => { handleTabChange('history'); await viewPlayerHistory(target); }} onBack={historyTarget ? () => { handleTabChange('history'); returnToOwnHistory(); } : undefined} />} support={<><UpdateControl api={window.lolViewer} canAutoPrompt={!feedbackOpen && ['None', 'Lobby', 'EndOfGame'].includes(updatePhase ?? '')} /><DonationControl api={window.lolViewer} /></>} onFeedback={() => setFeedbackOpen(true)}>{content}</AppShell><FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} api={window.lolViewer} /></>;
+return <><AppShell active={page} onChange={handleTabChange} liveAttention={liveAttention} search={<PlayerSearch key={searchReset} onSelect={async target => { setPage('history'); await viewPlayerHistory(target); }} />} support={<><UpdateControl api={window.lolViewer} canAutoPrompt={!feedbackOpen && ['None', 'Lobby', 'EndOfGame'].includes(updatePhase ?? '')} /><DonationControl api={window.lolViewer} /></>} onFeedback={() => setFeedbackOpen(true)}>{content}</AppShell><FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} api={window.lolViewer} /></>;
 }

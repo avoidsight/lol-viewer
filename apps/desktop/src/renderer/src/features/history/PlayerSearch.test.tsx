@@ -1,7 +1,19 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import PlayerSearch from './PlayerSearch';
 afterEach(() => { cleanup(); delete window.lolViewer; });
+it('ignores a pending alias lookup after returning to own history resets search', async () => {
+  let finish!: (value: unknown) => void;
+  window.lolViewer = { searchPlayer: () => new Promise<unknown>(resolve => { finish = resolve; }) } as unknown as NonNullable<typeof window.lolViewer>;
+  const onSelect = vi.fn();
+  const { rerender } = render(<PlayerSearch key={0} onSelect={onSelect} />);
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: '玩家#12345' } });
+  fireEvent.submit(screen.getByRole('form'));
+  rerender(<PlayerSearch key={1} onSelect={onSelect} />);
+  await act(async () => finish({ ok: true, target: { playerId: 'other', displayName: '玩家#12345' } }));
+  expect(onSelect).not.toHaveBeenCalled();
+  expect(screen.getByRole('textbox')).toHaveValue('');
+});
 it('fills a focused empty input without submitting or overwriting typed text', async () => {
   let finish!: (value: string) => void;
   const read = vi.fn(() => new Promise<string>(resolve => { finish = resolve; }));
