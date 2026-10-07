@@ -20,8 +20,9 @@
 .player-search .player-search__back:hover { color:#e6f6ff; border-color:#4a8da9; background:#1b3048; }
 .player-search button:focus-visible { outline:2px solid #39c6f4; outline-offset:3px; }
 .app-shell__bar { gap:16px; }
-.app-shell__bar .player-search { position:relative; flex:1; min-width:0; padding:0; margin:0; flex-wrap:nowrap; }
-.app-shell__bar .player-search__field { width:280px; max-width:100%; min-width:150px; flex:1; }
+.app-shell__bar .player-search { position:relative; flex:0 1 auto; min-width:0; padding:0; margin:0 0 0 auto; flex-wrap:nowrap; }
+.app-shell__bar .player-search__field { width:240px; max-width:100%; min-width:150px; flex:0 1 240px; }
+.app-shell__bar .app-shell__actions { margin-left:0; }
 .app-shell__bar .player-search__back { flex-shrink:0; margin-right:0; }
 .app-shell__bar .player-search [role=alert] { position:absolute; top:calc(100% + 8px); right:0; width:max-content; max-width:100%; padding:8px 12px; border:1px solid #71404d; border-radius:8px; background:#211925; z-index:60; }
 .app-shell__bar .app-shell__tabs { flex-shrink:0; }

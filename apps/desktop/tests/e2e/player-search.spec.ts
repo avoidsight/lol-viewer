@@ -32,6 +32,7 @@ test('search by full player ID opens history and can return', async () => {
       const searchBounds = await page.getByRole('button', { name: '搜索', exact: true }).boundingBox();
       expect(Math.abs(buttonBounds!.y + buttonBounds!.height / 2 - searchBounds!.y - searchBounds!.height / 2)).toBeLessThan(1);
       const field = await page.locator('.player-search__field').boundingBox();
+      expect(field!.width).toBeLessThanOrEqual(240);
       expect(searchBounds!.x + searchBounds!.width).toBeLessThanOrEqual(field!.x + field!.width);
       const nav = await page.getByRole('navigation').boundingBox();
       expect(field!.y + field!.height).toBeLessThanOrEqual(nav!.y + nav!.height);
