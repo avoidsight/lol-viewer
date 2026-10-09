@@ -18,15 +18,6 @@
 .history-pagination { display:flex; justify-content:space-between; align-items:center; padding:12px; border-top:1px solid #26364b; }
 .history-pagination button { border:1px solid #34465c; background:#152236; color:#c7d6e6; border-radius:6px; padding:6px 9px; font-size:11px; cursor:pointer; }
 .history-pagination button:disabled { opacity:.35; cursor:default; }
-.history-detail__heading { display:flex; justify-content:space-between; align-items:center; padding:22px; background:linear-gradient(110deg,#192d43,#101b2c); border-bottom:1px solid #2a3c52; }
-.history-detail__heading p { color:#8c9eb5; font-size:11px; margin-bottom:8px; }
-.history-detail__heading h2 { font-size:20px; margin-bottom:9px; }
-.history-detail__heading h2 span { margin-left:8px; font-size:13px; color:#62d4c8; }
-.history-detail__heading h2 .is-loss { color:#e68c9d; }
-.history-detail__heading small { font-size:11px; color:#8c9eb5; }
-.history-detail__performance { display:grid; justify-items:end; gap:7px; }
-.history-detail__performance>b { font-size:19px; }
-.history-detail__performance>div { display:flex; gap:4px; }
 .history-team { margin:16px 16px 0; }
 .history-team>header { display:flex; justify-content:space-between; align-items:center; padding:10px 0; }
 .history-team h3 { margin:0; font-size:13px; color:#65cec4; }
@@ -57,5 +48,5 @@
 .history-detail>footer { padding:16px; color:#586f89; font-size:10px; }
 .history-detail__empty { display:grid; place-items:center; min-height:400px; color:#71869f; }
 .history-workspace button:focus-visible { outline:2px solid #52bddc; outline-offset:-2px; }
-@media(max-width:1050px) { .history-workspace { grid-template-columns:250px minmax(0,1fr); gap:10px; } .history-team { margin:10px 10px 0; } .history-team table { min-width:550px; } .history-detail__heading { padding:16px; } }
+@media(max-width:1050px) { .history-workspace { grid-template-columns:250px minmax(0,1fr); gap:10px; } .history-team { margin:10px 10px 0; } .history-team table { min-width:550px; } }
 @media(max-width:720px) { .history-workspace { grid-template-columns:1fr; } }

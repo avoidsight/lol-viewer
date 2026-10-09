@@ -9,10 +9,10 @@ test('history master detail paginates, selects and opens players', async () => {
     const rows = page.getByTestId('personal-match');
     const detail = page.getByLabel('选中对局详情', { exact: true });
     await expect(rows).toHaveCount(10);
-    await expect(detail.getByTestId('history-highlight')).toHaveText(['超神', '三杀', '最高输出']);
+    await expect(detail.locator('.history-detail__heading')).toHaveCount(0);
+    await expect(detail.getByText('总 KDA', { exact: false }).first()).toContainText('36 / 19 / 42');
     await rows.nth(2).click();
-    await expect(detail.getByTestId('history-highlight')).toHaveText(['CARRY', '最高输出', '最高承伤']);
-    await expect(detail.getByTestId('match-score')).toBeVisible();
+    await expect(detail).toContainText('对局 ID · fixture-personal-2');
     await expect(detail.getByRole('row')).toHaveCount(12);
     await page.getByRole('button', { name: '下一页' }).click();
     await expect(detail).toContainText('对局 ID · fixture-personal-10');
@@ -25,7 +25,7 @@ test('history master detail paginates, selects and opens players', async () => {
       expect(left!.x + left!.width).toBeLessThan(right!.x);
     }
     await page.setViewportSize({ width: 1320, height: 980 });
-    await page.screenshot({ path: '/private/tmp/lol-history-master-detail.png', fullPage: true });
+    await page.screenshot({ path: '/private/tmp/lol-history-team-kda.png', fullPage: true });
     await detail.getByRole('button', { name: 'Fixture Enemy 1#192', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Fixture Enemy 1#192', exact: true })).toBeVisible();
   } finally { await app.close(); }

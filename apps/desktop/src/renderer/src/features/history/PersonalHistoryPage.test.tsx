@@ -84,11 +84,12 @@ describe('PersonalHistoryPage', () => {
   it('sums complete team metrics, preserves zero and hides partial totals', () => {
     const players = snapshot.matches[0].allyPlayers!.map(p => ({ ...p, kills: 0, goldEarned: 10000, deaths: 1, assists: 2 }));
     const { rerender } = render(<PersonalHistoryPage snapshot={{ ...snapshot, matches: [{ ...snapshot.matches[0], allyPlayers: players }] }} state="ready" />);
-    expect(screen.getByLabelText('己方详情')).toHaveTextContent('人头 0');
+    expect(screen.getByLabelText('己方详情')).toHaveTextContent('总 KDA 0 / 5 / 10');
     expect(screen.getByLabelText('己方详情')).toHaveTextContent('总经济 50,000');
     rerender(<PersonalHistoryPage snapshot={{ ...snapshot, matches: [{ ...snapshot.matches[0], allyPlayers: players.slice(0, 4) }] }} state="ready" />);
     expect(screen.getByLabelText('己方详情')).toHaveTextContent('总经济 —');
     expect(screen.getByText('部分玩家详情暂不可用')).toBeVisible();
+    expect(screen.getByLabelText('己方详情')).toHaveTextContent('总 KDA — / — / —');
   });
   it('paginates twenty matches and selects the first match on each page', () => {
     render(<PersonalHistoryPage snapshot={snapshot} state="ready" />);
@@ -104,9 +105,10 @@ describe('PersonalHistoryPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '上一页' }));
     expect(screen.getByText('对局 ID · 0')).toBeVisible();
   });
-  it('shows bounded text honors and both teams without fabricating missing totals', () => {
+  it('shows both teams without the removed detail header or fabricated totals', () => {
     render(<PersonalHistoryPage snapshot={snapshot} state="ready" />);
-    expect(screen.getAllByTestId('history-highlight')).toHaveLength(3);
+    expect(screen.queryAllByTestId('history-highlight')).toHaveLength(0);
+    expect(screen.queryByText('对局详情')).toBeNull();
     expect(screen.getByLabelText('己方详情')).toBeVisible();
     expect(screen.getByLabelText('敌方详情')).toBeVisible();
     expect(screen.getAllByRole('row')).toHaveLength(12);
@@ -131,12 +133,6 @@ describe('PersonalHistoryPage', () => {
     fireEvent.change(screen.getByRole('combobox', { name: '胜负筛选' }), { target: { value: 'losses' } });
     expect(screen.queryAllByTestId('personal-match')).toHaveLength(0);
     expect(screen.getByText('暂无对局详情')).toBeVisible();
-  });
-  it('shows rating only when the required metrics exist', () => {
-    const { rerender } = render(<PersonalHistoryPage snapshot={{ ...snapshot, matches: [{ ...snapshot.matches[0], killParticipation: .7 }] }} state="ready" />);
-    expect(screen.getByTestId('match-score')).toHaveClass('is-win');
-    rerender(<PersonalHistoryPage snapshot={snapshot} state="ready" />);
-    expect(screen.queryByTestId('match-score')).toBeNull();
   });
   it('refreshes and shows loading or unavailable states', () => {
     const refresh = vi.fn();
