@@ -393,7 +393,12 @@ export class MatchService {
       checkCancelled(signal);
       currentSummoner = undefined;
     }
-    if (!champSelectFallback && currentSummoner?.puuid && teamOne.length + teamTwo.length === 9) {
+    const isCurrentSummoner = (participant: Participant): boolean => !!currentSummoner && (
+      (String(currentSummoner.summonerId) !== '0' && String(participant.summonerId) === String(currentSummoner.summonerId))
+      || (!!currentSummoner.puuid && participant.puuid === currentSummoner.puuid)
+    );
+    const localAlreadyPresent = [...teamOne, ...teamTwo].some(participant => isCurrentSummoner(participant) || participant.isLocalPlayer);
+    if (!champSelectFallback && !localAlreadyPresent && currentSummoner?.puuid && teamOne.length + teamTwo.length === 9) {
       const selection = gameflowSession.gameData.playerChampionSelections?.find(
         (entry) => entry.puuid === currentSummoner?.puuid
       );
@@ -403,6 +408,7 @@ export class MatchService {
         incompleteTeam.push({
           summonerId: currentSummoner.summonerId,
           summonerName: summonerName(currentSummoner) || '我的账号',
+          puuid: currentSummoner.puuid,
           teamId,
           championId: selection.championId,
           isLocalPlayer: true
@@ -416,8 +422,8 @@ export class MatchService {
       && hasReliablePositions(teamOne)
       && hasReliablePositions(teamTwo);
     const allParticipants = [...teamOne, ...teamTwo];
-    const local = allParticipants.find((participant) => participant.isLocalPlayer)
-      ?? (currentSummoner ? allParticipants.find((participant) => String(participant.summonerId) === String(currentSummoner.summonerId)) : undefined);
+    const local = allParticipants.find(isCurrentSummoner)
+      ?? allParticipants.find((participant) => participant.isLocalPlayer);
     const localTeamId = local?.teamId ?? (champSelectFallback ? 100 : null);
     const participants: Participant[] = local ? [
       ...allParticipants.filter((participant) => participant.teamId === localTeamId),

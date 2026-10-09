@@ -350,6 +350,27 @@ describe('MatchService', () => {
     expect(result.players.slice(0, 5).every((player) => player.teamId === 200)).toBe(true);
   });
 
+  it.each(['id', 'puuid', 'flag'])('never inserts the local player twice when already identified by %s', async identity => {
+    const local = { ...participants[0],
+      summonerId: identity === 'id' ? 'self-id' : 'roster-id',
+      ...(identity === 'puuid' ? { puuid: 'self-puuid' } : {}),
+      ...(identity === 'flag' ? { isLocalPlayer: true } : {}) };
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') return { gameData: {
+        teamOne: [local, ...participants.slice(1, 5)], teamTwo: participants.slice(5, 9),
+        playerChampionSelections: [{ puuid: 'self-puuid', championId: 1 }]
+      } };
+      if (path === '/lol-summoner/v1/current-summoner') return { summonerId: 'self-id', puuid: 'self-puuid' };
+      throw new Error('Unexpected history lookup');
+    });
+    const service = new MatchService({ get } as LcuClient);
+    await expect(service.loadLiveRoster()).rejects.toThrow('Live roster is incomplete');
+    const onPlayer = vi.fn();
+    await expect(service.loadLiveMatch('all', onPlayer)).rejects.toThrow('Live roster is incomplete');
+    expect(onPlayer).not.toHaveBeenCalled();
+    expect(get.mock.calls.every(([path]) => path === '/lol-gameflow/v1/session' || path === '/lol-summoner/v1/current-summoner')).toBe(true);
+  });
+
   it('restores the local player omitted from a four-player in-game team', async () => {
     const get = vi.fn(async (path: string) => {
       if (path === '/lol-gameflow/v1/session') return {
