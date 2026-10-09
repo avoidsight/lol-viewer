@@ -137,6 +137,15 @@ function participantSummaries(
     const profileIconId = identity?.profileIconId ?? identity?.profileIcon;
     return {
       championId: participant.championId,
+      kills: participant.stats.kills,
+      deaths: participant.stats.deaths,
+      assists: participant.stats.assists,
+      ...(participant.stats.goldEarned === undefined ? {} : { goldEarned: participant.stats.goldEarned }),
+      ...(participant.stats.totalDamageDealtToChampions === undefined ? {} : { damage: participant.stats.totalDamageDealtToChampions }),
+      ...(participant.stats.totalDamageTaken === undefined ? {} : { damageTaken: participant.stats.totalDamageTaken }),
+      ...(participantCs(participant) === undefined ? {} : { cs: participantCs(participant) }),
+      ...([participant.stats.item0, participant.stats.item1, participant.stats.item2, participant.stats.item3, participant.stats.item4, participant.stats.item5].some(id => id !== undefined)
+        ? { itemIds: [participant.stats.item0, participant.stats.item1, participant.stats.item2, participant.stats.item3, participant.stats.item4, participant.stats.item5].map(id => id ?? 0) } : {}),
       ...(playerId ? { playerId } : {}),
       ...(identity?.puuid ? { puuid: identity.puuid } : {}),
       ...(displayName ? { displayName } : {}),

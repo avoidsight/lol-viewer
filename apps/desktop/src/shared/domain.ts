@@ -27,6 +27,14 @@ export interface MatchAchievement {
 }
 
 export interface MatchParticipantSummary {
+  kills?: number;
+  deaths?: number;
+  assists?: number;
+  goldEarned?: number;
+  damage?: number;
+  damageTaken?: number;
+  cs?: number;
+  itemIds?: number[];
   championId: number;
   playerId?: string;
   puuid?: string;

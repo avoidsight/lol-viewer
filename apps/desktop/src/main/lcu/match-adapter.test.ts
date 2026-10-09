@@ -3,6 +3,20 @@ import fixture from '../../../tests/fixtures/match-history.json';
 import { adaptMatchHistory, describeQueue } from './match-adapter';
 
 describe('adaptMatchHistory', () => {
+  it('preserves participant detail metrics and empty item slots without inventing missing data', () => {
+    const participant = { participantId: 1, championId: 1, teamId: 100,
+      stats: { win: true, kills: 0, deaths: 2, assists: 8, goldEarned: 12345,
+        totalDamageDealtToChampions: 23456, totalDamageTaken: 34567,
+        totalMinionsKilled: 100, neutralMinionsKilled: 20, item0: 3071, item1: 0, item2: 3053 } };
+    const game = { gameId: 1, queueId: 420, gameCreation: 1000, gameDuration: 1800, participants: [participant] };
+    const adapt = (value: unknown) => adaptMatchHistory({ games: [value] }, { scope: 'all', limit: 10 })[0].allyPlayers?.[0];
+    expect(adapt(game)).toMatchObject({ kills: 0, deaths: 2, assists: 8, goldEarned: 12345,
+      damage: 23456, damageTaken: 34567, cs: 120, itemIds: [3071, 0, 3053, 0, 0, 0] });
+    const missing = adapt({ ...game, participants: [{ ...participant, stats: { win: true, kills: 0, deaths: 0, assists: 0 } }] });
+    expect(missing?.goldEarned).toBeUndefined();
+    expect(missing?.damage).toBeUndefined();
+    expect(missing?.itemIds).toBeUndefined();
+  });
   it('derives custom MVP/SVP only for the unique highest complete teammate score', () => {
     const team = Array.from({ length: 5 }, (_, i) => ({ participantId: i + 1, championId: i + 1, teamId: 100,
       stats: { win: true, kills: i === 0 ? 10 : 2, assists: i === 0 ? 8 : 2, deaths: i === 0 ? 2 : 5,
@@ -181,7 +195,7 @@ describe('adaptMatchHistory', () => {
 
     expect(result.allyPlayers).toHaveLength(5);
     expect(result.enemyPlayers).toHaveLength(5);
-    expect(result.enemyPlayers?.[0]).toEqual({
+    expect(result.enemyPlayers?.[0]).toMatchObject({
       championId: 6,
       playerId: '1005',
       puuid: 'puuid-5',

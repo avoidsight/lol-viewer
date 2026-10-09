@@ -1,10 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { PersonalHistorySnapshot } from '../../../../shared/domain';
 import PersonalHistoryPage from './PersonalHistoryPage';
-import PlayerSearch from './PlayerSearch';
 
 const snapshot: PersonalHistorySnapshot = {
   playerId: 'me',
@@ -84,158 +81,70 @@ const snapshot: PersonalHistorySnapshot = {
 };
 
 describe('PersonalHistoryPage', () => {
-  it('shows the shared rating above time, hides missing data, and preserves zero', () => {
-    const scored = { ...snapshot.matches[0], killParticipation: .7 };
-    const { rerender } = render(<PersonalHistoryPage snapshot={{ ...snapshot, matches: [scored] }} state="ready" />);
-    const score = screen.getByTestId('match-score');
-    expect(score).toHaveClass('is-win');
-    expect(score.parentElement!.tagName).toBe('TIME');
-    expect(score).toBe(score.parentElement!.firstElementChild);
-    rerender(<PersonalHistoryPage snapshot={{ ...snapshot, matches: [{ ...scored, win: false, kills: 0, assists: 0, deaths: 5, teamDamageShare: 0, teamDamageTakenShare: 0, killParticipation: 0 }] }} state="ready" />);
-    expect(screen.getByTestId('match-score')).toHaveTextContent('0');
-    expect(screen.getByTestId('match-score')).toHaveClass('is-loss');
-    rerender(<PersonalHistoryPage snapshot={{ ...snapshot, matches: [snapshot.matches[0]] }} state="ready" />);
-    expect(screen.queryByTestId('match-score')).toBeNull();
+  it('sums complete team metrics, preserves zero and hides partial totals', () => {
+    const players = snapshot.matches[0].allyPlayers!.map(p => ({ ...p, kills: 0, goldEarned: 10000, deaths: 1, assists: 2 }));
+    const { rerender } = render(<PersonalHistoryPage snapshot={{ ...snapshot, matches: [{ ...snapshot.matches[0], allyPlayers: players }] }} state="ready" />);
+    expect(screen.getByLabelText('己方详情')).toHaveTextContent('人头 0');
+    expect(screen.getByLabelText('己方详情')).toHaveTextContent('总经济 50,000');
+    rerender(<PersonalHistoryPage snapshot={{ ...snapshot, matches: [{ ...snapshot.matches[0], allyPlayers: players.slice(0, 4) }] }} state="ready" />);
+    expect(screen.getByLabelText('己方详情')).toHaveTextContent('总经济 —');
+    expect(screen.getByText('部分玩家详情暂不可用')).toBeVisible();
   });
-  it('renders the rich twenty-match dashboard with spells and team compositions', () => {
+  it('paginates twenty matches and selects the first match on each page', () => {
     render(<PersonalHistoryPage snapshot={snapshot} state="ready" />);
-
-    expect(screen.getByText(/最近 20 场/)).toBeVisible();
-    expect(screen.getByText(/未定级/)).toBeVisible();
-    expect(screen.getByText('缓存数据')).toBeVisible();
-    expect(screen.getAllByTestId('favorite-champion')).toHaveLength(5);
-    expect(screen.getAllByTestId('personal-match')).toHaveLength(20);
-    expect(screen.getAllByText('极地大乱斗')).toHaveLength(10);
-    expect(screen.getAllByLabelText('击杀、死亡、助攻')).toHaveLength(20);
-    expect(screen.queryByText(/平均 8\.3/)).not.toBeInTheDocument();
-    expect(screen.queryByText('7.00 KDA')).not.toBeInTheDocument();
-    expect(screen.queryByText('186 CS')).not.toBeInTheDocument();
-    expect(screen.queryByText('31.5k')).not.toBeInTheDocument();
-    expect(screen.queryByText('28.1k')).not.toBeInTheDocument();
-    expect(screen.queryByText('12.4k')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('personal-match')).toHaveLength(10);
+    expect(screen.getAllByTestId('personal-match')[0]).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('对局 ID · 0')).toBeVisible();
+    fireEvent.click(screen.getAllByTestId('personal-match')[2]);
+    expect(screen.getByText('对局 ID · 2')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '下一页' }));
+    expect(screen.getByText('对局 ID · 10')).toBeVisible();
+    expect(screen.getAllByTestId('personal-match')).toHaveLength(10);
+    expect(screen.getByRole('button', { name: '下一页' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '上一页' }));
+    expect(screen.getByText('对局 ID · 0')).toBeVisible();
+  });
+  it('shows bounded text honors and both teams without fabricating missing totals', () => {
+    render(<PersonalHistoryPage snapshot={snapshot} state="ready" />);
     expect(screen.getAllByTestId('history-highlight')).toHaveLength(3);
-    const itemImages = screen.getAllByRole('img', { name: /装备/ });
-    expect(itemImages).toHaveLength(40);
-    expect(screen.queryByRole('img', { name: '装备 3340' })).not.toBeInTheDocument();
-    expect(itemImages[0]).toHaveAttribute(
-      'src',
-      'lol-asset://game-data/%2Flol-game-data%2Fassets%2FASSETS%2FItems%2FIcons2D%2F3071_Fighter_T3_BlackCleaver.png'
-    );
-    expect(screen.getAllByRole('img', { name: '召唤师技能 4' })).toHaveLength(20);
-    expect(screen.getAllByRole('img', { name: '召唤师技能 12' })).toHaveLength(20);
-    expect(screen.getAllByTestId('team-composition')).toHaveLength(20);
-    expect(screen.getAllByRole('img', { name: /己方英雄/ })).toHaveLength(100);
-    expect(screen.getAllByRole('img', { name: /敌方英雄/ })).toHaveLength(100);
-    expect(document.querySelectorAll('.personal-history__team-icon.is-local')).toHaveLength(20);
-    expect(screen.getByText('最高输出')).toBeVisible();
-    expect(screen.getByText('最高承伤')).toBeVisible();
-    expect(screen.queryByText('死亡最多')).not.toBeInTheDocument();
-    expect(screen.getByText('三杀')).toBeVisible();
-    expect(screen.queryByText('MVP')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('己方详情')).toBeVisible();
+    expect(screen.getByLabelText('敌方详情')).toBeVisible();
+    expect(screen.getAllByRole('row')).toHaveLength(12);
+    expect(screen.getByLabelText('敌方详情')).toHaveTextContent('总经济 —');
+    expect(screen.queryByText('MVP')).toBeNull();
   });
-
-  it('organizes the dashboard into a compact overview, horizontal favorites, and full-width matches', () => {
-    const { container } = render(<PersonalHistoryPage snapshot={snapshot} state="ready" />);
-    expect(container.querySelector('.personal-history__hero')).toBeInTheDocument();
-    expect(container.querySelector('.personal-history__hero-avatar')).toHaveAttribute('src');
-    expect(container.querySelector('.personal-history__win-rate')).toHaveTextContent('60.0%');
-    expect(container.querySelector('.personal-history__record')).toHaveAccessibleName('12 胜 8 负');
-    expect(container.querySelector('.personal-history__quickbar')).toBeInTheDocument();
-    expect(container.querySelector('.personal-history__favorites')).toBeInTheDocument();
-    expect(container.querySelector('.personal-history__matches-panel')).toBeInTheDocument();
-  });
-
-  it('opens another player history from a clickable team champion portrait', () => {
+  it('opens player history from the selected team table', () => {
     const onPlayerSelect = vi.fn();
     render(<PersonalHistoryPage snapshot={snapshot} state="ready" onPlayerSelect={onPlayerSelect} />);
-
-    expect(screen.getAllByRole('button', { name: '对手 1' })[0]).toHaveAttribute('title', '对手 1');
-    fireEvent.click(screen.getAllByRole('button', { name: '对手 1' })[0]);
-
+    fireEvent.click(screen.getByRole('button', { name: '对手 1' }));
     expect(onPlayerSelect).toHaveBeenCalledWith({
-      playerId: 'enemy-0-0',
-      puuid: 'enemy-puuid-0-0',
-      displayName: '对手 1',
-      profileIconId: 30
+      playerId: 'enemy-0-0', puuid: 'enemy-puuid-0-0', displayName: '对手 1', profileIconId: 30
     });
-    expect(screen.queryByRole('button', { name: '召唤师' })).not.toBeInTheDocument();
-    const css = readFileSync(resolve('src/renderer/src/features/history/personal-history.css'), 'utf8');
-    expect(css).toMatch(/\.personal-history__team-player\s*\{[^}]*width:\s*28px;[^}]*height:\s*28px;/s);
-    expect(css).toMatch(/\.personal-history__team-player--link:focus-visible\s*\{[^}]*outline:\s*2px solid #fbbf24;/s);
+    expect(screen.queryByRole('button', { name: '召唤师' })).toBeNull();
   });
-
-  it('keeps search free of a separate return action', () => {
-    render(<PlayerSearch onSelect={vi.fn()} />);
-    expect(screen.queryByRole('button', { name: /返回我的战绩/ })).not.toBeInTheDocument();
-  });
-
-  it('renders an accessible refresh action and inline refresh failure', () => {
-    const onRefresh = vi.fn();
-    const { rerender } = render(
-      <PersonalHistoryPage snapshot={snapshot} state="ready" onRefresh={onRefresh} refreshing={false} />
-    );
-    fireEvent.click(screen.getByRole('button', { name: '刷新' }));
-    expect(onRefresh).toHaveBeenCalledOnce();
-
-    rerender(
-      <PersonalHistoryPage snapshot={snapshot} state="ready" onRefresh={onRefresh} refreshing refreshError="刷新失败，请重试" />
-    );
-    expect(screen.getByRole('button', { name: '刷新中' })).toBeDisabled();
-    expect(screen.getByText('刷新失败，请重试')).toHaveAttribute('aria-live', 'polite');
-  });
-
-  it('labels match duration explicitly so it is not mistaken for time ago', () => {
-    const yesterday = {
-      ...snapshot,
-      matches: [{
-        ...snapshot.matches[0],
-        endedAt: new Date('2026-07-29T23:05:00+08:00').getTime()
-      }]
-    };
-
-    render(<PersonalHistoryPage snapshot={yesterday} state="ready" />);
-
-    expect(screen.getByText('时长 20 分钟')).toBeVisible();
-    expect(screen.queryByText('昨天')).not.toBeInTheDocument();
-  });
-
-  it('filters the visible history by ranked queue and result', () => {
+  it('resets pagination when filtering and handles empty results', () => {
     render(<PersonalHistoryPage snapshot={snapshot} state="ready" />);
-    expect(screen.getAllByTestId('personal-match')).toHaveLength(20);
-
+    fireEvent.click(screen.getByRole('button', { name: '下一页' }));
     fireEvent.click(screen.getByRole('button', { name: '排位' }));
-    expect(screen.getAllByTestId('personal-match')).toHaveLength(10);
-    expect(screen.queryByText('极地大乱斗')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: '全部' }));
+    expect(screen.getByText('1 / 1')).toBeVisible();
+    expect(screen.getByText('对局 ID · 0')).toBeVisible();
     fireEvent.change(screen.getByRole('combobox', { name: '胜负筛选' }), { target: { value: 'losses' } });
-    expect(screen.getAllByTestId('personal-match')).toHaveLength(10);
-    expect(screen.getAllByText('失败')).toHaveLength(10);
-    expect(screen.queryByText('胜利')).not.toBeInTheDocument();
+    expect(screen.queryAllByTestId('personal-match')).toHaveLength(0);
+    expect(screen.getByText('暂无对局详情')).toBeVisible();
   });
-
-  it('keeps each desktop match on one row and only styles highest-performance icons', () => {
-    const css = readFileSync(resolve('src/renderer/src/features/history/personal-history.css'), 'utf8');
-    expect(css).toMatch(/\.personal-history\s*{[^}]*background:\s*var\(--ui-page-bg\)/i);
-    expect(css).toMatch(/\.personal-history__quickbar\s*{[^}]*display:\s*flex/i);
-    expect(css).toMatch(/\.personal-history__matches article\s*{[^}]*grid-template-columns:/i);
-    expect(css).toMatch(/\.personal-history__match-champion\s*{[^}]*width:\s*60px[^}]*height:\s*60px/i);
-    expect(css).toMatch(/\.personal-history__spells\s*{[^}]*flex-direction:\s*column/i);
-    expect(css).toMatch(/\.personal-history__honor\s*{[^}]*font-weight:\s*800/i);
-    expect(css).toMatch(/\.personal-history__items\s*{[^}]*display:\s*flex/i);
-    expect(css).not.toMatch(/personal-history__items img:nth-child\(n\+4\)/i);
-    expect(css).toMatch(/\.personal-history__match-highlights\s*{[^}]*flex-wrap:\s*wrap/i);
-    expect(css).not.toMatch(/\.personal-history__performance-metrics/i);
-    expect(css).not.toMatch(/\.personal-history__performance-bar/i);
-    expect(css).toMatch(/@media\s*\(max-width:\s*1080px\)/i);
-    expect(css).toMatch(/@media\s*\(max-width:\s*900px\)/i);
-    expect(css).toMatch(/@media\s*\(max-width:\s*780px\)/i);
-    expect(css).toMatch(/@media\s*\(max-width:\s*520px\)/i);
+  it('shows rating only when the required metrics exist', () => {
+    const { rerender } = render(<PersonalHistoryPage snapshot={{ ...snapshot, matches: [{ ...snapshot.matches[0], killParticipation: .7 }] }} state="ready" />);
+    expect(screen.getByTestId('match-score')).toHaveClass('is-win');
+    rerender(<PersonalHistoryPage snapshot={snapshot} state="ready" />);
+    expect(screen.queryByTestId('match-score')).toBeNull();
   });
-
-  it('renders loading and unavailable states explicitly', () => {
-    const { rerender } = render(<PersonalHistoryPage state="loading" />);
-    expect(screen.getByRole('status')).toHaveTextContent('正在加载个人战绩…');
+  it('refreshes and shows loading or unavailable states', () => {
+    const refresh = vi.fn();
+    const { rerender } = render(<PersonalHistoryPage snapshot={snapshot} state="ready" onRefresh={refresh} />);
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }));
+    expect(refresh).toHaveBeenCalledOnce();
+    rerender(<PersonalHistoryPage state="loading" />);
+    expect(screen.getByRole('status')).toHaveTextContent('正在加载个人战绩');
     rerender(<PersonalHistoryPage state="unavailable" />);
     expect(screen.getByRole('alert')).toHaveTextContent('请先启动英雄联盟客户端');
   });

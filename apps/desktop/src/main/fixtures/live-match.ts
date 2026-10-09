@@ -43,14 +43,22 @@ function personalMatchesFor(target?: PersonalHistoryTarget): MatchSummary[] {
       playerId: index === 0 ? target?.playerId ?? 'fixture-personal-player' : `fixture-ally-${matchIndex}-${index}`,
       puuid: index === 0 ? target?.puuid ?? 'fixture-personal-puuid' : `fixture-ally-puuid-${matchIndex}-${index}`,
       displayName: index === 0 ? target?.displayName ?? 'Fixture Personal Player' : `Fixture Ally ${index}`,
-      profileIconId: index === 0 ? target?.profileIconId ?? 29 : 29 + index
+      profileIconId: index === 0 ? target?.profileIconId ?? 29 : 29 + index,
+      kills: index === 0 ? (matchIndex === 0 ? 14 : matchIndex === 2 ? 12 : base.kills) : 3 + index,
+      deaths: index === 0 ? (matchIndex === 2 ? 2 : base.deaths) : 2 + index,
+      assists: index === 0 ? (matchIndex === 2 ? 16 : base.assists) : 7 + index,
+      goldEarned: 12000 + index * 1300, damage: 18000 + index * 2800, damageTaken: 15000 + index * 4000,
+      cs: 120 + index * 25, itemIds: base.itemIds
     }));
     const enemies = Array.from({ length: 5 }, (_, index) => ({
       championId: 30 + index,
       playerId: `fixture-enemy-${matchIndex}-${index}`,
       puuid: `fixture-enemy-puuid-${matchIndex}-${index}`,
       displayName: `Fixture Enemy ${index + 1}#192`,
-      profileIconId: 40 + index
+      profileIconId: 40 + index,
+      kills: 2 + index, deaths: 4 + index, assists: 9 + index,
+      goldEarned: 10000 + index * 1100, damage: 14000 + index * 2300, damageTaken: 19000 + index * 3200,
+      cs: 105 + index * 21, itemIds: base.itemIds
     }));
     return {
       ...base,

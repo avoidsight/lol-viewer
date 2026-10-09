@@ -23,6 +23,14 @@ const matchAchievementSchema = z.object({
   value: z.number().nonnegative()
 }).strict();
 const matchParticipantSummarySchema = z.object({
+  kills: z.number().int().nonnegative().optional(),
+  deaths: z.number().int().nonnegative().optional(),
+  assists: z.number().int().nonnegative().optional(),
+  goldEarned: z.number().int().nonnegative().optional(),
+  damage: z.number().int().nonnegative().optional(),
+  damageTaken: z.number().int().nonnegative().optional(),
+  cs: z.number().int().nonnegative().optional(),
+  itemIds: z.array(z.number().int().nonnegative()).max(7).optional(),
   championId: z.number().int().nonnegative(),
   playerId: z.string().min(1).optional(),
   puuid: z.string().min(1).optional(),

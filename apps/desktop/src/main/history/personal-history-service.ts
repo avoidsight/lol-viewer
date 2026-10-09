@@ -12,7 +12,7 @@ import {
   matchHistoryResponseSchema
 } from '../lcu/match-adapter';
 
-const PERSONAL_HISTORY_DATA_VERSION = 10;
+const PERSONAL_HISTORY_DATA_VERSION = 11;
 
 const currentSummonerSchema = z.object({
   summonerId: z.union([z.string(), z.number()]),
@@ -218,7 +218,7 @@ export class PersonalHistoryService {
       const kills = history.reduce((total, match) => total + match.kills, 0);
       const deaths = history.reduce((total, match) => total + match.deaths, 0);
       const assists = history.reduce((total, match) => total + match.assists, 0);
-      const usedItemIds = new Set(history.flatMap((match) => match.itemIds ?? []));
+      const usedItemIds = new Set(history.flatMap((match) => [...(match.itemIds ?? []), ...[...(match.allyPlayers ?? []), ...(match.enemyPlayers ?? [])].flatMap(player => player.itemIds ?? [])]));
       const itemIconPaths = Object.fromEntries(
         itemsResult.status === 'fulfilled'
           ? Object.entries(itemsResult.value)
