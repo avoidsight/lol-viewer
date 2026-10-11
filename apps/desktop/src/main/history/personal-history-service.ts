@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { safeHistoryError } from '../../shared/history-error';
 import type { FavoriteChampion, PersonalHistorySnapshot } from '../../shared/domain';
 import { formatRank } from '../../shared/rank';
 import { personalHistorySchema, type PersonalHistoryTarget } from '../../shared/ipc';
@@ -35,10 +36,6 @@ const rankedStatsSchema = z.object({
     queueType: z.string(), tier: z.string(), division: z.string(), leaguePoints: z.number().int()
   }))
 });
-
-function unavailable(): Error & { code: 'HISTORY_UNAVAILABLE' } {
-  return Object.assign(new Error('Personal history is unavailable'), { code: 'HISTORY_UNAVAILABLE' as const });
-}
 
 function favoriteChampions(matches: PersonalHistorySnapshot['matches']): FavoriteChampion[] {
   const groups = new Map<number, {
@@ -249,14 +246,14 @@ export class PersonalHistoryService {
         // A healthy LCU result remains usable when persistence is unavailable.
       }
       return snapshot;
-    } catch {
+    } catch (error) {
       try {
         const cached = playerId === undefined ? this.cache.getLatest() : this.cache.getLatest(playerId);
         if (cached) return cached;
       } catch {
         // Cache failures are sanitized together with LCU failures.
       }
-      throw unavailable();
+      throw safeHistoryError(error);
     }
   }
 }

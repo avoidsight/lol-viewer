@@ -116,7 +116,9 @@ describe('App tab lifecycle', () => {
     await act(async () => refresh.reject(new Error('offline')));
 
     expect(screen.getByText('召唤师')).toBeVisible();
-    expect(screen.getByText('刷新失败，请重试')).toBeVisible();
+    expect(screen.getByRole('alert')).toHaveTextContent('刷新失败：暂时无法读取战绩');
+    fireEvent.click(screen.getByRole('button', { name: '关闭刷新错误提示' }));
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('navigates to another player history from a match portrait and returns to the local snapshot', async () => {

@@ -1,6 +1,7 @@
 import { clipboard, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import type { PersonalHistorySnapshot } from '../../shared/domain';
 import { PERSONAL_HISTORY_GET_CHANNEL, personalHistorySchema, personalHistoryTargetSchema, type PersonalHistoryTarget } from '../../shared/ipc';
+import { safeHistoryError } from '../../shared/history-error';
 import { assertAuthorizedRenderer } from './authorization';
 import { PLAYER_SEARCH, PLAYER_SEARCH_CLIPBOARD, clipboardPlayerId, playerSearchInputSchema, playerSearchResultSchema, type PlayerSearchResult } from '../../shared/player-search';
 
@@ -27,6 +28,7 @@ export function registerHistoryIpc(service: PersonalHistoryLoader): void {
   ipcMain.handle(PERSONAL_HISTORY_GET_CHANNEL, async (event: IpcMainInvokeEvent, input: unknown) => {
     assertAuthorizedRenderer(event);
     const target = personalHistoryTargetSchema.optional().parse(input);
-    return personalHistorySchema.parse(await service.load(target));
+    try { return personalHistorySchema.parse(await service.load(target)); }
+    catch (error) { throw safeHistoryError(error); }
   });
 }

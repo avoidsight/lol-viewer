@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import type { PersonalHistorySnapshot } from '../../shared/domain';
 import type { AppSettings, LolViewerApi, PersonalHistoryTarget } from '../../shared/ipc';
+import { historyRefreshMessage } from '../../shared/history-error';
 import AppShell, { type AppTab } from './AppShell';
 import { DonationControl } from './features/donation/DonationControl';
 import { UpdateControl } from './features/updates/UpdateControl';
@@ -50,6 +51,11 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   const [historyState, setHistoryState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const [historyRefreshing, setHistoryRefreshing] = useState(false);
   const [historyRefreshError, setHistoryRefreshError] = useState('');
+  useEffect(() => {
+    if (!historyRefreshError) return;
+    const timer = window.setTimeout(() => setHistoryRefreshError(''), 8000);
+    return () => window.clearTimeout(timer);
+  }, [historyRefreshError]);
   const [liveView, dispatchLiveView] = useReducer(liveMatchReducer, initialLiveMatchState);
   const [liveAttention, setLiveAttention] = useState(false);
   const [updatePhase, setUpdatePhase] = useState<string | undefined>(undefined);
@@ -290,8 +296,8 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
       if (!historyTarget) ownHistoryRef.current = snapshot;
       setHistory(snapshot);
       setHistoryState('ready');
-    } catch {
-      if (requestId === historyNavigation.current) setHistoryRefreshError('刷新失败，请重试');
+    } catch (error) {
+      if (requestId === historyNavigation.current) setHistoryRefreshError(historyRefreshMessage(error));
     } finally {
       historyRefreshingRef.current = false;
       setHistoryRefreshing(false);
@@ -365,11 +371,11 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
         : null;
 
   const content = <>
-    <div hidden={page !== 'history'}><PersonalHistoryPage snapshot={history} state={historyState} onRefresh={() => void refreshHistory()} onPlayerSelect={(target) => void viewPlayerHistory(target)} onBack={historyTarget ? returnToOwnHistory : undefined} refreshing={historyRefreshing} refreshError={historyRefreshError} /></div>
+    <div hidden={page !== 'history'}><PersonalHistoryPage snapshot={history} state={historyState} onRefresh={() => void refreshHistory()} onPlayerSelect={(target) => void viewPlayerHistory(target)} onBack={historyTarget ? returnToOwnHistory : undefined} refreshing={historyRefreshing} /></div>
     <div hidden={page !== 'live'}><LiveMatchPage onPlayerSelect={target => void viewPlayerHistory(target)} match={liveView.match} players={liveView.match ? undefined : liveView.progress} loadingProgress={liveView.requesting && !liveView.match && (liveView.progress.length > 0 || (liveView.phase !== undefined && activePhases.has(liveView.phase))) ? liveView.progress.length : undefined} lifecycleStatus={liveView.status} gameflowPhase={liveView.phase} showLaneDifferences={settings.showLaneDifferences} notice={liveNotice} /></div>
     {page === 'champions' && <ChampionLibraryPage getCatalog={getChampionCatalog} getDetails={getChampionDetails} getGuide={getChampionGuide} />}
     {page === 'settings' && <SettingsPage onGameTextInputChange={(checked) => void updateGameTextInputSetting(checked)} settings={settings} message={message} onAutoCopyEnemyHistoryChange={(checked) => void updateAutoCopySetting(checked)} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onClearCache={() => void clearCache()} />}
     {clipboardNotice && <div role="status" className="clipboard-notice">对局战绩已复制</div>}
   </>;
-return <><AppShell active={page} onChange={handleTabChange} liveAttention={liveAttention} search={<PlayerSearch key={searchReset} onSelect={async target => { setPage('history'); await viewPlayerHistory(target); }} />} support={<><UpdateControl api={window.lolViewer} canAutoPrompt={!feedbackOpen && ['None', 'Lobby', 'EndOfGame'].includes(updatePhase ?? '')} /><DonationControl api={window.lolViewer} /></>} onFeedback={() => setFeedbackOpen(true)}>{content}</AppShell><FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} api={window.lolViewer} /></>;
+return <>{historyRefreshError && <div className="history-error-toast" role="alert"><span>{historyRefreshError}</span><button aria-label="关闭刷新错误提示" onClick={() => setHistoryRefreshError('')}>×</button></div>}<AppShell active={page} onChange={handleTabChange} liveAttention={liveAttention} search={<PlayerSearch key={searchReset} onSelect={async target => { setPage('history'); await viewPlayerHistory(target); }} />} support={<><UpdateControl api={window.lolViewer} canAutoPrompt={!feedbackOpen && ['None', 'Lobby', 'EndOfGame'].includes(updatePhase ?? '')} /><DonationControl api={window.lolViewer} /></>} onFeedback={() => setFeedbackOpen(true)}>{content}</AppShell><FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} api={window.lolViewer} /></>;
 }
