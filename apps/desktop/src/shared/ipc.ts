@@ -235,7 +235,7 @@ export interface LolViewerApi {
   getDonationImage?: () => Promise<string | null>;
   getFeedbackContext?: import('./feedback').FeedbackApi['getFeedbackContext'];
   submitFeedback?: import('./feedback').FeedbackApi['submitFeedback'];
-  getPersonalHistory(target?: PersonalHistoryTarget): Promise<PersonalHistorySnapshot>;
+  getPersonalHistory(target?: PersonalHistoryTarget, forceRefresh?: boolean): Promise<PersonalHistorySnapshot>;
   getAppVersion?(): Promise<string>;
   searchPlayer?(input: string): Promise<import('./player-search').PlayerSearchResult>;
   readClipboardPlayerId?(): Promise<string | undefined>;

@@ -3,6 +3,19 @@ import fixture from '../../../tests/fixtures/match-history.json';
 import { adaptMatchHistory, describeQueue } from './match-adapter';
 
 describe('adaptMatchHistory', () => {
+  it('accepts nullable optional fields and isolates invalid games in nested responses', () => {
+    const base = fixture.games[0];
+    const valid = { ...base, participants: [{ ...base.participants[0], participantId: 1, teamId: 100,
+      spell1Id: 0, stats: { ...base.participants[0].stats, goldEarned: null } }],
+      participantIdentities: [{ participantId: 1, player: { puuid: '', gameName: null } }] };
+    const result = adaptMatchHistory({ games: { games: [valid, { gameId: 2 }] } }, { scope: 'all', limit: 20 });
+    expect(result).toHaveLength(1);
+    expect(result[0].kills).toBe(base.participants[0].stats.kills);
+    expect(result[0].goldEarned).toBeUndefined();
+    expect(result[0].allyPlayers?.[0].puuid).toBeUndefined();
+    expect(() => adaptMatchHistory({ games: [{ gameId: 2 }] }, { scope: 'all', limit: 20 })).toThrow();
+    expect(adaptMatchHistory({ games: [] }, { scope: 'all', limit: 20 })).toEqual([]);
+  });
   it('preserves participant detail metrics and empty item slots without inventing missing data', () => {
     const participant = { participantId: 1, championId: 1, teamId: 100,
       stats: { win: true, kills: 0, deaths: 2, assists: 8, goldEarned: 12345,

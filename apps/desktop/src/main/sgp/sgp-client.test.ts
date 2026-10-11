@@ -3,6 +3,17 @@ import type { LcuClient } from '../lcu/http-client';
 import { createSgpClient } from './sgp-client';
 
 describe('SgpClient', () => {
+  it('isolates invalid games and accepts missing optional SGP statistics', async () => {
+    const lcu = { get: vi.fn(async () => ({ accessToken: 'test-token' })) } as unknown as LcuClient;
+    const request = vi.fn(async () => new Response(JSON.stringify({ games: [
+      { json: { gameId: 1, queueId: 420, gameCreation: 1000, gameDuration: 1800, participants: [
+        { puuid: 'target', championId: 1, kills: 1, deaths: 2, assists: 3, win: true, goldEarned: null, summoner1Id: 0 }
+      ] } }, { json: {} }
+    ] })));
+    const result = await createSgpClient(lcu, 'HN1', request).getHistory('target', 20) as { games: Array<{ participants: Array<{ stats: { goldEarned?: number } }> }> };
+    expect(result.games).toHaveLength(1);
+    expect(result.games[0].participants[0].stats.goldEarned).toBeUndefined();
+  });
   it('uses the entitlements token and converts a player summary to LCU history shape', async () => {
     const lcu = { get: vi.fn(async (path: string) => {
       if (path === '/entitlements/v1/token') return { accessToken: 'entitlement-token' };

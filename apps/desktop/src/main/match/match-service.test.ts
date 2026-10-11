@@ -36,6 +36,19 @@ function deferred<T>() {
 }
 
 describe('MatchService', () => {
+  it('accepts the nested LCU history envelope at the HTTP schema boundary', async () => {
+    const get = vi.fn(async (path: string, schema: import('zod').ZodTypeAny) => {
+      let value: unknown;
+      if (path === '/lol-gameflow/v1/session') value = { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queueId: 440 } };
+      else if (path === '/lol-summoner/v1/current-summoner') value = { summonerId: '1', displayName: 'Local' };
+      else if (path.includes('/matches?')) value = { games: { games: history.games } };
+      else if (path.includes('/ranked-stats/')) value = { queues: [] };
+      else throw new Error('optional endpoint unavailable');
+      return schema.parse(value);
+    });
+    const result = await new MatchService({ get } as LcuClient).loadLiveMatch('all', vi.fn());
+    expect(result.players.every(p => p.status === 'ready' && p.matches.length === 1)).toBe(true);
+  });
   it('enriches current champion names once without changing historical champions', async () => {
     const get = vi.fn(async (path: string) => {
       if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queueId: 440 } };

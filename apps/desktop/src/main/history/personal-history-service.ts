@@ -13,7 +13,7 @@ import {
   matchHistoryResponseSchema
 } from '../lcu/match-adapter';
 
-const PERSONAL_HISTORY_DATA_VERSION = 11;
+const PERSONAL_HISTORY_DATA_VERSION = 12;
 
 const currentSummonerSchema = z.object({
   summonerId: z.union([z.string(), z.number()]),
@@ -90,7 +90,7 @@ export class PersonalHistoryService {
     private readonly staticData: LcuStaticDataProvider = new LcuStaticDataCache()
   ) {}
 
-  async load(target?: PersonalHistoryTarget): Promise<PersonalHistorySnapshot> {
+  async load(target?: PersonalHistoryTarget, forceRefresh = false): Promise<PersonalHistorySnapshot> {
     let playerId = target?.playerId;
     try {
       let displayName: string;
@@ -130,7 +130,7 @@ export class PersonalHistoryService {
         puuid = summoner.puuid;
       }
       try {
-        const fresh = this.cache.getFresh(playerId);
+        const fresh = forceRefresh ? null : this.cache.getFresh(playerId);
         const supportsRichMatchRows = fresh?.matches.every((match) => target
           ? match.allyPlayers !== undefined && match.enemyPlayers !== undefined
           : match.summonerSpellIds !== undefined &&
@@ -169,10 +169,10 @@ export class PersonalHistoryService {
           hasCompleteTeamMetrics
         ) return game;
         try {
-          const detailedGame = await this.client.get(
+          const detailedGame = matchHistoryGameSchema.parse(await this.client.get(
             `/lol-match-history/v1/games/${encodeURIComponent(String(game.gameId))}`,
             matchHistoryGameSchema
-          );
+          ));
           const targetIdentity = detailedGame.participantIdentities?.find((identity) =>
             (puuid !== undefined && identity.player.puuid === puuid) ||
             (identity.player.summonerId !== undefined && String(identity.player.summonerId) === playerId)
@@ -249,7 +249,7 @@ export class PersonalHistoryService {
     } catch (error) {
       try {
         const cached = playerId === undefined ? this.cache.getLatest() : this.cache.getLatest(playerId);
-        if (cached) return cached;
+        if (cached && !forceRefresh) return cached;
       } catch {
         // Cache failures are sanitized together with LCU failures.
       }

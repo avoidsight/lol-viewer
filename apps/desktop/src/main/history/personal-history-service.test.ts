@@ -21,7 +21,7 @@ const cachedSnapshot: PersonalHistorySnapshot = {
   playerId: '7', displayName: 'Cached Player', profileIconId: 29, matches: [], sampleSize: 0,
   wins: 0, losses: 0, winRate: 0, averageKda: 0, favoriteChampions: [], cached: false,
   itemIconPaths: {},
-  historyDataVersion: 11,
+  historyDataVersion: 12,
   updatedAt: 1_000
 };
 
@@ -33,6 +33,17 @@ function createService(get: LcuClient['get']) {
 }
 
 describe('PersonalHistoryService', () => {
+  it('forced refresh bypasses fresh cache and does not hide failures behind old data', async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path.includes('current-summoner') && !path.includes('/matches?')) return { summonerId: 7, profileIconId: 30 };
+      throw Object.assign(new Error('LCU request timed out'), { code: 'LCU_UNAVAILABLE' });
+    }) as LcuClient['get'];
+    const cache = { getFresh: vi.fn(() => cachedSnapshot), getLatest: vi.fn(() => cachedSnapshot), put: vi.fn() };
+    const service = new PersonalHistoryService({ get } as LcuClient, cache);
+    await expect(service.load(undefined, true)).rejects.toThrow('[HISTORY:TIMEOUT]');
+    expect(cache.getFresh).not.toHaveBeenCalled();
+    expect(cache.put).not.toHaveBeenCalled();
+  });
   it('returns a fresh snapshot after identity lookup without requesting history, rank, or patch', async () => {
     const get = vi.fn(async (path: string) => {
       if (path === '/lol-summoner/v1/current-summoner') return { summonerId: 7, displayName: 'Current', profileIconId: 30 };
@@ -144,7 +155,7 @@ describe('PersonalHistoryService', () => {
       displayName: '目标玩家#CN1',
       profileIconId: 88,
       rank: '黄金 I 77 胜点',
-      historyDataVersion: 11
+      historyDataVersion: 12
     });
     expect(result.matches[0]).toMatchObject({
       championId: 99,
@@ -341,7 +352,7 @@ describe('PersonalHistoryService', () => {
     });
 
     expect(sgp.getHistory).toHaveBeenCalledWith('target-puuid', 40);
-    expect(result.historyDataVersion).toBe(11);
+    expect(result.historyDataVersion).toBe(12);
     expect(cache.put).toHaveBeenCalled();
   });
 
@@ -442,6 +453,6 @@ describe('PersonalHistoryService', () => {
 
   it('throws a sanitized unavailable error without cache', async () => {
     const { service } = createService((async () => { throw new Error('network details'); }) as LcuClient['get']);
-    await expect(service.load()).rejects.toMatchObject({ message: 'Personal history is unavailable', code: 'HISTORY_UNAVAILABLE' });
+    await expect(service.load()).rejects.toMatchObject({ message: 'Personal history is unavailable [HISTORY:UNKNOWN]', code: 'HISTORY_UNAVAILABLE' });
   });
 });

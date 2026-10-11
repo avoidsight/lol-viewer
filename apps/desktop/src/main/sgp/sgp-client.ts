@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { compatibleGames } from '../lcu/history-compat';
 import type { LcuClient } from '../lcu/http-client';
 
 const entitlementsSchema = z.object({ accessToken: z.string().min(1) });
@@ -6,27 +7,27 @@ const leagueSessionTokenSchema = z.string().min(1);
 const sgpParticipantSchema = z.object({
   puuid: z.string(), championId: z.number().int().nonnegative(),
   kills: z.number().int().nonnegative(), deaths: z.number().int().nonnegative(),
-  assists: z.number().int().nonnegative(), win: z.boolean(), teamId: z.number().int().optional(),
-  mvp: z.boolean().optional(), isMvp: z.boolean().optional(),
-  largestMultiKill: z.number().int().nonnegative().optional(),
-  doubleKills: z.number().int().nonnegative().optional(), tripleKills: z.number().int().nonnegative().optional(),
-  quadraKills: z.number().int().nonnegative().optional(), pentaKills: z.number().int().nonnegative().optional(),
-  summoner1Id: z.number().int().positive().optional(), summoner2Id: z.number().int().positive().optional(),
-  spell1Id: z.number().int().positive().optional(), spell2Id: z.number().int().positive().optional(),
-  totalMinionsKilled: z.number().int().nonnegative().optional(),
-  neutralMinionsKilled: z.number().int().nonnegative().optional(),
-  goldEarned: z.number().int().nonnegative().optional(),
-  totalDamageDealtToChampions: z.number().int().nonnegative().optional(),
-  totalDamageTaken: z.number().int().nonnegative().optional(),
-  item0: z.number().int().nonnegative().optional(), item1: z.number().int().nonnegative().optional(),
-  item2: z.number().int().nonnegative().optional(), item3: z.number().int().nonnegative().optional(),
-  item4: z.number().int().nonnegative().optional(), item5: z.number().int().nonnegative().optional(),
-  item6: z.number().int().nonnegative().optional(),
-  teamPosition: z.string().optional(), individualPosition: z.string().optional(), lane: z.string().optional(),
-  riotIdGameName: z.string().optional(), riotIdTagline: z.string().optional(),
-  summonerName: z.string().optional(), profileIconId: z.number().int().nonnegative().optional()
+  assists: z.number().int().nonnegative(), win: z.boolean(), teamId: z.number().int().optional().catch(undefined),
+  mvp: z.boolean().optional().catch(undefined), isMvp: z.boolean().optional().catch(undefined),
+  largestMultiKill: z.number().int().nonnegative().optional().catch(undefined),
+  doubleKills: z.number().int().nonnegative().optional().catch(undefined), tripleKills: z.number().int().nonnegative().optional().catch(undefined),
+  quadraKills: z.number().int().nonnegative().optional().catch(undefined), pentaKills: z.number().int().nonnegative().optional().catch(undefined),
+  summoner1Id: z.number().int().positive().optional().catch(undefined), summoner2Id: z.number().int().positive().optional().catch(undefined),
+  spell1Id: z.number().int().positive().optional().catch(undefined), spell2Id: z.number().int().positive().optional().catch(undefined),
+  totalMinionsKilled: z.number().int().nonnegative().optional().catch(undefined),
+  neutralMinionsKilled: z.number().int().nonnegative().optional().catch(undefined),
+  goldEarned: z.number().int().nonnegative().optional().catch(undefined),
+  totalDamageDealtToChampions: z.number().int().nonnegative().optional().catch(undefined),
+  totalDamageTaken: z.number().int().nonnegative().optional().catch(undefined),
+  item0: z.number().int().nonnegative().optional().catch(undefined), item1: z.number().int().nonnegative().optional().catch(undefined),
+  item2: z.number().int().nonnegative().optional().catch(undefined), item3: z.number().int().nonnegative().optional().catch(undefined),
+  item4: z.number().int().nonnegative().optional().catch(undefined), item5: z.number().int().nonnegative().optional().catch(undefined),
+  item6: z.number().int().nonnegative().optional().catch(undefined),
+  teamPosition: z.string().optional().catch(undefined), individualPosition: z.string().optional().catch(undefined), lane: z.string().optional().catch(undefined),
+  riotIdGameName: z.string().optional().catch(undefined), riotIdTagline: z.string().optional().catch(undefined),
+  summonerName: z.string().optional().catch(undefined), profileIconId: z.number().int().nonnegative().optional().catch(undefined)
 });
-const sgpHistorySchema = z.object({ games: z.array(z.object({ json: z.object({
+const sgpHistorySchema = z.object({ games: compatibleGames(z.object({ json: z.object({
   gameId: z.number(), queueId: z.number().int(), gameCreation: z.number(),
   gameDuration: z.number(), participants: z.array(sgpParticipantSchema)
 }) })) });

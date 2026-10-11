@@ -3,7 +3,7 @@ import type { Lane, MatchSummary, PlayerDataErrorCode, PlayerSnapshot, QueueScop
 import type { LiveMatch, LiveRoster } from '../../shared/ipc';
 import { formatRank } from '../../shared/rank';
 import type { LcuClient, LcuError } from '../lcu/http-client';
-import { adaptMatchHistory, describeQueue } from '../lcu/match-adapter';
+import { adaptMatchHistory, describeQueue, matchHistoryResponseSchema } from '../lcu/match-adapter';
 import type { SgpClient } from '../sgp/sgp-client';
 import { LcuStaticDataCache, type LcuStaticDataProvider } from '../lcu/static-data-cache';
 
@@ -68,7 +68,7 @@ const summonerIdentitySchema = z.object({
   puuid: z.string().optional()
 });
 
-const matchHistorySchema = z.object({ games: z.array(z.unknown()) });
+const matchHistorySchema = matchHistoryResponseSchema;
 const retryDelays = [250, 750] as const;
 const lanes = new Set<Lane>(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'UNKNOWN']);
 const standardPositions = new Set(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']);
@@ -120,6 +120,7 @@ function classifyHistoryError(error: unknown, source: 'lcu' | 'sgp'): PlayerData
   if (message.includes('privacy') || message.includes('forbidden') || /status (403|404)\b/.test(message)) return 'PRIVACY_RESTRICTED';
   if (code === 'LCU_UNAVAILABLE' || code === 'LCU_AUTH') return 'CLIENT_UNAVAILABLE';
   if (code === 'LCU_INVALID_RESPONSE' || code === 'LCU_RESPONSE_TOO_LARGE') return 'INVALID_RESPONSE';
+  if (error instanceof z.ZodError) return 'INVALID_RESPONSE';
   if (source === 'sgp') return 'DATA_SERVICE_UNAVAILABLE';
   return 'UNKNOWN';
 }

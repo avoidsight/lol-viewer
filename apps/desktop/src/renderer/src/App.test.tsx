@@ -38,6 +38,20 @@ function install(getLiveMatch: LolViewerApi['getLiveMatch'] = vi.fn().mockResolv
 afterEach(() => { delete window.lolViewer; });
 
 describe('App tab lifecycle', () => {
+  it('bounds retries for unavailable players in the same game', async () => {
+    vi.useFakeTimers();
+    try {
+      const failed = { ...match, gameId: 'game-retry', players: [{ ...player, status: 'unavailable' as const, errorCode: 'DATA_SERVICE_UNAVAILABLE' as const }] };
+      const { api } = install(vi.fn().mockResolvedValue(failed));
+      vi.mocked(api.getGameflowSessionIdentity).mockResolvedValue({ phase: 'InProgress', gameId: 'game-retry' });
+      render(<App initialTab="live" />);
+      await act(async () => { await Promise.resolve(); });
+      for (let step = 0; step < 8; step += 1) {
+        await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
+      }
+      expect(api.getLiveMatch).toHaveBeenCalledTimes(4);
+    } finally { vi.useRealTimers(); }
+  });
   it.each(['deferred', 'resolved'] as const)('deduplicates a %s personal history request during StrictMode effect replay', async (kind) => {
     const pending = deferred<PersonalHistorySnapshot>();
     const { api } = install();

@@ -58,9 +58,9 @@ const api: LolViewerApi = Object.freeze({
   getDonationImage: async () => donationImageSchema.parse(await ipcRenderer.invoke(DONATION_IMAGE_CHANNEL)),
   getFeedbackContext: async () => feedbackContextSchema.parse(await ipcRenderer.invoke(FEEDBACK_CONTEXT_CHANNEL)),
   submitFeedback: async (input: FeedbackInput) => feedbackResultSchema.parse(await ipcRenderer.invoke(FEEDBACK_SUBMIT_CHANNEL, feedbackInputSchema.parse(input))),
-  getPersonalHistory: async (target?: PersonalHistoryTarget): Promise<PersonalHistorySnapshot> => {
+  getPersonalHistory: async (target?: PersonalHistoryTarget, forceRefresh?: boolean): Promise<PersonalHistorySnapshot> => {
     const input = personalHistoryTargetSchema.optional().parse(target);
-    return personalHistorySchema.parse(await (input === undefined
+    return personalHistorySchema.parse(await (forceRefresh === true ? ipcRenderer.invoke(PERSONAL_HISTORY_GET_CHANNEL, input, true) : input === undefined
       ? ipcRenderer.invoke(PERSONAL_HISTORY_GET_CHANNEL)
       : ipcRenderer.invoke(PERSONAL_HISTORY_GET_CHANNEL, input)));
   },

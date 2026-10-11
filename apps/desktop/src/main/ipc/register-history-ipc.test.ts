@@ -55,6 +55,9 @@ describe('registerHistoryIpc', () => {
     const target = { playerId: 'target', puuid: 'target-puuid', displayName: '目标玩家' };
     await expect(handler({ sender }, target)).resolves.toEqual(snapshot);
     expect(load).toHaveBeenLastCalledWith(target);
+    await handler({ sender }, target, true);
+    expect(load).toHaveBeenLastCalledWith(target, true);
+    await expect(handler({ sender }, target, 'yes')).rejects.toThrow();
     await expect(handler({ sender }, { unexpected: true })).rejects.toThrow();
     await expect(handler({ sender: {} }, undefined)).rejects.toThrow('Unauthorized IPC sender');
 

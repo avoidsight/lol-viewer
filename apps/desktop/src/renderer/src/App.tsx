@@ -132,6 +132,21 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     void Promise.resolve(api.getSettings()).then((value) => { if (value) { settingsRef.current = value; setSettings(value); } }).catch(() => undefined);
   }, []);
 
+  const liveRetryBudget = useRef({ gameId: '', attempts: 0 });
+  useEffect(() => {
+    const match = liveView.match;
+    if (page !== 'live' || liveView.requesting || !match?.gameId || !activePhases.has(liveView.phase ?? '')) return;
+    if (!match.players.some(p => p.status === 'unavailable' && p.playerId !== '0' && !p.playerId.startsWith('-')
+      && ['CLIENT_UNAVAILABLE', 'DATA_SERVICE_UNAVAILABLE', 'INVALID_RESPONSE', 'UNKNOWN'].includes(p.errorCode ?? 'UNKNOWN'))) return;
+    if (liveRetryBudget.current.gameId !== match.gameId) liveRetryBudget.current = { gameId: match.gameId, attempts: 0 };
+    if (liveRetryBudget.current.attempts >= 3) return;
+    const timer = window.setTimeout(() => {
+      liveRetryBudget.current.attempts += 1;
+      loadedGameIdRef.current = undefined;
+      setRetryNonce(value => value + 1);
+    }, 15000);
+    return () => window.clearTimeout(timer);
+  }, [page, liveView.match, liveView.requesting, liveView.phase]);
   useEffect(() => {
     if (page !== 'live') return;
     if (
@@ -290,7 +305,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     setHistoryRefreshError('');
     const requestId = historyNavigation.current;
     try {
-      const snapshot = await window.lolViewer.getPersonalHistory(historyTarget);
+      const snapshot = await window.lolViewer.getPersonalHistory(historyTarget, true);
       if (requestId !== historyNavigation.current) return;
       if (!snapshot) throw new Error('History unavailable');
       if (!historyTarget) ownHistoryRef.current = snapshot;

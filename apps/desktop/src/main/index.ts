@@ -174,7 +174,7 @@ void app.whenReady().then(() => {
       if (!connection) return { ok: false, error: 'unavailable' };
       return searchPlayer(createLcuClient(connection), input);
     },
-    load: async (target) => {
+    load: async (target, forceRefresh) => {
       if (fixtureMode) return createFixturePersonalHistory(target);
       const connection = await discoverLcuConnection();
       if (!connection) throw new Error('League client is unavailable');
@@ -182,7 +182,7 @@ void app.whenReady().then(() => {
       const sgp = connection.region?.toUpperCase() === 'TENCENT' && connection.rsoPlatformId
         ? createSgpClient(lcu, connection.rsoPlatformId)
         : undefined;
-      return new PersonalHistoryService(lcu, personalHistoryCache, sgp, staticData).load(target);
+      return new PersonalHistoryService(lcu, personalHistoryCache, sgp, staticData).load(target, forceRefresh);
     }
   });
   const readIdentity = async (): Promise<GameflowSessionIdentity> => {

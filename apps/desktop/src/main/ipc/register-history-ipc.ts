@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { clipboard, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import type { PersonalHistorySnapshot } from '../../shared/domain';
 import { PERSONAL_HISTORY_GET_CHANNEL, personalHistorySchema, personalHistoryTargetSchema, type PersonalHistoryTarget } from '../../shared/ipc';
@@ -6,7 +7,7 @@ import { assertAuthorizedRenderer } from './authorization';
 import { PLAYER_SEARCH, PLAYER_SEARCH_CLIPBOARD, clipboardPlayerId, playerSearchInputSchema, playerSearchResultSchema, type PlayerSearchResult } from '../../shared/player-search';
 
 export interface PersonalHistoryLoader {
-  load(target?: PersonalHistoryTarget): Promise<PersonalHistorySnapshot>;
+  load(target?: PersonalHistoryTarget, forceRefresh?: boolean): Promise<PersonalHistorySnapshot>;
   search?(input: string): Promise<PlayerSearchResult>;
 }
 
@@ -25,10 +26,11 @@ export function registerHistoryIpc(service: PersonalHistoryLoader): void {
     catch { return { ok: false, error: 'failed' }; }
     finally { searching = false; }
   });
-  ipcMain.handle(PERSONAL_HISTORY_GET_CHANNEL, async (event: IpcMainInvokeEvent, input: unknown) => {
+  ipcMain.handle(PERSONAL_HISTORY_GET_CHANNEL, async (event: IpcMainInvokeEvent, input: unknown, refresh: unknown) => {
     assertAuthorizedRenderer(event);
+    const forceRefresh = z.boolean().optional().parse(refresh);
     const target = personalHistoryTargetSchema.optional().parse(input);
-    try { return personalHistorySchema.parse(await service.load(target)); }
+    try { return personalHistorySchema.parse(await (forceRefresh ? service.load(target, true) : service.load(target))); }
     catch (error) { throw safeHistoryError(error); }
   });
 }

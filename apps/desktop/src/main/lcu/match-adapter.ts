@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { compatibleGames } from './history-compat';
 import type { Lane, MatchAchievement, MatchParticipantSummary, MatchSummary, QueueScope } from '../../shared/domain';
 import { isBuildItem } from '../../shared/items';
 import { rankedMatchForm } from '../../shared/ranked-form';
@@ -7,58 +8,58 @@ export { describeQueue } from '../../shared/queue';
 const laneSchema = z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']);
 
 const participantSchema = z.object({
-  participantId: z.number().int().positive().optional(),
+  participantId: z.number().int().positive().optional().catch(undefined),
   championId: z.number().int().nonnegative(),
-  teamId: z.number().int().optional(),
-  spell1Id: z.number().int().positive().optional(),
-  spell2Id: z.number().int().positive().optional(),
-  mvp: z.boolean().optional(),
-  isMvp: z.boolean().optional(),
+  teamId: z.number().int().optional().catch(undefined),
+  spell1Id: z.number().int().positive().optional().catch(undefined),
+  spell2Id: z.number().int().positive().optional().catch(undefined),
+  mvp: z.boolean().optional().catch(undefined),
+  isMvp: z.boolean().optional().catch(undefined),
   stats: z.object({
     win: z.boolean(),
     kills: z.number().int().nonnegative(),
     deaths: z.number().int().nonnegative(),
     assists: z.number().int().nonnegative(),
-    gameEndedInEarlySurrender: z.boolean().optional(),
-    mvp: z.boolean().optional(),
-    isMvp: z.boolean().optional(),
-    largestMultiKill: z.number().int().nonnegative().optional(),
-    largestKillingSpree: z.number().int().nonnegative().optional(),
-    doubleKills: z.number().int().nonnegative().optional(),
-    tripleKills: z.number().int().nonnegative().optional(),
-    quadraKills: z.number().int().nonnegative().optional(),
-    pentaKills: z.number().int().nonnegative().optional(),
-    totalMinionsKilled: z.number().int().nonnegative().optional(),
-    neutralMinionsKilled: z.number().int().nonnegative().optional(),
-    goldEarned: z.number().int().nonnegative().optional(),
-    totalDamageDealtToChampions: z.number().int().nonnegative().optional(),
-    totalDamageTaken: z.number().int().nonnegative().optional(),
-    item0: z.number().int().nonnegative().optional(),
-    item1: z.number().int().nonnegative().optional(),
-    item2: z.number().int().nonnegative().optional(),
-    item3: z.number().int().nonnegative().optional(),
-    item4: z.number().int().nonnegative().optional(),
-    item5: z.number().int().nonnegative().optional(),
-    item6: z.number().int().nonnegative().optional()
+    gameEndedInEarlySurrender: z.boolean().optional().catch(undefined),
+    mvp: z.boolean().optional().catch(undefined),
+    isMvp: z.boolean().optional().catch(undefined),
+    largestMultiKill: z.number().int().nonnegative().optional().catch(undefined),
+    largestKillingSpree: z.number().int().nonnegative().optional().catch(undefined),
+    doubleKills: z.number().int().nonnegative().optional().catch(undefined),
+    tripleKills: z.number().int().nonnegative().optional().catch(undefined),
+    quadraKills: z.number().int().nonnegative().optional().catch(undefined),
+    pentaKills: z.number().int().nonnegative().optional().catch(undefined),
+    totalMinionsKilled: z.number().int().nonnegative().optional().catch(undefined),
+    neutralMinionsKilled: z.number().int().nonnegative().optional().catch(undefined),
+    goldEarned: z.number().int().nonnegative().optional().catch(undefined),
+    totalDamageDealtToChampions: z.number().int().nonnegative().optional().catch(undefined),
+    totalDamageTaken: z.number().int().nonnegative().optional().catch(undefined),
+    item0: z.number().int().nonnegative().optional().catch(undefined),
+    item1: z.number().int().nonnegative().optional().catch(undefined),
+    item2: z.number().int().nonnegative().optional().catch(undefined),
+    item3: z.number().int().nonnegative().optional().catch(undefined),
+    item4: z.number().int().nonnegative().optional().catch(undefined),
+    item5: z.number().int().nonnegative().optional().catch(undefined),
+    item6: z.number().int().nonnegative().optional().catch(undefined)
   }),
   timeline: z
     .object({
-      lane: z.string().optional()
+      lane: z.string().optional().catch(undefined)
     })
-    .optional()
+    .optional().catch(undefined)
 });
 
 const participantIdentitySchema = z.object({
   participantId: z.number().int().positive(),
   player: z.object({
-    summonerId: z.union([z.string(), z.number()]).optional(),
-    puuid: z.string().min(1).optional(),
-    gameName: z.string().optional(),
-    tagLine: z.string().optional(),
-    summonerName: z.string().optional(),
-    displayName: z.string().optional(),
-    profileIconId: z.number().int().nonnegative().optional(),
-    profileIcon: z.number().int().nonnegative().optional()
+    summonerId: z.union([z.string(), z.number()]).optional().catch(undefined),
+    puuid: z.string().min(1).optional().catch(undefined),
+    gameName: z.string().optional().catch(undefined),
+    tagLine: z.string().optional().catch(undefined),
+    summonerName: z.string().optional().catch(undefined),
+    displayName: z.string().optional().catch(undefined),
+    profileIconId: z.number().int().nonnegative().optional().catch(undefined),
+    profileIcon: z.number().int().nonnegative().optional().catch(undefined)
   }).passthrough()
 });
 
@@ -68,7 +69,7 @@ export const matchHistoryGameSchema = z.object({
   gameCreation: z.number().int().nonnegative(),
   gameDuration: z.number().int().nonnegative(),
   participants: z.array(participantSchema).min(1),
-  participantIdentities: z.array(participantIdentitySchema).optional()
+  participantIdentities: z.array(participantIdentitySchema).optional().catch(undefined)
 });
 
 export const matchHistoryResponseSchema = z.preprocess((input) => {
@@ -78,7 +79,7 @@ export const matchHistoryResponseSchema = z.preprocess((input) => {
   if (!gamesEnvelope || typeof gamesEnvelope !== 'object' || Array.isArray(gamesEnvelope)) return input;
   const nestedGames = (gamesEnvelope as Record<string, unknown>).games;
   return Array.isArray(nestedGames) ? { ...root, games: nestedGames } : input;
-}, z.object({ games: z.array(matchHistoryGameSchema) }));
+}, z.object({ games: compatibleGames(matchHistoryGameSchema) }));
 
 interface AdaptOptions {
   scope: QueueScope;
