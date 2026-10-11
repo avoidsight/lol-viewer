@@ -39,7 +39,7 @@ describe('PersonalHistoryService', () => {
       throw Object.assign(new Error('LCU request timed out'), { code: 'LCU_UNAVAILABLE' });
     }) as LcuClient['get'];
     const cache = { getFresh: vi.fn(() => cachedSnapshot), getLatest: vi.fn(() => cachedSnapshot), put: vi.fn() };
-    const service = new PersonalHistoryService({ get } as LcuClient, cache);
+    const service = new PersonalHistoryService({ get } as LcuClient, cache, undefined, undefined, async () => {});
     await expect(service.load(undefined, true)).rejects.toThrow('[HISTORY:TIMEOUT]');
     expect(cache.getFresh).not.toHaveBeenCalled();
     expect(cache.put).not.toHaveBeenCalled();
@@ -454,5 +454,76 @@ describe('PersonalHistoryService', () => {
   it('throws a sanitized unavailable error without cache', async () => {
     const { service } = createService((async () => { throw new Error('network details'); }) as LcuClient['get']);
     await expect(service.load()).rejects.toMatchObject({ message: 'Personal history is unavailable [HISTORY:UNKNOWN]', code: 'HISTORY_UNAVAILABLE' });
+  });
+  it('retries a transient failure during manual refresh and keeps the successful result', async () => {
+    let historyAttempts = 0;
+    const sleep = vi.fn(async (_milliseconds: number) => {});
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-summoner/v1/current-summoner') return { summonerId: 7, displayName: 'Player', profileIconId: 29 };
+      if (path.includes('/matches?')) {
+        historyAttempts += 1;
+        if (historyAttempts === 1) throw Object.assign(new Error('LCU is unavailable'), { code: 'LCU_UNAVAILABLE' });
+        return { games: Array.from({ length: 3 }, (_, index) => game(index)) };
+      }
+      throw new Error('optional endpoint offline');
+    }) as LcuClient['get'];
+    const cache = { getFresh: vi.fn(), getLatest: vi.fn(), put: vi.fn() };
+    const service = new PersonalHistoryService({ get } as LcuClient, cache, undefined, undefined, sleep);
+
+    const result = await service.load(undefined, true);
+
+    expect(historyAttempts).toBe(2);
+    expect(sleep).toHaveBeenCalledWith(250);
+    expect(result.matches).toHaveLength(3);
+    expect(cache.put).toHaveBeenCalled();
+  });
+  it('stops manual refresh retries at the retry budget and reports the reason', async () => {
+    const sleep = vi.fn(async (_milliseconds: number) => {});
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-summoner/v1/current-summoner') return { summonerId: 7, displayName: 'Player', profileIconId: 29 };
+      throw Object.assign(new Error('LCU request timed out'), { code: 'LCU_UNAVAILABLE' });
+    }) as LcuClient['get'];
+    const cache = { getFresh: vi.fn(), getLatest: vi.fn(() => cachedSnapshot), put: vi.fn() };
+    const service = new PersonalHistoryService({ get } as LcuClient, cache, undefined, undefined, sleep);
+
+    await expect(service.load(undefined, true)).rejects.toThrow('[HISTORY:TIMEOUT]');
+    expect(sleep.mock.calls.map(([delay]) => delay)).toEqual([250, 750]);
+    expect(cache.put).not.toHaveBeenCalled();
+  });
+  it('does not retry manual refresh failures that cannot recover', async () => {
+    const sleep = vi.fn(async (_milliseconds: number) => {});
+    const get = vi.fn(async () => { throw new Error('SGP request failed with status 429'); }) as LcuClient['get'];
+    const cache = { getFresh: vi.fn(), getLatest: vi.fn(() => cachedSnapshot), put: vi.fn() };
+    const service = new PersonalHistoryService({ get } as LcuClient, cache, undefined, undefined, sleep);
+
+    await expect(service.load(undefined, true)).rejects.toThrow('[HISTORY:RATE_LIMIT]');
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+  it('keeps ordinary loads single-attempt', async () => {
+    const sleep = vi.fn(async (_milliseconds: number) => {});
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-summoner/v1/current-summoner') return { summonerId: 7, displayName: 'Player', profileIconId: 29 };
+      throw Object.assign(new Error('LCU request timed out'), { code: 'LCU_UNAVAILABLE' });
+    }) as LcuClient['get'];
+    const cache = { getFresh: vi.fn(() => null), getLatest: vi.fn(), put: vi.fn() };
+    const service = new PersonalHistoryService({ get } as LcuClient, cache, undefined, undefined, sleep);
+
+    await expect(service.load()).rejects.toThrow('[HISTORY:TIMEOUT]');
+    expect(sleep).not.toHaveBeenCalled();
+  });
+  it('treats a missing or negative profile icon as the default instead of failing', async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-summoner/v1/current-summoner') return { summonerId: 7, displayName: 'Player', profileIconId: -1 };
+      if (path.includes('/matches?')) return { games: [game(0)] };
+      throw new Error('optional endpoint offline');
+    }) as LcuClient['get'];
+    const cache = { getFresh: vi.fn(() => null), getLatest: vi.fn(), put: vi.fn() };
+    const service = new PersonalHistoryService({ get } as LcuClient, cache);
+
+    const result = await service.load();
+
+    expect(result.profileIconId).toBe(0);
+    expect(result.matches).toHaveLength(1);
   });
 });

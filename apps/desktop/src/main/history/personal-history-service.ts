@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { safeHistoryError } from '../../shared/history-error';
+import { isTransientHistoryError, safeHistoryError } from '../../shared/history-error';
 import type { FavoriteChampion, PersonalHistorySnapshot } from '../../shared/domain';
 import { formatRank } from '../../shared/rank';
 import { personalHistorySchema, type PersonalHistoryTarget } from '../../shared/ipc';
@@ -14,13 +14,15 @@ import {
 } from '../lcu/match-adapter';
 
 const PERSONAL_HISTORY_DATA_VERSION = 12;
+const refreshRetryDelays = [250, 750] as const;
 
 const currentSummonerSchema = z.object({
   summonerId: z.union([z.string(), z.number()]),
   displayName: z.string().optional(),
   gameName: z.string().optional(),
   tagLine: z.string().optional(),
-  profileIconId: z.number().int().nonnegative(),
+  // 登录未完成或未设置头像时客户端会给负数或缺失，视为默认头像，而不是让整次读取失败。
+  profileIconId: z.number().int().optional().catch(undefined),
   puuid: z.string().min(1).optional()
 });
 const targetSummonerSchema = z.object({
@@ -87,10 +89,27 @@ export class PersonalHistoryService {
     private readonly client: LcuClient,
     private readonly cache: Pick<PersonalHistoryCache, 'getFresh' | 'getLatest' | 'put'>,
     private readonly sgp?: SgpClient,
-    private readonly staticData: LcuStaticDataProvider = new LcuStaticDataCache()
+    private readonly staticData: LcuStaticDataProvider = new LcuStaticDataCache(),
+    private readonly sleep: (milliseconds: number) => Promise<void> =
+      (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
   ) {}
 
+  // 手动刷新是用户主动操作，短暂抖动不应直接报错：对可能自行恢复的故障做有限重试。
+  // 重试仍失败才抛出，由页面保留旧数据并提示原因。普通加载保持单次请求语义。
   async load(target?: PersonalHistoryTarget, forceRefresh = false): Promise<PersonalHistorySnapshot> {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await this.loadOnce(target, forceRefresh);
+      } catch (error) {
+        if (!forceRefresh || attempt >= refreshRetryDelays.length || !isTransientHistoryError(error)) {
+          throw error;
+        }
+        await this.sleep(refreshRetryDelays[attempt]);
+      }
+    }
+  }
+
+  private async loadOnce(target?: PersonalHistoryTarget, forceRefresh = false): Promise<PersonalHistorySnapshot> {
     let playerId = target?.playerId;
     try {
       let displayName: string;
@@ -126,7 +145,7 @@ export class PersonalHistoryService {
         displayName = gameName
           ? `${gameName}${tagLine ? `#${tagLine}` : ''}`
           : summoner.displayName?.trim() || '我的战绩';
-        profileIconId = summoner.profileIconId;
+        profileIconId = Math.max(0, summoner.profileIconId ?? 0);
         puuid = summoner.puuid;
       }
       try {
