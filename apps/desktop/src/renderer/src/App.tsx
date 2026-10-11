@@ -133,10 +133,6 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
       loadedGameIdRef.current !== undefined &&
       loadedGameIdRef.current === currentGameIdRef.current
     ) return;
-    if (
-      liveViewRef.current.status === 'paused' &&
-      (liveViewRef.current.phase === 'GameStart' || liveViewRef.current.phase === 'InProgress')
-    ) return;
     let active = true;
     const api = window.lolViewer;
     if (!api) { dispatchLive({ type: 'request-failed', reason: 'client-unavailable' }); return; }
@@ -206,13 +202,6 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
             }
             dispatchLive({ type: 'new-match-detected', phase });
             setRetryNonce((value) => value + 1);
-          } else if (
-            liveViewRef.current.requesting &&
-            (phase === 'GameStart' || phase === 'InProgress')
-          ) {
-            generation.current += 1;
-            void Promise.resolve(api.cancelLiveMatch?.()).catch(() => undefined);
-            dispatchLive({ type: 'enrichment-paused', phase });
           } else {
             dispatchLive({ type: 'phase-observed', phase, active: isActive });
             if (

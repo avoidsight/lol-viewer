@@ -315,12 +315,12 @@ describe('App tab lifecycle', () => {
     }
   });
 
-  it('stops unfinished player enrichment when the game starts and keeps completed players', async () => {
+  it.each(['GameStart', 'InProgress', 'Reconnect'])('finishes pending enrichment in %s without starting duplicate requests', async (phase) => {
     vi.useFakeTimers();
     try {
       const pending = deferred<LiveMatch>();
       const { api, emit } = install(vi.fn(() => pending.promise));
-      vi.mocked(api.getGameflowSessionIdentity).mockResolvedValue({ phase: 'GameStart', gameId: 'game-1' });
+      vi.mocked(api.getGameflowSessionIdentity).mockResolvedValue({ phase, gameId: 'game-1' });
       render(<App initialTab="live" />);
       await act(async () => { await Promise.resolve(); });
       const requestGeneration = vi.mocked(api.getLiveMatch).mock.calls[0][1];
@@ -328,11 +328,13 @@ describe('App tab lifecycle', () => {
 
       await act(async () => { vi.advanceTimersByTime(3_000); await Promise.resolve(); await Promise.resolve(); });
 
-      expect(api.cancelLiveMatch).toHaveBeenCalledOnce();
+      expect(api.cancelLiveMatch).not.toHaveBeenCalled();
       expect(screen.getByText('Player One')).toBeVisible();
-      expect(screen.getByText('游戏中，战绩更新已暂停')).toBeVisible();
+      expect(screen.queryByText('游戏中，战绩更新已暂停')).not.toBeInTheDocument();
+      await act(async () => { pending.resolve(match); await Promise.resolve(); });
       await act(async () => { vi.advanceTimersByTime(30_000); await Promise.resolve(); });
       expect(api.getLiveMatch).toHaveBeenCalledOnce();
+      expect(api.cancelLiveMatch).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }
