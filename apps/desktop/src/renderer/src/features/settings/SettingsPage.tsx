@@ -34,6 +34,18 @@ export default function SettingsPage({
   onClearCache: () => void;
 }) {
   const [version, setVersion] = useState<string>();
+  const [exporting, setExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState('');
+  async function exportLogs() {
+    if (exporting) return;
+    setExporting(true); setExportMessage('');
+    try {
+      const result = await window.lolViewer?.exportDiagnostics?.();
+      setExportMessage(result?.status === 'saved' ? '诊断日志已保存，可将文件发给开发者排查。'
+        : result?.status === 'cancelled' ? '' : result?.status === 'busy' ? '日志正在导出，请稍候。' : '导出失败，请检查保存位置和磁盘空间后重试。');
+    } catch { setExportMessage('导出失败，请稍后重试。'); }
+    finally { setExporting(false); }
+  }
   useEffect(() => {
     let disposed = false;
     void window.lolViewer?.getAppVersion?.().then(value => { if (!disposed) setVersion(value); }).catch(() => {});
@@ -47,7 +59,10 @@ export default function SettingsPage({
       <SettingSwitch title="自动复制双方战绩" description="选人时先复制己方，敌方就绪再补全双方；包含排位平均评分。会替换剪贴板，需自行粘贴发送。" checked={settings.autoCopyEnemyHistory === true} onChange={onAutoCopyEnemyHistoryChange ?? (() => {})} />
       <SettingSwitch title="游戏内填入战绩（实验）" description="先在对战页加载战绩，再在游戏内按 Enter 打开聊天框，按 Ctrl + Alt + V 填入后自行发送。仅 Windows；切出游戏可中止。" checked={settings.gameTextInput === true} onChange={onGameTextInputChange ?? (() => {})} />
     </section>
-    <section className="settings-page__section" aria-labelledby="maintenance-settings"><h2 id="maintenance-settings">本地维护</h2><div className="settings-row"><span><strong>清理缓存</strong><small>清除本地战绩缓存，不影响游戏战绩。</small></span><button type="button" onClick={onClearCache}>清理缓存</button></div></section>
+    <section className="settings-page__section" aria-labelledby="maintenance-settings"><h2 id="maintenance-settings">本地维护</h2><div className="settings-row"><span><strong>清理缓存</strong><small>清除本地战绩缓存，不影响游戏战绩。</small></span><button type="button" onClick={onClearCache}>清理缓存</button></div>
+      <div className="settings-row"><span><strong>诊断日志</strong><small>仅本地保存最近 7 天，最多约 3 MB。不含玩家信息或令牌，不自动上传。</small></span><button type="button" disabled={exporting} onClick={() => void exportLogs()}>{exporting ? '正在导出…' : '导出日志'}</button></div>
+    </section>
+    {exportMessage && <p className="settings-page__message" role="status">{exportMessage}</p>}
     {message && <p className="settings-page__message" aria-live="polite">{message}</p>}
     <footer className="settings-page__version">峡谷雷达 <span>{version ? `v${version}` : '版本信息不可用'}</span></footer>
   </div></main>;

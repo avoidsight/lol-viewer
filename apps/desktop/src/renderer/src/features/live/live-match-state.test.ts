@@ -14,6 +14,17 @@ const match = {
 } satisfies LiveMatch;
 
 describe('liveMatchReducer', () => {
+  it('reports retry diagnostics without triggering duplicate loading and clears stale errors', () => {
+    const diagnostic = { id: 'D-012345ABCDEF', reason: 'SCHEMA' } as const;
+    const loading = liveMatchReducer(initialLiveMatchState, { type: 'request-started' });
+    const reported = liveMatchReducer(loading, { type: 'diagnostic-reported', diagnostic });
+    expect(reported).toMatchObject({ requesting: true, diagnostic, status: 'loading' });
+    const ready = liveMatchReducer(reported, { type: 'request-succeeded', match });
+    expect(ready.diagnostic).toBeUndefined();
+    expect(liveMatchReducer(ready, { type: 'diagnostic-reported', diagnostic })).toBe(ready);
+    expect(liveMatchReducer(reported, { type: 'phase-observed', phase: 'None', active: false, connected: false }).diagnostic).toBeUndefined();
+    expect(liveMatchReducer(reported, { type: 'new-match-detected', phase: 'ChampSelect' }).diagnostic).toBeUndefined();
+  });
   it('progresses from loading players to a current snapshot', () => {
     const loading = liveMatchReducer(initialLiveMatchState, { type: 'request-started' });
     const progressive = liveMatchReducer(loading, { type: 'player-updated', player });

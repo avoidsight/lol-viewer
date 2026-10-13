@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { PersonalHistorySnapshot } from '../../../../shared/domain';
+import { diagnosticLabels, type Diagnostic } from '../../../../shared/diagnostics';
 import type { PersonalHistoryTarget } from '../../../../shared/ipc';
 import { localizeRank } from '../../../../shared/rank';
 import { isRankedQueue } from '../../../../shared/queue';
@@ -16,9 +17,10 @@ const championIconUrl = (_version: string | undefined, championId: number) =>
 const profileIconUrl = (_version: string | undefined, profileIconId: number) =>
   `lol-asset://profile-icons/${profileIconId}.jpg`;
 
-export default function PersonalHistoryPage({ snapshot, state, onRefresh, onPlayerSelect, onBack, refreshing = false, refreshError = '' }: {
+export default function PersonalHistoryPage({ snapshot, state, diagnostic, onRefresh, onPlayerSelect, onBack, refreshing = false, refreshError = '' }: {
   snapshot?: PersonalHistorySnapshot;
   state: HistoryState;
+  diagnostic?: Diagnostic;
   onRefresh?: () => void;
   onPlayerSelect?: (target: PersonalHistoryTarget) => void;
   onBack?: () => void;
@@ -39,7 +41,7 @@ export default function PersonalHistoryPage({ snapshot, state, onRefresh, onPlay
     return <main className="personal-history"><div className="personal-history__inner"><div className="personal-history__unavailable"><p role="status">正在加载个人战绩…</p></div></div></main>;
   }
   if (state === 'unavailable' || !snapshot) {
-    return <main className="personal-history"><div className="personal-history__inner"><div className="personal-history__unavailable"><p role="alert">{onBack ? '该玩家战绩暂时无法读取' : '请先启动英雄联盟客户端'}</p></div></div></main>;
+    return <main className="personal-history"><div className="personal-history__inner"><div className="personal-history__unavailable"><p role="alert">{diagnostic ? diagnosticLabels[diagnostic.reason] : onBack ? '该玩家战绩暂时无法读取' : '请先启动英雄联盟客户端'}</p>{diagnostic && <small>{diagnostic.id} · 可在设置中导出日志</small>}</div></div></main>;
   }
 
   return <main className="personal-history">

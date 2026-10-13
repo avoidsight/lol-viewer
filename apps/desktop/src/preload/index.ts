@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { z } from 'zod';
+import { DIAGNOSTICS_EXPORT, LIVE_DIAGNOSTIC, diagnosticExportSchema, liveDiagnosticEventSchema, type Diagnostic } from '../shared/diagnostics';
 import { UPDATE_CANCEL, UPDATE_CHECK, UPDATE_DOWNLOAD, UPDATE_INSTALL, UPDATE_STATE, UPDATE_STATUS, updateDownloadSchema, updateSchema, versionSchema, type UpdateDownloadState } from '../shared/updates';
 import { ENEMY_HISTORY_COPIED_CHANNEL } from '../shared/enemy-history';
 import { DONATION_CONFIG_CHANNEL, DONATION_IMAGE_CHANNEL, donationConfigSchema, donationImageSchema } from '../shared/donation';
@@ -47,6 +48,14 @@ import {
 } from '../shared/ipc';
 
 const api: LolViewerApi = Object.freeze({
+  exportDiagnostics: async () => diagnosticExportSchema.parse(await ipcRenderer.invoke(DIAGNOSTICS_EXPORT)),
+  onLiveDiagnostic: (callback: (diagnostic: Diagnostic, generation: number) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, input: unknown) => {
+      const parsed = liveDiagnosticEventSchema.safeParse(input); if (parsed.success) callback(parsed.data.diagnostic, parsed.data.generation);
+    };
+    ipcRenderer.on(LIVE_DIAGNOSTIC, handler);
+    return () => { ipcRenderer.removeListener(LIVE_DIAGNOSTIC, handler); };
+  },
   checkUpdate: async () => updateSchema.nullable().parse(await ipcRenderer.invoke(UPDATE_CHECK)),
   downloadUpdate: async (version: string) => updateDownloadSchema.parse(await ipcRenderer.invoke(UPDATE_DOWNLOAD, versionSchema.parse(version))),
   installUpdate: async (version: string) => updateDownloadSchema.parse(await ipcRenderer.invoke(UPDATE_INSTALL, versionSchema.parse(version))),

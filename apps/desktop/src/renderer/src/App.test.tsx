@@ -38,6 +38,30 @@ function install(getLiveMatch: LolViewerApi['getLiveMatch'] = vi.fn().mockResolv
 afterEach(() => { delete window.lolViewer; });
 
 describe('App tab lifecycle', () => {
+  it('shows a safe reason and diagnostic ID on initial personal-history failure', async () => {
+    const { api } = install();
+    vi.mocked(api.getPersonalHistory).mockRejectedValue(new Error('Personal history is unavailable [HISTORY:SCHEMA] [DIAG:D-012345ABCDEF:SCHEMA]'));
+    render(<App />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('数据格式不兼容');
+    expect(screen.getByText(/D-012345ABCDEF/)).toBeVisible();
+  });
+  it('shows coordinator retry diagnostics then removes them on recovery', async () => {
+    const pending = deferred<LiveMatch>();
+    const { api } = install(vi.fn().mockReturnValue(pending.promise));
+    let onDiagnostic!: (value: { id: string; reason: 'SCHEMA' }, generation: number) => void;
+    const off = vi.fn();
+    api.onLiveDiagnostic = vi.fn(listener => { onDiagnostic = listener; return off; });
+    const { unmount } = render(<App initialTab="live" />);
+    await act(async () => onDiagnostic({ id: 'D-012345ABCDEF', reason: 'SCHEMA' }, 0));
+    expect(screen.queryByRole('alert')).toBeNull();
+    await act(async () => onDiagnostic({ id: 'D-012345ABCDEF', reason: 'SCHEMA' }, 1));
+    expect(screen.getByRole('alert')).toHaveTextContent('数据格式不兼容');
+    expect(screen.getByRole('alert')).toHaveTextContent('D-012345ABCDEF');
+    expect(api.getLiveMatch).toHaveBeenCalledOnce();
+    await act(async () => pending.resolve(match));
+    expect(screen.queryByRole('alert')).toBeNull();
+    unmount(); expect(off).toHaveBeenCalledOnce();
+  });
   it('bounds retries for unavailable players in the same game', async () => {
     vi.useFakeTimers();
     try {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { recordDiagnostic } from '../diagnostics/logger';
 import { isTransientHistoryError, safeHistoryError } from '../../shared/history-error';
 import type { FavoriteChampion, PersonalHistorySnapshot } from '../../shared/domain';
 import { formatRank } from '../../shared/rank';
@@ -266,6 +267,7 @@ export class PersonalHistoryService {
       }
       return snapshot;
     } catch (error) {
+      recordDiagnostic('history.load', error);
       try {
         const cached = playerId === undefined ? this.cache.getLatest() : this.cache.getLatest(playerId);
         if (cached && !forceRefresh) return cached;

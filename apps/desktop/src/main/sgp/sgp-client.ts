@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { compatibleGames } from '../lcu/history-compat';
 import type { LcuClient } from '../lcu/http-client';
+import { recordDiagnostic } from '../diagnostics/logger';
 
 const entitlementsSchema = z.object({ accessToken: z.string().min(1) });
 const leagueSessionTokenSchema = z.string().min(1);
@@ -64,7 +65,7 @@ export function createSgpClient(lcu: LcuClient, rsoPlatformId: string, request: 
   const baseUrl = tencentHosts[rsoPlatformId.toUpperCase()];
   if (!baseUrl) throw new Error(`Unsupported Tencent platform: ${rsoPlatformId}`);
 
-  return {
+  const client: SgpClient = {
     async getHistory(puuid, count) {
       const { accessToken } = entitlementsSchema.parse(
         await lcu.get('/entitlements/v1/token', entitlementsSchema)
@@ -149,4 +150,11 @@ export function createSgpClient(lcu: LcuClient, rsoPlatformId: string, request: 
         }] : []) };
     }
   };
+  const traced = async <T>(operation: 'sgp.history' | 'sgp.rank', load: () => Promise<T>): Promise<T> => {
+    const started = Date.now();
+    try { return await load(); }
+    catch (error) { recordDiagnostic(operation, error, { source: 'sgp', elapsedMs: Date.now() - started }); throw error; }
+  };
+  return { getHistory: (puuid, count) => traced('sgp.history', () => client.getHistory(puuid, count)),
+    getRankedStats: puuid => traced('sgp.rank', () => client.getRankedStats(puuid)) };
 }

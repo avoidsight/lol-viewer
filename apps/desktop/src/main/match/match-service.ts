@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { diagnosticPhase, recordDiagnostic } from '../diagnostics/logger';
+import type { Diagnostic } from '../../shared/diagnostics';
 import type { Lane, MatchSummary, PlayerDataErrorCode, PlayerSnapshot, QueueScope } from '../../shared/domain';
 import type { LiveMatch, LiveRoster } from '../../shared/ipc';
 import { formatRank } from '../../shared/rank';
@@ -259,6 +261,7 @@ export class MatchService {
       checkCancelled(signal);
       let matches: MatchSummary[] | null = cached?.matches ?? null;
       let historyErrorCode: PlayerDataErrorCode | undefined;
+      let diagnostic: Diagnostic | undefined;
       let rank = cached?.rank;
       if (!cached) {
         try {
@@ -299,6 +302,7 @@ export class MatchService {
         } catch (error) {
           checkCancelled(signal);
           matches = null;
+          diagnostic = recordDiagnostic('live.player', error, { source: historySource });
           historyErrorCode = classifyHistoryError(error, historySource);
         }
       }
@@ -324,6 +328,7 @@ export class MatchService {
         currentChampionWinRate: championMatches.length ? currentChampionWins / championMatches.length : 0,
         status: matches === null ? 'unavailable' : 'ready',
         ...(historyErrorCode === undefined ? {} : { errorCode: historyErrorCode }),
+        ...(diagnostic ? { diagnostic } : {}),
         ...(matches === null ? { error: 'Player history is unavailable' } : {})
       };
       if (player.status === 'ready' && !cached) {
@@ -353,6 +358,7 @@ export class MatchService {
     const gameflowSession = sessionSchema.parse(
       await this.client.get('/lol-gameflow/v1/session', sessionSchema)
     );
+    diagnosticPhase(gameflowSession.phase ?? 'unknown');
     checkCancelled(signal);
     let teamOne = gameflowSession.gameData.teamOne.map((participant) => ({ ...participant, teamId: participant.teamId ?? 100 }));
     let teamTwo = gameflowSession.gameData.teamTwo.map((participant) => ({ ...participant, teamId: participant.teamId ?? 200 }));

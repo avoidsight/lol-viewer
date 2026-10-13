@@ -3,6 +3,7 @@ import { clipboard, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import type { PersonalHistorySnapshot } from '../../shared/domain';
 import { PERSONAL_HISTORY_GET_CHANNEL, personalHistorySchema, personalHistoryTargetSchema, type PersonalHistoryTarget } from '../../shared/ipc';
 import { historyErrorDiagnostic, safeHistoryError } from '../../shared/history-error';
+import { recordDiagnostic } from '../diagnostics/logger';
 import { assertAuthorizedRenderer } from './authorization';
 import { PLAYER_SEARCH, PLAYER_SEARCH_CLIPBOARD, clipboardPlayerId, playerSearchInputSchema, playerSearchResultSchema, type PlayerSearchResult } from '../../shared/player-search';
 
@@ -32,6 +33,7 @@ export function registerHistoryIpc(service: PersonalHistoryLoader): void {
     const target = personalHistoryTargetSchema.optional().parse(input);
     try { return personalHistorySchema.parse(await (forceRefresh ? service.load(target, true) : service.load(target))); }
     catch (error) {
+      recordDiagnostic('history.load', error);
       // 只记录脱敏的原因码、来源与状态码，便于定位刷新失败；不记录响应体、路径或令牌。
       console.warn(`[history] 战绩读取失败：${historyErrorDiagnostic(error)}`);
       throw safeHistoryError(error);

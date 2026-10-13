@@ -126,6 +126,7 @@ export interface PlayerSnapshot {
   currentChampionWinRate: number;
   status: DataStatus;
   errorCode?: PlayerDataErrorCode;
+  diagnostic?: import('./diagnostics').Diagnostic;
   error?: string;
   updatedAt: number;
 }

@@ -3,6 +3,7 @@ import type { ClientRequest, IncomingMessage, RequestOptions } from 'node:http';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { createLcuClient, type HttpsRequest } from './http-client';
+import * as diagnostics from '../diagnostics/logger';
 
 const unknownSchema = z.unknown();
 
@@ -32,6 +33,21 @@ function requestDouble(
 }
 
 describe('createLcuClient', () => {
+  it('captures HTTP status, duration and schema failures without request identity or response values', async () => {
+    const log = vi.spyOn(diagnostics, 'recordDiagnostic');
+    try {
+      const transport = requestDouble({ statusCode: 200, body: '{"participants":[{"stats":{"kills":"private-value"}}]}' });
+      const client = createLcuClient({ port: 53122, password: 'secret', protocol: 'https' }, transport.request);
+      await expect(client.get('/lol-match-history/v1/products/lol/private-player/matches', z.object({ participants: z.array(z.object({ stats: z.object({ kills: z.number() }) })) }))).rejects.toThrow('schema');
+      expect(log).toHaveBeenCalledOnce();
+      const [operation, error, context] = log.mock.calls[0];
+      expect(operation).toBe('lcu.history');
+      expect(context).toMatchObject({ source: 'lcu', status: 200, elapsedMs: expect.any(Number) });
+      expect(diagnostics.safeIssues(context!.issues)).toEqual([{ path: 'participants.[].stats.kills', code: 'invalid_type', expected: 'number', received: 'string' }]);
+      expect(String(error)).not.toContain('private-value');
+      expect(JSON.stringify(context)).not.toContain('private-player');
+    } finally { log.mockRestore(); }
+  });
   it('posts a JSON payload and validates the response', async () => {
     const transport = requestDouble({ statusCode: 200, body: '[{"id":1}]' });
     const client = createLcuClient({ port: 53122, password: 'secret', protocol: 'https' }, transport.request);

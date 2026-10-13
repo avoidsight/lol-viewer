@@ -1,4 +1,5 @@
 import { ZodError } from 'zod';
+import { diagnosticFromError, diagnosticMarker } from './diagnostics';
 
 const reasons = {
   CONNECTION: '无法连接英雄联盟客户端，请确认已登录',
@@ -74,9 +75,10 @@ export function historyErrorDiagnostic(error: unknown): string {
 
 // Only a fixed reason code crosses Electron IPC; never expose raw responses or tokens.
 export function safeHistoryError(error: unknown): Error {
-  return Object.assign(new Error(`Personal history is unavailable [HISTORY:${historyErrorReason(error)}]`), { code: 'HISTORY_UNAVAILABLE' });
+  return Object.assign(new Error(`Personal history is unavailable [HISTORY:${historyErrorReason(error)}]${diagnosticMarker(diagnosticFromError(error))}`), { code: 'HISTORY_UNAVAILABLE' });
 }
 
 export function historyRefreshMessage(error: unknown): string {
-  return `刷新失败：${reasons[historyErrorReason(error)]}`;
+  const diagnostic = diagnosticFromError(error);
+  return `刷新失败：${reasons[historyErrorReason(error)]}${diagnostic ? `（${diagnostic.id}）` : ''}`;
 }

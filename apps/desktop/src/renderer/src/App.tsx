@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import type { PersonalHistorySnapshot } from '../../shared/domain';
 import type { AppSettings, LolViewerApi, PersonalHistoryTarget } from '../../shared/ipc';
 import { historyRefreshMessage } from '../../shared/history-error';
+import { diagnosticFromError, diagnosticLabels, type Diagnostic } from '../../shared/diagnostics';
 import AppShell, { type AppTab } from './AppShell';
 import { DonationControl } from './features/donation/DonationControl';
 import { UpdateControl } from './features/updates/UpdateControl';
@@ -21,6 +22,9 @@ const clientRetryDelayMs = 3_000;
 const inGamePollDelayMs = 15_000;
 
 function liveErrorReason(error: unknown): LiveMatchErrorReason {
+  const diagnostic = diagnosticFromError(error);
+  if (diagnostic?.reason === 'CONNECTION' || diagnostic?.reason === 'AUTH') return 'client-unavailable';
+  if (diagnostic?.reason === 'NOT_READY') return 'not-in-match';
   const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
   if (message.includes('league client') || message.includes('lcu is unavailable') || message.includes('lcu authentication')) return 'client-unavailable';
   if (message.includes('roster is incomplete') || message.includes('champ-select') || message.includes('not in game') || message.includes('no active')) return 'not-in-match';
@@ -51,6 +55,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   const [historyState, setHistoryState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const [historyRefreshing, setHistoryRefreshing] = useState(false);
   const [historyRefreshError, setHistoryRefreshError] = useState('');
+  const [historyDiagnostic, setHistoryDiagnostic] = useState<Diagnostic>();
   useEffect(() => {
     if (!historyRefreshError) return;
     const timer = window.setTimeout(() => setHistoryRefreshError(''), 8000);
@@ -88,8 +93,8 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     void request.then((snapshot) => {
       if (!active) return;
       if (!snapshot) { if (!history) setHistoryState('unavailable'); return; }
-      ownHistoryRef.current = snapshot; setHistory(snapshot); setHistoryState('ready');
-    }).catch(() => { if (active && !history) setHistoryState('unavailable'); }).finally(() => {
+      ownHistoryRef.current = snapshot; setHistory(snapshot); setHistoryState('ready'); setHistoryDiagnostic(undefined);
+    }).catch((error) => { if (active && !history) { setHistoryState('unavailable'); setHistoryDiagnostic(diagnosticFromError(error)); } }).finally(() => {
       if (historyRequest.current === request) historyRequest.current = undefined;
     });
     return () => { active = false; };
@@ -116,8 +121,9 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
       try {
         const snapshot = await window.lolViewer.getPersonalHistory();
         if (!active) return;
-        if (snapshot) { ownHistoryRef.current = snapshot; setHistory(snapshot); setHistoryState('ready'); return; }
-      } catch {
+        if (snapshot) { ownHistoryRef.current = snapshot; setHistory(snapshot); setHistoryState('ready'); setHistoryDiagnostic(undefined); return; }
+      } catch (error) {
+        if (active) setHistoryDiagnostic(diagnosticFromError(error));
         // The League client is still starting; retry shortly.
       }
       if (active) timer = window.setTimeout(() => void poll(), clientRetryDelayMs);
@@ -159,6 +165,9 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     if (!api) { dispatchLive({ type: 'request-failed', reason: 'client-unavailable' }); return; }
     const currentGeneration = ++generation.current;
     dispatchLive({ type: 'request-started' });
+    const offDiagnostic = api.onLiveDiagnostic?.((diagnostic, eventGeneration) => {
+      if (active && currentGeneration === generation.current && eventGeneration === currentGeneration) dispatchLive({ type: 'diagnostic-reported', diagnostic });
+    });
     const unsubscribe = api.onPlayerUpdated((player, eventGeneration = currentGeneration) => {
       if (!active || currentGeneration !== generation.current || eventGeneration !== currentGeneration || player.scope !== 'all') return;
       dispatchLive({ type: 'player-updated', player });
@@ -171,11 +180,12 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
       }
       dispatchLive({ type: 'request-succeeded', match: next });
     }).catch((error: unknown) => {
-      if (active && currentGeneration === generation.current) dispatchLive({ type: 'request-failed', reason: liveErrorReason(error) });
+      if (active && currentGeneration === generation.current) dispatchLive({ type: 'request-failed', reason: liveErrorReason(error), diagnostic: diagnosticFromError(error) });
     });
     return () => {
       active = false;
       unsubscribe();
+      offDiagnostic?.();
       void Promise.resolve(api.cancelLiveMatch?.()).catch(() => undefined);
     };
   }, [dispatchLive, page, retryNonce]);
@@ -249,7 +259,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
         if (active && pageRef.current === 'live' && !liveViewRef.current.match) {
           generation.current += 1;
           void Promise.resolve(window.lolViewer?.cancelLiveMatch?.()).catch(() => undefined);
-          dispatchLive({ type: 'request-failed', reason: liveErrorReason(error) });
+          dispatchLive({ type: 'request-failed', reason: liveErrorReason(error), diagnostic: diagnosticFromError(error) });
         }
       } finally {
         schedule(nextDelay);
@@ -311,6 +321,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
       if (!historyTarget) ownHistoryRef.current = snapshot;
       setHistory(snapshot);
       setHistoryState('ready');
+      setHistoryDiagnostic(undefined);
     } catch (error) {
       if (requestId === historyNavigation.current) setHistoryRefreshError(historyRefreshMessage(error));
     } finally {
@@ -326,15 +337,17 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     setHistoryTarget(target);
     setHistory(undefined);
     setHistoryRefreshError('');
+    setHistoryDiagnostic(undefined);
     setHistoryState('loading');
     try {
       const snapshot = await api.getPersonalHistory(target);
       if (requestId !== historyNavigation.current) return;
       setHistory(snapshot);
       setHistoryState('ready');
-    } catch {
+    } catch (error) {
       if (requestId !== historyNavigation.current) return;
       setHistoryState('unavailable');
+      setHistoryDiagnostic(diagnosticFromError(error));
     }
   };
   const returnToOwnHistory = (): void => {
@@ -343,6 +356,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     setHistory(ownHistoryRef.current);
     setHistoryState(ownHistoryRef.current ? 'ready' : 'loading');
     setHistoryRefreshError('');
+    setHistoryDiagnostic(undefined);
   };
   const clearCache = async () => { setMessage('正在清理缓存…'); try { await window.lolViewer?.clearCache(); setMessage('缓存已清理'); } catch { setMessage('清理失败，请重试'); } };
   const updateAutoAcceptSetting = async (autoAcceptReadyCheck: boolean) => {
@@ -375,6 +389,8 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   };
   const liveNotice = liveView.status === 'disconnected'
       ? <LiveStateNotice kind="waiting" title="未连接英雄联盟客户端" detail="请先启动并登录英雄联盟客户端。" />
+      : liveView.diagnostic && !liveView.match
+      ? <LiveStateNotice kind="error" alert title={diagnosticLabels[liveView.diagnostic.reason]} detail={`${liveView.diagnostic.id} · 正在重试，可在设置中导出日志。`} />
       : liveView.status === 'loading' && !liveView.match && liveView.progress.length === 0
       ? <LiveStateNotice kind="loading" title={liveView.phase && activePhases.has(liveView.phase) ? '正在读取对局阵容' : '正在检测客户端与对局状态'} />
       : liveView.status === 'error'
@@ -386,7 +402,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
         : null;
 
   const content = <>
-    <div hidden={page !== 'history'}><PersonalHistoryPage snapshot={history} state={historyState} onRefresh={() => void refreshHistory()} onPlayerSelect={(target) => void viewPlayerHistory(target)} onBack={historyTarget ? returnToOwnHistory : undefined} refreshing={historyRefreshing} /></div>
+    <div hidden={page !== 'history'}><PersonalHistoryPage snapshot={history} state={historyState} diagnostic={historyDiagnostic} onRefresh={() => void refreshHistory()} onPlayerSelect={(target) => void viewPlayerHistory(target)} onBack={historyTarget ? returnToOwnHistory : undefined} refreshing={historyRefreshing} /></div>
     <div hidden={page !== 'live'}><LiveMatchPage onPlayerSelect={target => void viewPlayerHistory(target)} match={liveView.match} players={liveView.match ? undefined : liveView.progress} loadingProgress={liveView.requesting && !liveView.match && (liveView.progress.length > 0 || (liveView.phase !== undefined && activePhases.has(liveView.phase))) ? liveView.progress.length : undefined} lifecycleStatus={liveView.status} gameflowPhase={liveView.phase} showLaneDifferences={settings.showLaneDifferences} notice={liveNotice} /></div>
     {page === 'champions' && <ChampionLibraryPage getCatalog={getChampionCatalog} getDetails={getChampionDetails} getGuide={getChampionGuide} />}
     {page === 'settings' && <SettingsPage onGameTextInputChange={(checked) => void updateGameTextInputSetting(checked)} settings={settings} message={message} onAutoCopyEnemyHistoryChange={(checked) => void updateAutoCopySetting(checked)} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onClearCache={() => void clearCache()} />}

@@ -3,6 +3,7 @@ import type { PlayerSnapshot } from '../../../../shared/domain';
 import type { PersonalHistoryTarget } from '../../../../shared/ipc';
 import { localizeRank } from '../../../../shared/rank';
 import { isRankedQueue } from '../../../../shared/queue';
+import { diagnosticLabels } from '../../../../shared/diagnostics';
 import bottomLaneIcon from '../../assets/positions/position-bottom-light.svg';
 import jungleLaneIcon from '../../assets/positions/position-jungle-light.svg';
 import middleLaneIcon from '../../assets/positions/position-middle-light.svg';
@@ -71,7 +72,7 @@ export default function PlayerCard({ player, onPlayerSelect, overview = false, g
     {player.status === 'loading'
       ? <HistorySkeleton overview={overview} />
       : player.status === 'unavailable'
-        ? <div className="player-card__state player-card__state--private" role="status" aria-label={groupedError ? '战绩暂不可用' : undefined}><span className="player-card__empty-icon" aria-hidden="true">—</span>{!groupedError && <span>{player.errorCode ? unavailableLabels[player.errorCode] : '战绩暂时无法读取'}</span>}</div>
+        ? <div className="player-card__state player-card__state--private" role="status" aria-label={groupedError ? '战绩暂不可用' : undefined}><span className="player-card__empty-icon" aria-hidden="true">—</span>{player.diagnostic ? <><span>{diagnosticLabels[player.diagnostic.reason]}</span><small title="可在设置中导出诊断日志">{player.diagnostic.id}</small></> : !groupedError && <span>{player.errorCode ? unavailableLabels[player.errorCode] : '战绩暂时无法读取'}</span>}</div>
         : <>
           <ol className="player-card__matches" tabIndex={!overview && visibleMatches.length > 4 ? 0 : undefined} aria-label={`${player.displayName}${historyScope === 'ranked' ? '最近排位对局' : '最近对局'}`}>{visibleMatches.map((match) => <RecentMatch key={match.matchId} compact={overview} match={match} assetVersion={player.assetVersion} itemIconPaths={player.itemIconPaths} />)}</ol>
         </>}

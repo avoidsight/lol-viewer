@@ -3,6 +3,7 @@ import type { RequestOptions } from 'node:https';
 import type { ClientRequest, IncomingMessage } from 'node:http';
 import type { z } from 'zod';
 import { invalidateLcuConnection, type LcuConnection } from './discovery';
+import { lcuOperation, recordDiagnostic } from '../diagnostics/logger';
 
 export interface LcuError extends Error {
   code: 'LCU_UNAVAILABLE' | 'LCU_AUTH' | 'LCU_INVALID_RESPONSE' | 'LCU_RESPONSE_TOO_LARGE';
@@ -43,6 +44,12 @@ export function createLcuClient(
     }
 
     return new Promise((resolve, reject) => {
+        const started = Date.now();
+        let status: number | undefined;
+        const fail = (error: LcuError, issues?: unknown) => {
+          recordDiagnostic(lcuOperation(path), error, { source: 'lcu', status, elapsedMs: Date.now() - started, issues });
+          reject(error);
+        };
         let settled = false;
         const finish = (action: () => void): void => {
           if (settled) return;
@@ -66,6 +73,7 @@ export function createLcuClient(
             }
           },
           (response) => {
+            status = response.statusCode;
             const chunks: Buffer[] = [];
             let receivedBytes = 0;
             response.on('data', (chunk: Buffer | string) => {
@@ -73,22 +81,22 @@ export function createLcuClient(
               receivedBytes += buffer.length;
               if (receivedBytes > maxResponseBytes) {
                 response.destroy?.();
-                finish(() => reject(lcuError('LCU_RESPONSE_TOO_LARGE', 'LCU response exceeded the size limit')));
+                finish(() => fail(lcuError('LCU_RESPONSE_TOO_LARGE', 'LCU response exceeded the size limit')));
                 return;
               }
               chunks.push(buffer);
             });
             response.on('error', () =>
-              finish(() => reject(lcuError('LCU_INVALID_RESPONSE', 'LCU response could not be read')))
+              finish(() => fail(lcuError('LCU_INVALID_RESPONSE', 'LCU response could not be read')))
             );
             response.on('end', () => {
               if (response.statusCode === 401 || response.statusCode === 403) {
                 invalidateLcuConnection(connection);
-                finish(() => reject(lcuError('LCU_AUTH', 'LCU authentication failed')));
+                finish(() => fail(lcuError('LCU_AUTH', 'LCU authentication failed')));
                 return;
               }
               if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
-                finish(() => reject(lcuError(
+                finish(() => fail(lcuError(
                   'LCU_INVALID_RESPONSE',
                   `LCU returned an unexpected status${response.statusCode ? ` (${response.statusCode})` : ''}`
                 )));
@@ -104,13 +112,13 @@ export function createLcuClient(
                 const result = schema.safeParse(value);
                 if (!result.success) {
                   finish(() =>
-                    reject(lcuError('LCU_INVALID_RESPONSE', 'LCU response did not match its schema'))
+                    fail(lcuError('LCU_INVALID_RESPONSE', 'LCU response did not match its schema'), result.error)
                   );
                   return;
                 }
                 finish(() => resolve(result.data));
               } catch {
-                finish(() => reject(lcuError('LCU_INVALID_RESPONSE', 'LCU returned invalid JSON')));
+                finish(() => fail(lcuError('LCU_INVALID_RESPONSE', 'LCU returned invalid JSON')));
               }
             });
           }
@@ -119,11 +127,11 @@ export function createLcuClient(
         req.on('timeout', () => {
           req.destroy();
           invalidateLcuConnection(connection);
-          finish(() => reject(lcuError('LCU_UNAVAILABLE', 'LCU request timed out')));
+          finish(() => fail(lcuError('LCU_UNAVAILABLE', 'LCU request timed out')));
         });
         req.on('error', () => {
           invalidateLcuConnection(connection);
-          finish(() => reject(lcuError('LCU_UNAVAILABLE', 'LCU is unavailable')));
+          finish(() => fail(lcuError('LCU_UNAVAILABLE', 'LCU is unavailable')));
         });
         req.end(json);
       });

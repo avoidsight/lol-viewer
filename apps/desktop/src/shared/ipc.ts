@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { diagnosticSchema } from './diagnostics';
 import type { PersonalHistorySnapshot, PlayerSnapshot, QueueScope } from './domain';
 
 export const MATCH_GET_CHANNEL = 'match:get-live' as const;
@@ -143,6 +144,7 @@ export const playerSnapshotSchema: z.ZodType<PlayerSnapshot> = z.object({
   currentChampionWinRate: z.number(),
   status: z.enum(['loading', 'ready', 'unavailable']),
   errorCode: z.enum(['PRIVACY_RESTRICTED', 'CLIENT_UNAVAILABLE', 'DATA_SERVICE_UNAVAILABLE', 'INVALID_RESPONSE', 'UNKNOWN']).optional(),
+  diagnostic: diagnosticSchema.optional(),
   error: z.string().optional(),
   updatedAt: z.number()
 }).strict();
@@ -228,6 +230,8 @@ export type LiveRosterPlayer = z.infer<typeof liveRosterPlayerSchema>;
 export type LiveRoster = z.infer<typeof liveRosterSchema>;
 
 export interface LolViewerApi {
+  exportDiagnostics?: () => Promise<import('./diagnostics').DiagnosticExportResult>;
+  onLiveDiagnostic?: (callback: (diagnostic: import('./diagnostics').Diagnostic, generation: number) => void) => () => void;
   checkUpdate?: () => Promise<import('./updates').AvailableUpdate | null>;
   downloadUpdate?: (version: string) => Promise<import('./updates').UpdateDownloadState>;
   cancelUpdateDownload?: () => Promise<import('./updates').UpdateDownloadState>;

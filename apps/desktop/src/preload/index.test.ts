@@ -32,6 +32,22 @@ async function loadApi(): Promise<LolViewerApi> {
 describe('preload match API validation', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('exports diagnostics through a fixed channel and only forwards validated error IDs', async () => {
+    const api = await loadApi();
+    electron.invoke.mockResolvedValue({ status: 'saved' });
+    await expect(api.exportDiagnostics!()).resolves.toEqual({ status: 'saved' });
+    expect(electron.invoke).toHaveBeenLastCalledWith('diagnostics:export');
+    electron.invoke.mockResolvedValue({ status: 'saved', path: '/private' });
+    await expect(api.exportDiagnostics!()).rejects.toThrow();
+    const listener = vi.fn(); const off = api.onLiveDiagnostic!(listener);
+    const handler = electron.on.mock.calls.at(-1)![1];
+    const diagnostic = { id: 'D-012345ABCDEF', reason: 'SCHEMA' };
+    handler({}, { generation: 7, diagnostic: { ...diagnostic, body: 'private' } });
+    expect(listener).not.toHaveBeenCalled();
+    handler({}, { generation: 7, diagnostic }); expect(listener).toHaveBeenCalledExactlyOnceWith(diagnostic, 7);
+    off(); expect(electron.removeListener).toHaveBeenCalledWith('diagnostics:live-error', handler);
+  });
+
   it('validates update commands and progress, removes listeners, exposes no browser fallback', async () => {
     const api = await loadApi();
     await expect(api.downloadUpdate!('https://evil.test/a.exe')).rejects.toThrow();

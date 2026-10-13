@@ -56,6 +56,16 @@ const fixtureLiveMatch: LiveMatch = {
 };
 
 describe('LiveMatchPage', () => {
+  it('keeps diagnostic IDs visible even when team failures are grouped', () => {
+    const diagnostic = { id: 'D-012345ABCDEF', reason: 'TIMEOUT' } as const;
+    render(<LiveMatchPage match={{ ...fixtureLiveMatch, players: fixtureLiveMatch.players.map(entry => ({ ...entry,
+      status: 'unavailable', matches: [], errorCode: 'DATA_SERVICE_UNAVAILABLE', diagnostic })) }} />);
+    for (const view of ['详细', '总览']) {
+      fireEvent.click(screen.getByRole('button', { name: view }));
+      expect(screen.getAllByText('请求超时')).toHaveLength(10);
+      expect(screen.getAllByText('D-012345ABCDEF')).toHaveLength(10);
+    }
+  });
   it('opens player histories from names in both views, excluding anonymous identities', () => {
     const select = vi.fn();
     render(<LiveMatchPage match={fixtureLiveMatch} onPlayerSelect={select} />);

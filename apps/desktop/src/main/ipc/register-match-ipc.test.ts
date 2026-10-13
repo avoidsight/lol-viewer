@@ -6,11 +6,14 @@ vi.mock('electron', () => ({ ipcMain: { handle }, BrowserWindow: { getAllWindows
 import { GAMEFLOW_PHASE_GET_CHANNEL, GAMEFLOW_SESSION_GET_CHANNEL, MATCH_GET_CHANNEL, MATCH_ROSTER_GET_CHANNEL, PLAYER_UPDATED_CHANNEL } from '../../shared/ipc';
 import { registerMatchIpc } from './register-match-ipc';
 import { createFixtureLiveMatch } from '../fixtures/live-match';
+import { LIVE_DIAGNOSTIC } from '../../shared/diagnostics';
 
 describe('registerMatchIpc', () => {
   it('validates scope before calling the service and streams updates to the sender', async () => {
-    const loadLiveMatch = vi.fn(async (_scope, onPlayer) => {
+    const diagnostic = { id: 'D-012345ABCDEF', reason: 'SCHEMA' } as const;
+    const loadLiveMatch = vi.fn(async (_scope, onPlayer, onError) => {
       onPlayer(createFixtureLiveMatch('all').players[0]);
+      onError(diagnostic);
       return createFixtureLiveMatch('all');
     });
     const send = vi.fn();
@@ -37,5 +40,6 @@ describe('registerMatchIpc', () => {
     await expect(handler({ sender }, { scope: 'all', generation: 7 })).resolves.toEqual(createFixtureLiveMatch('all'));
     expect(loadLiveMatch).toHaveBeenCalledOnce();
     expect(send).toHaveBeenCalledWith(PLAYER_UPDATED_CHANNEL, { generation: 7, player: createFixtureLiveMatch('all').players[0] });
+    expect(send).toHaveBeenCalledWith(LIVE_DIAGNOSTIC, { generation: 7, diagnostic });
   });
 });

@@ -1,5 +1,6 @@
 import type { PlayerSnapshot } from '../../../../shared/domain';
 import type { LiveMatch, LiveRoster } from '../../../../shared/ipc';
+import type { Diagnostic } from '../../../../shared/diagnostics';
 
 export type LiveMatchStatus =
   | 'waiting'
@@ -19,6 +20,7 @@ export interface LiveMatchViewState {
   requesting: boolean;
   phase?: string;
   errorReason?: LiveMatchErrorReason;
+  diagnostic?: Diagnostic;
 }
 
 export type LiveMatchAction =
@@ -26,7 +28,8 @@ export type LiveMatchAction =
   | { type: 'player-updated'; player: PlayerSnapshot }
   | { type: 'request-succeeded'; match: LiveMatch }
   | { type: 'roster-refreshed'; roster: LiveRoster }
-  | { type: 'request-failed'; reason?: LiveMatchErrorReason }
+  | { type: 'request-failed'; reason?: LiveMatchErrorReason; diagnostic?: Diagnostic }
+  | { type: 'diagnostic-reported'; diagnostic: Diagnostic }
   | { type: 'phase-observed'; phase: string; active: boolean; connected?: boolean }
   | { type: 'enrichment-paused'; phase: string }
   | { type: 'new-match-detected'; phase: string };
@@ -77,7 +80,8 @@ export function liveMatchReducer(
             status: state.status === 'new-match-loading' ? 'new-match-loading' : 'loading',
             progress: [],
             requesting: true,
-            errorReason: undefined
+            errorReason: undefined,
+            diagnostic: undefined
           };
     case 'player-updated':
       return {
@@ -95,7 +99,8 @@ export function liveMatchReducer(
         progress: [],
         requesting: false,
         ...(state.phase ? { phase: state.phase } : {}),
-        errorReason: undefined
+        errorReason: undefined,
+        diagnostic: undefined
       };
     case 'roster-refreshed':
       return state.match
@@ -104,7 +109,9 @@ export function liveMatchReducer(
     case 'request-failed':
       return state.match
         ? { ...state, requesting: false }
-        : { ...state, status: 'error', requesting: false, errorReason: action.reason ?? 'data-unavailable' };
+        : { ...state, status: 'error', requesting: false, errorReason: action.reason ?? 'data-unavailable', diagnostic: action.diagnostic };
+    case 'diagnostic-reported':
+      return state.requesting && !state.match ? { ...state, diagnostic: action.diagnostic } : state;
     case 'phase-observed':
       if (!action.active && !state.match) return {
         status: action.connected === false ? 'disconnected' : 'waiting',

@@ -16,3 +16,5 @@
 @media (prefers-reduced-motion: reduce) { .settings-switch__track, .settings-switch__track i { transition: none; } }
 .settings-page__version { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:28px; color:#8291a6; font-size:12px; }
 .settings-page__version span { color:#aebdce; font-variant-numeric:tabular-nums; }
+.settings-row button { flex-shrink:0; }
+.settings-row button:disabled { opacity:.55; cursor:wait; }

@@ -11,6 +11,8 @@ import { FeedbackService, feedbackEndpoint } from './feedback/feedback-service';
 import Database from 'better-sqlite3';
 import { app, BrowserWindow, protocol, powerMonitor, clipboard, shell, globalShortcut, Notification } from 'electron';
 import { UpdateService } from './updates/service';
+import { DiagnosticLogger, setDiagnosticLogger } from './diagnostics/logger';
+import { registerDiagnosticsIpc } from './ipc/register-diagnostics-ipc';
 import { registerUpdateIpc } from './ipc/register-update-ipc';
 import { EnemyHistoryClipboard } from './match/enemy-history-clipboard';
 import { ENEMY_HISTORY_COPIED_CHANNEL } from '../shared/enemy-history';
@@ -92,6 +94,11 @@ function createWindow(): void {
 
 void app.whenReady().then(() => {
   const fixtureMode = fixtureModeEnabled(process.argv, app.isPackaged, process.env);
+  const diagnostics = new DiagnosticLogger(join(app.getPath('userData'), 'diagnostics'), {
+    version: app.getVersion(), platform: process.platform, osVersion: release(), arch: process.arch
+  });
+  setDiagnosticLogger(diagnostics);
+  registerDiagnosticsIpc(diagnostics);
   registerDonationIpc(new DonationService(app.isPackaged && !fixtureMode));
   updateService = new UpdateService(app.isPackaged && !fixtureMode, app.getVersion(), {
     root: join(app.getPath('temp'), 'lol-viewer-updates'), platform: process.platform,
@@ -244,7 +251,7 @@ void app.whenReady().then(() => {
       return match;
   });
   registerMatchIpc({
-    loadLiveMatch: (scope, onPlayer) => coordinator!.loadLiveMatch(scope, onPlayer),
+    loadLiveMatch: (scope, onPlayer, onError) => coordinator!.loadLiveMatch(scope, onPlayer, onError),
     getLiveRoster: async () => {
       if (aramFixtureMode) return rosterFromMatch(createFixtureAramLiveMatch('all'));
       if (fixtureMode) return rosterFromMatch(createFixtureLiveMatch('all'));

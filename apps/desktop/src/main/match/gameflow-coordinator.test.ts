@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { GameflowCoordinator } from './gameflow-coordinator';
+import { setDiagnosticLogger, type DiagnosticLogger } from '../diagnostics/logger';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -9,6 +10,20 @@ function deferred<T>() {
 }
 
 describe('GameflowCoordinator', () => {
+  it('reports failures while retrying and continues if a renderer disappears', async () => {
+    const diagnostic = { id: 'D-012345ABCDEF', reason: 'SCHEMA' } as const;
+    setDiagnosticLogger({ error: () => diagnostic } as unknown as DiagnosticLogger);
+    vi.useFakeTimers();
+    const match = { players: [], queueId: 420, modeName: '单双排', positionOrderReliable: true };
+    const observer = vi.fn(() => { throw new Error('Window closed'); });
+    const coordinator = new GameflowCoordinator(vi.fn().mockRejectedValueOnce(new Error('schema')).mockResolvedValue(match), { intervalMs: 1000 });
+    try {
+      const pending = coordinator.loadLiveMatch('all', () => {}, observer);
+      await vi.advanceTimersByTimeAsync(1000);
+      await expect(pending).resolves.toEqual(match);
+      expect(observer).toHaveBeenCalledExactlyOnceWith(diagnostic);
+    } finally { coordinator.dispose(); setDiagnosticLogger(); vi.useRealTimers(); }
+  });
   it('drops late player events from cancelled generations while forwarding the replacement generation', async () => {
     const attempts: Array<{ onPlayer: (player: any) => void; signal: AbortSignal; result: ReturnType<typeof deferred<any>> }> = [];
     const coordinator = new GameflowCoordinator((_scope, onPlayer, signal) => {

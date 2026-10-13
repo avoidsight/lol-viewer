@@ -1,5 +1,7 @@
 import type { PlayerSnapshot, QueueScope } from '../../shared/domain';
 import type { LiveMatch } from '../../shared/ipc';
+import type { Diagnostic } from '../../shared/diagnostics';
+import { recordDiagnostic } from '../diagnostics/logger';
 
 type Load = (scope: QueueScope, onPlayer: (player: PlayerSnapshot) => void, signal: AbortSignal) => Promise<LiveMatch>;
 
@@ -22,7 +24,7 @@ export class GameflowCoordinator {
     this.intervalMs = options.intervalMs ?? 2_000;
   }
 
-  async loadLiveMatch(scope: QueueScope, onPlayer: (player: PlayerSnapshot) => void): Promise<LiveMatch> {
+  async loadLiveMatch(scope: QueueScope, onPlayer: (player: PlayerSnapshot) => void, onError?: (diagnostic: Diagnostic) => void): Promise<LiveMatch> {
     this.cancelActive();
     const generation = ++this.generation;
     const controller = new AbortController();
@@ -40,13 +42,17 @@ export class GameflowCoordinator {
           return await Promise.race([this.attempt(scope, guardedOnPlayer, controller.signal), cancellation]);
         } catch (error) {
           if ((error as Partial<MatchCancelledError>)?.code === 'MATCH_CANCELLED') throw error;
-        if (this.retryRequested) { this.retryRequested = false; continue; }
-        const backoff = new Promise<void>((resolve) => {
-          this.wake = resolve;
-          this.timer = setTimeout(resolve, this.intervalMs);
-        });
-        await Promise.race([backoff, cancellation]);
-        this.clearWait();
+          const diagnostic = recordDiagnostic('live.load', error);
+          if (diagnostic && !this.disposed && generation === this.generation) {
+            try { onError?.(diagnostic); } catch { /* A closed window must not stop retries. */ }
+          }
+          if (this.retryRequested) { this.retryRequested = false; continue; }
+          const backoff = new Promise<void>((resolve) => {
+            this.wake = resolve;
+            this.timer = setTimeout(resolve, this.intervalMs);
+          });
+          await Promise.race([backoff, cancellation]);
+          this.clearWait();
         }
       }
       throw cancelled();
