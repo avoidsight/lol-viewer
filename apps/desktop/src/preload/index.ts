@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { z } from 'zod';
-import { UPDATE_CHECK, UPDATE_OPEN, updateSchema, versionSchema } from '../shared/updates';
+import { UPDATE_CANCEL, UPDATE_CHECK, UPDATE_DOWNLOAD, UPDATE_INSTALL, UPDATE_STATE, UPDATE_STATUS, updateDownloadSchema, updateSchema, versionSchema, type UpdateDownloadState } from '../shared/updates';
 import { ENEMY_HISTORY_COPIED_CHANNEL } from '../shared/enemy-history';
 import { DONATION_CONFIG_CHANNEL, DONATION_IMAGE_CHANNEL, donationConfigSchema, donationImageSchema } from '../shared/donation';
 import { FEEDBACK_CONTEXT_CHANNEL, FEEDBACK_SUBMIT_CHANNEL, feedbackContextSchema, feedbackInputSchema, feedbackResultSchema, type FeedbackInput } from '../shared/feedback';
@@ -48,7 +48,18 @@ import {
 
 const api: LolViewerApi = Object.freeze({
   checkUpdate: async () => updateSchema.nullable().parse(await ipcRenderer.invoke(UPDATE_CHECK)),
-  openUpdate: async (version: string) => z.boolean().parse(await ipcRenderer.invoke(UPDATE_OPEN, versionSchema.parse(version))),
+  downloadUpdate: async (version: string) => updateDownloadSchema.parse(await ipcRenderer.invoke(UPDATE_DOWNLOAD, versionSchema.parse(version))),
+  installUpdate: async (version: string) => updateDownloadSchema.parse(await ipcRenderer.invoke(UPDATE_INSTALL, versionSchema.parse(version))),
+  cancelUpdateDownload: async () => updateDownloadSchema.parse(await ipcRenderer.invoke(UPDATE_CANCEL)),
+  getUpdateDownloadState: async () => updateDownloadSchema.parse(await ipcRenderer.invoke(UPDATE_STATUS)),
+  onUpdateDownloadState: (callback: (state: UpdateDownloadState) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, input: unknown) => {
+      const state = updateDownloadSchema.safeParse(input);
+      if (state.success) callback(state.data);
+    };
+    ipcRenderer.on(UPDATE_STATE, handler);
+    return () => { ipcRenderer.removeListener(UPDATE_STATE, handler); };
+  },
   onEnemyHistoryCopied: (callback: () => void) => {
     const listener = () => callback();
     ipcRenderer.on(ENEMY_HISTORY_COPIED_CHANNEL, listener);

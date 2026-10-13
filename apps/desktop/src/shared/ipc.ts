@@ -229,7 +229,11 @@ export type LiveRoster = z.infer<typeof liveRosterSchema>;
 
 export interface LolViewerApi {
   checkUpdate?: () => Promise<import('./updates').AvailableUpdate | null>;
-  openUpdate?: (version: string) => Promise<boolean>;
+  downloadUpdate?: (version: string) => Promise<import('./updates').UpdateDownloadState>;
+  cancelUpdateDownload?: () => Promise<import('./updates').UpdateDownloadState>;
+  installUpdate?: (version: string) => Promise<import('./updates').UpdateDownloadState>;
+  getUpdateDownloadState?: () => Promise<import('./updates').UpdateDownloadState>;
+  onUpdateDownloadState?: (callback: (state: import('./updates').UpdateDownloadState) => void) => () => void;
   onEnemyHistoryCopied?: (callback: () => void) => () => void;
   getDonationConfig?: () => Promise<import('./donation').DonationConfig>;
   getDonationImage?: () => Promise<string | null>;

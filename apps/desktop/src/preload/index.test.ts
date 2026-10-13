@@ -32,6 +32,23 @@ async function loadApi(): Promise<LolViewerApi> {
 describe('preload match API validation', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('validates update commands and progress, removes listeners, exposes no browser fallback', async () => {
+    const api = await loadApi();
+    await expect(api.downloadUpdate!('https://evil.test/a.exe')).rejects.toThrow();
+    expect(electron.invoke).not.toHaveBeenCalled();
+    const state = { phase: 'ready', version: '1.1.0', receivedBytes: 10, totalBytes: 10 };
+    electron.invoke.mockResolvedValue(state);
+    expect(await api.downloadUpdate!('1.1.0')).toEqual(state);
+    expect(electron.invoke).toHaveBeenLastCalledWith('updates:download', '1.1.0');
+    await api.installUpdate!('1.1.0'); expect(electron.invoke).toHaveBeenLastCalledWith('updates:install', '1.1.0');
+    const listener = vi.fn(); const off = api.onUpdateDownloadState!(listener);
+    const handler = electron.on.mock.calls.at(-1)![1];
+    handler({}, { ...state, path: '/evil' }); expect(listener).not.toHaveBeenCalled();
+    handler({}, state); expect(listener).toHaveBeenCalledWith(state);
+    off(); expect(electron.removeListener).toHaveBeenCalledWith('updates:state', handler);
+    expect(api).not.toHaveProperty('openUpdate');
+  });
+
   it('rejects an invalid invoke result before returning it to the consumer', async () => {
     electron.invoke.mockResolvedValue({ players: [{ playerId: 'missing-fields' }] });
     const api = await loadApi();

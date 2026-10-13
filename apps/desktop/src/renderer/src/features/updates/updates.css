@@ -13,4 +13,11 @@
 .update-dialog .update-dialog__ignore { margin-right:auto; padding-left:0; border-color:transparent; background:transparent; color:#9cadbe; font-size:12px; }
 .update-dialog button:disabled { opacity:.5; cursor:wait; }
 .update-dialog__error { color:#ffb5b5; font-size:12px; }
+.update-download { margin-top:20px; padding:16px; border:1px solid #2e465a; border-radius:10px; background:#142738; }
+.update-download__label { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:13px; }
+.update-download__label strong { color:#99e4ff; font-variant-numeric:tabular-nums; }
+.update-download progress { display:block; width:100%; height:6px; margin:12px 0 8px; border:0; border-radius:6px; overflow:hidden; background:#233f51; }
+.update-download progress::-webkit-progress-bar { background:#233f51; }
+.update-download progress::-webkit-progress-value { background:#77d6f4; border-radius:6px; }
+.update-download__size { font-size:11px; color:#9bafc1; font-variant-numeric:tabular-nums; text-align:right; }
 .update-trigger:focus-visible,.update-dialog button:focus-visible { outline:2px solid #8bdefa; outline-offset:3px; }

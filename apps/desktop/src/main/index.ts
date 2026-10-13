@@ -51,6 +51,7 @@ let database: Database.Database | undefined;
 let coordinator: GameflowCoordinator | undefined;
 let readyCheckAutoAcceptor: ReadyCheckAutoAcceptor | undefined;
 let usageReporter: UsageReporter | undefined;
+let updateService: UpdateService | undefined;
 
 function rosterFromMatch(match: LiveMatch): LiveRoster {
   return {
@@ -92,7 +93,11 @@ function createWindow(): void {
 void app.whenReady().then(() => {
   const fixtureMode = fixtureModeEnabled(process.argv, app.isPackaged, process.env);
   registerDonationIpc(new DonationService(app.isPackaged && !fixtureMode));
-  registerUpdateIpc(new UpdateService(app.isPackaged && !fixtureMode, app.getVersion(), url => shell.openExternal(url)));
+  updateService = new UpdateService(app.isPackaged && !fixtureMode, app.getVersion(), {
+    root: join(app.getPath('temp'), 'lol-viewer-updates'), platform: process.platform,
+    launch: path => shell.openPath(path), quit: () => app.quit()
+  });
+  registerUpdateIpc(updateService);
   const aramFixtureMode = fixtureMode && process.argv.includes('--fixture-aram');
   registerLcuAssetProtocol(join(app.getPath('userData'), 'asset-cache'), fixtureMode);
   database = new Database(join(app.getPath('userData'), 'lol-viewer.sqlite3'));
@@ -282,6 +287,7 @@ void app.whenReady().then(() => {
 });
 
 app.on('before-quit', () => {
+  updateService?.dispose();
   globalShortcut.unregister(GAME_INPUT_SHORTCUT);
   gameInput?.dispose();
   gameInput = undefined;

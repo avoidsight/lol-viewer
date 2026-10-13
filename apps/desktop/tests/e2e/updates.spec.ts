@@ -2,7 +2,7 @@ import { _electron as electron, expect, test } from '@playwright/test';
 import { join } from 'node:path';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-test('important update button is passive, offers notes, download, cancel and per-version ignore', async () => {
+test('in-app updates show progress, cancel/retry, defer installation and never open a browser', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'lol-updates-'));
   const app = await electron.launch({ args: [join(process.cwd(), 'out/main/index.js'), '--fixture-live-match', `--user-data-dir=${dir}`], env: { ...process.env, PLAYWRIGHT_TEST: '1' } });
   try {
@@ -13,11 +13,30 @@ test('important update button is passive, offers notes, download, cancel and per
     await page.screenshot({ path: '/private/tmp/lol-settings-version.png' });
     await page.getByRole('tab', { name: '战绩', exact: true }).click();
     await expect(page.getByRole('button', { name: '新版本' })).toHaveCount(0);
-    await app.evaluate(({ ipcMain }) => {
-      (globalThis as any).updateVersion = '1.1.0'; (globalThis as any).downloads = [];
-      ipcMain.removeHandler('updates:check'); ipcMain.removeHandler('updates:open');
-      ipcMain.handle('updates:check', () => ({ version: (globalThis as any).updateVersion, important: true, notes: '优化对战总览标签展示\n新增 MVP / SVP 综合表现评级\n修复部分情况下的战绩加载问题' }));
-      ipcMain.handle('updates:open', (_event, version) => { (globalThis as any).downloads.push(version); return true; });
+    await app.evaluate(({ ipcMain, BrowserWindow, shell }) => {
+      const state = globalThis as any;
+      state.updateVersion = '1.1.0'; state.downloads = []; state.installs = []; state.external = [];
+      shell.openExternal = async url => { state.external.push(url); };
+      state.updateDownload = { phase: 'idle', receivedBytes: 0, totalBytes: 0 };
+      state.sendUpdate = (value: unknown) => {
+        state.updateDownload = value;
+        BrowserWindow.getAllWindows()[0].webContents.send('updates:state', value);
+      };
+      for (const channel of ['check', 'status', 'download', 'cancel', 'install']) ipcMain.removeHandler(`updates:${channel}`);
+      ipcMain.handle('updates:check', () => ({ version: state.updateVersion, important: true, notes: '支持在应用内下载安装包\n优化战绩加载与兼容性\n修复部分情况下的阵容显示问题' }));
+      ipcMain.handle('updates:status', () => state.updateDownload);
+      ipcMain.handle('updates:download', (_event, version) => {
+        state.downloads.push(version);
+        state.sendUpdate({ phase: 'downloading', version, receivedBytes: 43369104, totalBytes: 92274688 });
+        return new Promise(resolve => { state.finishDownload = resolve; });
+      });
+      ipcMain.handle('updates:cancel', () => {
+        state.sendUpdate({ phase: 'idle', receivedBytes: 0, totalBytes: 0 });
+        state.finishDownload(state.updateDownload); return state.updateDownload;
+      });
+      ipcMain.handle('updates:install', (_event, version) => {
+        state.installs.push(version); state.sendUpdate({ ...state.updateDownload, phase: 'installing' }); return state.updateDownload;
+      });
     });
     await page.reload(); await page.setViewportSize({ width: 1184, height: 735 });
     const trigger = page.getByRole('button', { name: '新版本' });
@@ -25,11 +44,30 @@ test('important update button is passive, offers notes, download, cancel and per
     await expect(trigger).toBeVisible(); await expect(page.getByRole('dialog')).not.toBeVisible();
     await trigger.click(); const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('重要更新')).toBeVisible();
-    await page.screenshot({ path: '/private/tmp/lol-update-dialog.png' });
     await dialog.getByRole('button', { name: '取消', exact: true }).click(); await expect(trigger).toBeFocused();
-    await trigger.click(); await dialog.getByRole('button', { name: '更新', exact: true }).click();
+    await trigger.click(); await dialog.getByRole('button', { name: '下载更新', exact: true }).click();
+    await expect(dialog.getByRole('progressbar')).toHaveAttribute('value', '47');
+    await page.screenshot({ path: '/private/tmp/lol-update-download.png' });
+    await dialog.getByRole('button', { name: '后台下载' }).click();
+    await expect(dialog).not.toBeVisible(); await trigger.click();
+    await expect(dialog.getByRole('progressbar')).toHaveAttribute('value', '47');
     expect(await app.evaluate(() => (globalThis as any).downloads)).toEqual(['1.1.0']);
-    await trigger.click(); await dialog.getByRole('button', { name: '该版本不再提示' }).click();
+    await dialog.getByRole('button', { name: '取消下载' }).click();
+    await dialog.getByRole('button', { name: '下载更新' }).click();
+    await app.evaluate(() => {
+      const state = globalThis as any;
+      state.sendUpdate({ ...state.updateDownload, phase: 'ready', receivedBytes: state.updateDownload.totalBytes });
+      state.finishDownload(state.updateDownload);
+    });
+    await expect(dialog.getByRole('button', { name: '退出并安装' })).toBeEnabled();
+    expect(await app.evaluate(() => (globalThis as any).installs)).toEqual([]);
+    await page.screenshot({ path: '/private/tmp/lol-update-ready.png' });
+    await dialog.getByRole('button', { name: '稍后安装' }).click(); await trigger.click();
+    await dialog.getByRole('button', { name: '退出并安装' }).click();
+    expect(await app.evaluate(() => (globalThis as any).installs)).toEqual(['1.1.0']);
+    expect(await app.evaluate(() => (globalThis as any).external)).toEqual([]);
+    await app.evaluate(() => (globalThis as any).sendUpdate({ phase: 'idle', receivedBytes: 0, totalBytes: 0 }));
+    await dialog.getByRole('button', { name: '该版本不再提示' }).click();
     await page.reload(); await expect(trigger).toBeVisible(); await expect(dialog).not.toBeVisible();
     await app.evaluate(({ ipcMain }) => {
       (globalThis as any).updateVersion = '1.2.0';

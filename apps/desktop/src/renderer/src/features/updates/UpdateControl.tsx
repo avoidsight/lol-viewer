@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LolViewerApi } from '../../../../shared/ipc';
-import { versionSchema, type AvailableUpdate } from '../../../../shared/updates';
+import { idleUpdateDownload, versionSchema, type AvailableUpdate, type UpdateDownloadState } from '../../../../shared/updates';
 import './updates.css';
 const IGNORED = 'lol-viewer:ignored-update-versions';
 function ignoredVersions(): string[] {
@@ -14,9 +14,26 @@ export function UpdateControl({ api, canAutoPrompt = false }: { api?: LolViewerA
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [downloadState, setDownloadState] = useState<UpdateDownloadState>(idleUpdateDownload);
+  const activeDownload = downloadState.version === update?.version ? downloadState : idleUpdateDownload;
+  const transferring = ['checking', 'downloading', 'verifying'].includes(activeDownload.phase);
+  const ready = activeDownload.phase === 'ready';
+  const installing = activeDownload.phase === 'installing';
+  const progress = activeDownload.totalBytes ? Math.min(100, Math.floor(activeDownload.receivedBytes / activeDownload.totalBytes * 100)) : 0;
   const dialog = useRef<HTMLDialogElement>(null);
   const known = useRef<string | undefined>(undefined);
   const prompted = useRef(new Set<string>());
+  useEffect(() => {
+    let disposed = false, receivedEvent = false;
+    const unsubscribe = api?.onUpdateDownloadState?.(state => {
+      receivedEvent = true;
+      if (!disposed) setDownloadState(state);
+    });
+    void api?.getUpdateDownloadState?.().then(state => {
+      if (!disposed && !receivedEvent) setDownloadState(state);
+    }).catch(() => {});
+    return () => { disposed = true; unsubscribe?.(); };
+  }, [api]);
   useEffect(() => {
     let disposed = false, pending = false, checkedAt = -Infinity;
     const check = async () => {
@@ -60,13 +77,21 @@ export function UpdateControl({ api, canAutoPrompt = false }: { api?: LolViewerA
     } catch { setError('无法保存忽略设置，请取消后重试。'); }
   }
   async function download() {
-    if (!update || busy) return;
+    if (!update || busy || transferring || installing) return;
     setBusy(true); setError('');
     try {
-      if (await api?.openUpdate?.(update.version)) setOpen(false);
-      else setError('暂时无法下载，版本可能已撤下或网络不可用，请稍后重试。');
-    } catch { setError('打开下载失败，请稍后重试。'); }
+      const state = ready ? await api?.installUpdate?.(update.version) : await api?.downloadUpdate?.(update.version);
+      if (state) setDownloadState(state);
+      else setError('更新暂不可用，请稍后重试。');
+    } catch { setError('更新失败，请稍后重试。'); }
     finally { setBusy(false); }
+  }
+  async function cancelDownload() {
+    setError('');
+    try {
+      const state = await api?.cancelUpdateDownload?.();
+      if (state) setDownloadState(state);
+    } catch { setError('取消失败，请稍后重试。'); }
   }
   return <>
     {update && <button className="update-trigger" type="button" onClick={() => { prompted.current.add(update.version); setError(''); setOpen(true); }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12m-5-5 5 5 5-5M5 17v3h14v-3" /></svg>新版本<span className="update-trigger__dot" /></button>}
@@ -74,12 +99,18 @@ export function UpdateControl({ api, canAutoPrompt = false }: { api?: LolViewerA
       <span className="update-dialog__badge">{update?.important ? '重要更新' : '版本更新'}</span>
       <h2 id="update-title">新版本 {update?.version}</h2>
       <div className="update-dialog__notes">{update?.notes}</div>
-      <p className="update-dialog__hint">更新将打开官方下载链接，请下载安装包后覆盖安装。不会自动退出或安装。</p>
-      {error && <p role="alert" className="update-dialog__error">{error}</p>}
+      {(transferring || ready || installing) && <div className="update-download" aria-live="polite">
+        <div className="update-download__label"><span>{ready ? '下载完成' : installing ? '正在启动安装…' : activeDownload.phase === 'verifying' ? '正在校验安装包…' : activeDownload.phase === 'checking' ? '正在检查版本…' : '正在下载'}</span><strong>{(activeDownload.phase === 'downloading' || ready) && `${progress}%`}</strong></div>
+        <progress aria-label="安装包下载进度" max={100} value={progress} />
+        {activeDownload.totalBytes > 0 && <div className="update-download__size">{(activeDownload.receivedBytes / 1048576).toFixed(1)} / {(activeDownload.totalBytes / 1048576).toFixed(1)} MB</div>}
+      </div>}
+      <p className="update-dialog__hint">{ready ? '安装时会退出峡谷雷达，请在本局结束后安装。' : '在应用内下载，完成后由你确认安装。'}</p>
+      {(error || activeDownload.error) && <p role="alert" className="update-dialog__error">{error || activeDownload.error}</p>}
       <div className="update-dialog__actions">
-        <button type="button" className="update-dialog__ignore" disabled={busy} onClick={ignore}>该版本不再提示</button>
-        <button type="button" autoFocus onClick={() => setOpen(false)}>取消</button>
-        <button type="button" className="update-dialog__primary" disabled={busy} onClick={() => void download()}>{busy ? '正在检查…' : '更新'}</button>
+        {transferring ? <button type="button" className="update-dialog__ignore" onClick={() => void cancelDownload()}>取消下载</button>
+          : <button type="button" className="update-dialog__ignore" disabled={busy || installing} onClick={ignore}>该版本不再提示</button>}
+        <button type="button" autoFocus disabled={installing} onClick={() => setOpen(false)}>{transferring ? '后台下载' : ready ? '稍后安装' : '取消'}</button>
+        <button type="button" className="update-dialog__primary" disabled={busy || transferring || installing} onClick={() => void download()}>{installing ? '正在启动…' : ready ? '退出并安装' : transferring || busy ? '正在下载…' : activeDownload.phase === 'error' ? '重新下载' : '下载更新'}</button>
       </div>
     </dialog>
   </>;
