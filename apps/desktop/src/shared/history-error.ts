@@ -27,6 +27,7 @@ function errorMessage(error: unknown): string {
 export function historyErrorSource(error: unknown): 'lcu' | 'sgp' | undefined {
   const code = (error as { code?: string } | null)?.code;
   if (code?.startsWith('LCU_')) return 'lcu';
+  if (code?.startsWith('SGP_')) return 'sgp';
   const message = errorMessage(error);
   if (/SGP request failed/i.test(message)) return 'sgp';
   return /\bLCU\b/.test(message) ? 'lcu' : undefined;
@@ -46,7 +47,7 @@ export function historyErrorReason(error: unknown): Reason {
   const status = historyErrorStatus(error);
   const source = historyErrorSource(error);
   if (code === 'LCU_AUTH') return 'AUTH';
-  if (code === 'LCU_RESPONSE_TOO_LARGE') return 'TOO_LARGE';
+  if (code === 'LCU_RESPONSE_TOO_LARGE' || code === 'SGP_RESPONSE_TOO_LARGE') return 'TOO_LARGE';
   if (/timed out|timeout/i.test(message)) return 'TIMEOUT';
   if (/schema|invalid JSON/i.test(message)) return 'SCHEMA';
   if (status === 429) return 'RATE_LIMIT';

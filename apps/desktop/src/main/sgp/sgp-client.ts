@@ -56,9 +56,39 @@ export interface SgpClient {
 }
 
 async function readJson(request: typeof fetch, url: string, token: string): Promise<unknown> {
-  const response = await request(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (!response.ok) throw new Error(`SGP request failed with status ${response.status}`);
-  return response.json();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8_000);
+  try {
+    const response = await request(url, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal, redirect: 'error' });
+    if (!response.ok) { await response.body?.cancel(); throw new Error(`SGP request failed with status ${response.status}`); }
+    const maxBytes = 2 * 1024 * 1024;
+    if (Number(response.headers.get('content-length')) > maxBytes) {
+      await response.body?.cancel(); throw Object.assign(new Error('SGP response exceeded the size limit'), { code: 'SGP_RESPONSE_TOO_LARGE' });
+    }
+    if (!response.body) throw new Error('SGP returned invalid JSON');
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        received += value.byteLength;
+        if (received > maxBytes) { await reader.cancel(); throw Object.assign(new Error('SGP response exceeded the size limit'), { code: 'SGP_RESPONSE_TOO_LARGE' }); }
+        chunks.push(value);
+      }
+    } finally { reader.releaseLock(); }
+    try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+    catch { throw new Error('SGP returned invalid JSON'); }
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('SGP request timed out');
+    throw error;
+  } finally { clearTimeout(timer); }
+}
+
+// Unknown regional configuration must not prevent local LCU queries from running.
+export function createOptionalSgpClient(lcu: LcuClient, platform: string): SgpClient | undefined {
+  return Object.hasOwn(tencentHosts, platform.toUpperCase()) ? createSgpClient(lcu, platform) : undefined;
 }
 
 export function createSgpClient(lcu: LcuClient, rsoPlatformId: string, request: typeof fetch = fetch): SgpClient {

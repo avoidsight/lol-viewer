@@ -142,8 +142,10 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   useEffect(() => {
     const match = liveView.match;
     if (page !== 'live' || liveView.requesting || !match?.gameId || !activePhases.has(liveView.phase ?? '')) return;
-    if (!match.players.some(p => p.status === 'unavailable' && p.playerId !== '0' && !p.playerId.startsWith('-')
-      && ['CLIENT_UNAVAILABLE', 'DATA_SERVICE_UNAVAILABLE', 'INVALID_RESPONSE', 'UNKNOWN'].includes(p.errorCode ?? 'UNKNOWN'))) return;
+    if (!match.players.some(p => p.status === 'unavailable' && (
+      (p.playerId !== '0' && !p.playerId.startsWith('-') && ['CLIENT_UNAVAILABLE', 'DATA_SERVICE_UNAVAILABLE', 'INVALID_RESPONSE', 'UNKNOWN'].includes(p.errorCode ?? 'UNKNOWN'))
+      || (liveView.phase !== 'ChampSelect' && (p.playerId === '0' || p.playerId.startsWith('-')))
+    ))) return;
     if (liveRetryBudget.current.gameId !== match.gameId) liveRetryBudget.current = { gameId: match.gameId, attempts: 0 };
     if (liveRetryBudget.current.attempts >= 3) return;
     const timer = window.setTimeout(() => {
@@ -257,9 +259,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
         // Preserve completed snapshots, but never leave an empty page loading forever.
         if (active) setUpdatePhase(undefined);
         if (active && pageRef.current === 'live' && !liveViewRef.current.match) {
-          generation.current += 1;
-          void Promise.resolve(window.lolViewer?.cancelLiveMatch?.()).catch(() => undefined);
-          dispatchLive({ type: 'request-failed', reason: liveErrorReason(error), diagnostic: diagnosticFromError(error) });
+          dispatchLive({ type: 'phase-check-failed', reason: liveErrorReason(error), diagnostic: diagnosticFromError(error) });
         }
       } finally {
         schedule(nextDelay);
@@ -282,7 +282,17 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
       requesting = true;
       try {
         const roster = await api.getLiveRoster();
-        if (active) dispatchLive({ type: 'roster-refreshed', roster });
+        if (active) {
+          const previous = liveViewRef.current.match;
+          if (previous?.gameId && roster.gameId && previous.gameId !== roster.gameId) return;
+          const hasNewIdentity = previous && roster.players.some(p => p.playerId !== '0' && !p.playerId.startsWith('-')
+            && !previous.players.some(old => old.teamId === p.teamId && old.playerId === p.playerId));
+          dispatchLive({ type: 'roster-refreshed', roster });
+          if (hasNewIdentity && !liveViewRef.current.requesting) {
+            loadedGameIdRef.current = undefined;
+            setRetryNonce(value => value + 1);
+          }
+        }
       } catch {
         // Champion-select data can be briefly incomplete while players join.
       } finally {

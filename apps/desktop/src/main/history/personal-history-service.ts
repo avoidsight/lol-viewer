@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { recordDiagnostic } from '../diagnostics/logger';
+import { readHistorySource } from './history-source';
 import { isTransientHistoryError, safeHistoryError } from '../../shared/history-error';
 import type { FavoriteChampion, PersonalHistorySnapshot } from '../../shared/domain';
 import { formatRank } from '../../shared/rank';
@@ -19,20 +20,20 @@ const refreshRetryDelays = [250, 750] as const;
 
 const currentSummonerSchema = z.object({
   summonerId: z.union([z.string(), z.number()]),
-  displayName: z.string().optional(),
-  gameName: z.string().optional(),
-  tagLine: z.string().optional(),
+  displayName: z.string().optional().catch(undefined),
+  gameName: z.string().optional().catch(undefined),
+  tagLine: z.string().optional().catch(undefined),
   // 登录未完成或未设置头像时客户端会给负数或缺失，视为默认头像，而不是让整次读取失败。
   profileIconId: z.number().int().optional().catch(undefined),
-  puuid: z.string().min(1).optional()
+  puuid: z.string().min(1).optional().catch(undefined)
 });
 const targetSummonerSchema = z.object({
   summonerId: z.union([z.string(), z.number()]).optional(),
-  puuid: z.string().min(1).optional(),
-  displayName: z.string().optional(),
-  gameName: z.string().optional(),
-  tagLine: z.string().optional(),
-  profileIconId: z.number().int().nonnegative().optional()
+  puuid: z.string().min(1).optional().catch(undefined),
+  displayName: z.string().optional().catch(undefined),
+  gameName: z.string().optional().catch(undefined),
+  tagLine: z.string().optional().catch(undefined),
+  profileIconId: z.number().int().nonnegative().optional().catch(undefined)
 }).passthrough();
 const rankedStatsSchema = z.object({
   queues: z.array(z.object({
@@ -165,14 +166,15 @@ export class PersonalHistoryService {
       } catch {
         // A cache read failure must not prevent an online refresh.
       }
-      const rawHistory = target && puuid && this.sgp
-        ? await this.sgp.getHistory(puuid, 40)
-        : await this.client.get(
+      const lookupId = puuid ?? playerId!;
+      const lcuSource = { kind: 'lcu' as const, read: () => this.client.get(
           target
-            ? `/lol-match-history/v1/products/lol/${encodeURIComponent(puuid ?? playerId)}/matches?begIndex=0&endIndex=40`
-            : '/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=40',
+            ? `/lol-match-history/v1/products/lol/${encodeURIComponent(lookupId)}/matches?begIndex=0&endIndex=20`
+            : '/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=20',
           matchHistoryResponseSchema
-        );
+        ) };
+      const sgpSource = puuid && this.sgp ? { kind: 'sgp' as const, read: () => this.sgp!.getHistory(puuid!, 20) } : undefined;
+      const rawHistory = await readHistorySource(target && sgpSource ? sgpSource : lcuSource, target && sgpSource ? lcuSource : sgpSource);
       const listedHistory = matchHistoryResponseSchema.parse(rawHistory);
       const listedGames = [...listedHistory.games]
         .sort((left, right) => right.gameCreation - left.gameCreation)

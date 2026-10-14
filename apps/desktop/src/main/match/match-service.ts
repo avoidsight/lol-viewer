@@ -4,19 +4,21 @@ import type { Diagnostic } from '../../shared/diagnostics';
 import type { Lane, MatchSummary, PlayerDataErrorCode, PlayerSnapshot, QueueScope } from '../../shared/domain';
 import type { LiveMatch, LiveRoster } from '../../shared/ipc';
 import { formatRank } from '../../shared/rank';
-import type { LcuClient, LcuError } from '../lcu/http-client';
+import type { LcuClient } from '../lcu/http-client';
 import { adaptMatchHistory, describeQueue, matchHistoryResponseSchema } from '../lcu/match-adapter';
 import type { SgpClient } from '../sgp/sgp-client';
 import { LcuStaticDataCache, type LcuStaticDataProvider } from '../lcu/static-data-cache';
+import { readHistorySource } from '../history/history-source';
+import { isTransientHistoryError } from '../../shared/history-error';
 
 const participantSchema = z.object({
   summonerId: z.union([z.string(), z.number()]),
-  summonerName: z.string(),
-  teamId: z.number().int().optional(),
-  selectedPosition: z.string().optional(),
+  summonerName: z.string().optional().catch(undefined).transform(value => value ?? ''),
+  teamId: z.number().int().optional().catch(undefined),
+  selectedPosition: z.string().optional().catch(undefined),
   championId: z.number().int().nonnegative(),
-  isLocalPlayer: z.boolean().optional(),
-  puuid: z.string().optional()
+  isLocalPlayer: z.boolean().optional().catch(undefined),
+  puuid: z.string().min(1).optional().catch(undefined)
 });
 
 const gameflowTeamSchema = z.array(participantSchema).refine(
@@ -35,7 +37,7 @@ const sessionSchema = z.object({
     gameId: z.union([z.string(), z.number()]).optional(),
     teamOne: gameflowTeamSchema,
     teamTwo: gameflowTeamSchema,
-    queue: z.object({ id: z.number().int().nonnegative() }).optional(),
+    queue: z.object({ id: z.number().int().nonnegative() }).optional().catch(undefined),
     queueId: z.number().int().nonnegative().optional(),
     playerChampionSelections: z.array(championSelectionSchema).optional()
   })
@@ -45,19 +47,20 @@ const champSelectParticipantSchema = z.object({
   cellId: z.number().int().optional(),
   summonerId: z.union([z.string(), z.number()]),
   championId: z.number().int().nonnegative(),
-  assignedPosition: z.string().optional(),
-  gameName: z.string().optional(),
-  playerAlias: z.string().optional()
+  assignedPosition: z.string().optional().catch(undefined),
+  gameName: z.string().optional().catch(undefined),
+  playerAlias: z.string().optional().catch(undefined),
+  puuid: z.string().min(1).optional().catch(undefined)
 });
 
 const champSelectSessionSchema = z.object({
   myTeam: z.array(champSelectParticipantSchema).length(5),
-  theirTeam: z.array(champSelectParticipantSchema).length(5),
+  theirTeam: z.array(champSelectParticipantSchema).max(5).nullish().transform(value => value ?? []),
   queueId: z.number().int().nonnegative().optional(),
   localPlayerCellId: z.number().int().optional()
 });
 
-const currentSummonerSchema = z.object({ summonerId: z.union([z.string(), z.number()]), gameName: z.string().optional(), tagLine: z.string().optional(), displayName: z.string().optional(), puuid: z.string().optional() });
+const currentSummonerSchema = z.object({ summonerId: z.union([z.string(), z.number()]), gameName: z.string().optional().catch(undefined), tagLine: z.string().optional().catch(undefined), displayName: z.string().optional().catch(undefined), puuid: z.string().min(1).optional().catch(undefined) });
 const rankedStatsSchema = z.object({
   queues: z.array(z.object({
     queueType: z.string(), tier: z.string(), division: z.string(), leaguePoints: z.number().int()
@@ -113,7 +116,7 @@ function laneOf(value: string | undefined): Lane {
 }
 
 function isTransient(error: unknown): boolean {
-  return (error as Partial<LcuError>)?.code === 'LCU_UNAVAILABLE';
+  return isTransientHistoryError(error);
 }
 
 function classifyHistoryError(error: unknown, source: 'lcu' | 'sgp'): PlayerDataErrorCode {
@@ -226,7 +229,9 @@ export class MatchService {
       let displayName = (isLocalPlayer ? summonerName(currentSummoner) : '') || participant.summonerName.trim();
       let playerPuuid = participant.puuid
         ?? (isLocalPlayer ? currentSummoner?.puuid : undefined);
-      if (!displayName || !playerPuuid) {
+      const hiddenIdentity = !isLocalPlayer && !playerPuuid
+        && (String(participant.summonerId) === '0' || String(participant.summonerId).startsWith('-'));
+      if (!hiddenIdentity && (!displayName || !playerPuuid)) {
         try {
           const identity = summonerIdentitySchema.parse(await this.client.get(
             `/lol-summoner/v1/summoners/${encodeURIComponent(String(participant.summonerId))}`,
@@ -263,7 +268,7 @@ export class MatchService {
       let historyErrorCode: PlayerDataErrorCode | undefined;
       let diagnostic: Diagnostic | undefined;
       let rank = cached?.rank;
-      if (!cached) {
+      if (!cached && !hiddenIdentity) {
         try {
           const ranked = rankedStatsSchema.parse(playerPuuid && this.sgp
             ? await this.sgp.getRankedStats(playerPuuid)
@@ -279,24 +284,15 @@ export class MatchService {
         }
       }
       checkCancelled(signal);
-      if (!cached) {
+      if (!cached && !hiddenIdentity) {
         let historySource: 'lcu' | 'sgp' = playerPuuid && this.sgp ? 'sgp' : 'lcu';
         try {
+          const lcuSource = { kind: 'lcu' as const, read: () => this.getHistoryWithRetry(lookupId, isLocalPlayer, signal) };
           let rawHistory: unknown;
           if (playerPuuid && this.sgp) {
-            try {
-              rawHistory = await this.sgp.getHistory(playerPuuid, 20);
-            } catch (error) {
-              if (!isLocalPlayer) throw error;
-              historySource = 'lcu';
-              rawHistory = await this.getHistoryWithRetry(lookupId, true, signal);
-            }
+            rawHistory = await readHistorySource({ kind: 'sgp', read: () => this.sgp!.getHistory(playerPuuid!, 20) }, lcuSource);
           } else {
-            rawHistory = await this.getHistoryWithRetry(
-              lookupId,
-              isLocalPlayer && (champSelectFallback || participant.isLocalPlayer === true),
-              signal
-            );
+            rawHistory = await readHistorySource(lcuSource);
           }
           matches = adaptMatchHistory(rawHistory, { scope: 'all', limit: 20 });
         } catch (error) {
@@ -306,6 +302,7 @@ export class MatchService {
           historyErrorCode = classifyHistoryError(error, historySource);
         }
       }
+      if (hiddenIdentity) { matches = null; historyErrorCode = 'PRIVACY_RESTRICTED'; }
       checkCancelled(signal);
       const recentMatches = matches ?? [];
       const wins = recentMatches.filter((match) => match.win).length;
@@ -374,15 +371,18 @@ export class MatchService {
         teamId: number,
         sideName: string
       ): Array<z.infer<typeof participantSchema> & { teamId: number }> => team.map((participant, index) => ({
-        summonerId: participant.summonerId,
+        summonerId: String(participant.summonerId) === '0' && !(participant.cellId !== undefined && participant.cellId === champSelect.localPlayerCellId)
+          ? String(-teamId - index - 1) : participant.summonerId,
         summonerName: participant.gameName?.trim() || participant.playerAlias?.trim() || `${sideName}玩家 ${index + 1}`,
         teamId,
         selectedPosition: participant.assignedPosition,
         championId: participant.championId,
+        ...(participant.puuid ? { puuid: participant.puuid } : {}),
         ...(participant.cellId !== undefined && participant.cellId === champSelect.localPlayerCellId ? { isLocalPlayer: true } : {})
       }));
       teamOne = normalizeTeam(champSelect.myTeam, 100, '己方');
       teamTwo = normalizeTeam(champSelect.theirTeam, 200, '敌方');
+      while (teamTwo.length < 5) teamTwo.push({ summonerId: String(-201 - teamTwo.length), summonerName: `敌方玩家 ${teamTwo.length + 1}`, teamId: 200, championId: 0 });
       champSelectQueueId = champSelect.queueId;
       champSelectFallback = true;
     }

@@ -9,12 +9,8 @@ const gameflowSessionSchema = z.object({
 });
 
 export async function readGameflowSessionIdentity(client: LcuClient): Promise<GameflowSessionIdentity> {
-  let phase: string;
-  try {
-    phase = await client.get('/lol-gameflow/v1/gameflow-phase', gameflowPhaseSchema);
-  } catch {
-    return { phase: 'None' };
-  }
+  // A failed poll is not evidence that the game ended. Let the caller keep its last known state.
+  const phase = await client.get('/lol-gameflow/v1/gameflow-phase', gameflowPhaseSchema);
 
   if (!phasesWithSession.has(phase)) return { phase };
 

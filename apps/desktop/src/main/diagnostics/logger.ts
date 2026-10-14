@@ -6,7 +6,7 @@ import { diagnosticFromError, diagnosticMarker, type Diagnostic } from '../../sh
 import { historyErrorReason, historyErrorSource, historyErrorStatus } from '../../shared/history-error';
 
 const operations = ['startup', 'phase', 'lcu.session', 'lcu.selection', 'lcu.summoner', 'lcu.history', 'lcu.detail', 'lcu.rank', 'lcu.token', 'lcu.assets', 'lcu.other',
-  'sgp.history', 'sgp.rank', 'live.load', 'live.roster', 'live.player', 'history.load', 'history.detail', 'history.parse', 'history.cache', 'export'] as const;
+  'sgp.history', 'sgp.rank', 'live.load', 'live.roster', 'live.player', 'history.load', 'history.detail', 'history.parse', 'history.cache', 'history.fallback', 'export'] as const;
 export type DiagnosticOperation = typeof operations[number];
 const phases = new Set(['None', 'Lobby', 'Matchmaking', 'ReadyCheck', 'ChampSelect', 'GameStart', 'InProgress', 'Reconnect', 'WaitingForStats', 'PreEndOfGame', 'EndOfGame', 'TerminatedInError']);
 const fields = new Set(('games gameData gameId gameCreation gameDuration queue queueId id phase teamOne teamTwo myTeam theirTeam participants participantIdentities participantId player stats win kills deaths assists championId summonerId summonerName puuid displayName gameName tagLine playerAlias profileIconId selectedPosition assignedPosition teamId localPlayerCellId cellId isLocalPlayer queues queueType tier division rank leaguePoints json totalDamageDealtToChampions totalDamageTaken goldEarned totalMinionsKilled neutralMinionsKilled item0 item1 item2 item3 item4 item5 item6 spell1Id spell2Id summoner1Id summoner2Id timeline lane accessToken').split(' '));

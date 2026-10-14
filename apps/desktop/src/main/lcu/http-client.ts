@@ -51,9 +51,11 @@ export function createLcuClient(
           reject(error);
         };
         let settled = false;
+        let deadline: ReturnType<typeof setTimeout> | undefined;
         const finish = (action: () => void): void => {
           if (settled) return;
           settled = true;
+          clearTimeout(deadline);
           action();
         };
         const authorization = Buffer.from(`riot:${connection.password}`).toString('base64');
@@ -87,8 +89,11 @@ export function createLcuClient(
               chunks.push(buffer);
             });
             response.on('error', () =>
-              finish(() => fail(lcuError('LCU_INVALID_RESPONSE', 'LCU response could not be read')))
+              finish(() => fail(lcuError('LCU_UNAVAILABLE', 'LCU response could not be read')))
             );
+            const interrupted = () => finish(() => fail(lcuError('LCU_UNAVAILABLE', 'LCU response ended before completion')));
+            response.on('aborted', interrupted);
+            response.on('close', interrupted);
             response.on('end', () => {
               if (response.statusCode === 401 || response.statusCode === 403) {
                 invalidateLcuConnection(connection);
@@ -125,14 +130,18 @@ export function createLcuClient(
         );
 
         req.on('timeout', () => {
-          req.destroy();
           invalidateLcuConnection(connection);
           finish(() => fail(lcuError('LCU_UNAVAILABLE', 'LCU request timed out')));
+          req.destroy();
         });
         req.on('error', () => {
           invalidateLcuConnection(connection);
           finish(() => fail(lcuError('LCU_UNAVAILABLE', 'LCU is unavailable')));
         });
+        deadline = setTimeout(() => {
+          finish(() => fail(lcuError('LCU_UNAVAILABLE', 'LCU request timed out')));
+          req.destroy();
+        }, 10_000);
         req.end(json);
       });
   }

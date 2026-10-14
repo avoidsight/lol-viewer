@@ -97,7 +97,7 @@ describe('PersonalHistoryService', () => {
       cached: false
     });
     expect(cache.getLatest('7')).toEqual({ ...result, cached: true });
-    expect(get).toHaveBeenCalledWith('/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=40', expect.anything());
+    expect(vi.mocked(get).mock.calls.map(call => call[0])).toContain('/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=20');
   });
 
   it('loads another player by puuid through Tencent SGP without replacing the current summoner', async () => {
@@ -167,7 +167,7 @@ describe('PersonalHistoryService', () => {
     });
     expect(result.matches[0].teamDamageShare).toBeCloseTo(31_500 / 71_500);
     expect(result.matches[0].teamDamageTakenShare).toBeCloseTo(28_100 / 72_100);
-    expect(sgp.getHistory).toHaveBeenCalledWith('target-puuid', 40);
+    expect(sgp.getHistory).toHaveBeenCalledWith('target-puuid', 20);
     expect(sgp.getRankedStats).toHaveBeenCalledWith('target-puuid');
     expect(get).not.toHaveBeenCalledWith('/lol-summoner/v1/current-summoner', expect.anything());
     expect(get).not.toHaveBeenCalledWith('/lol-match-history/v1/games/1', expect.anything());
@@ -351,7 +351,7 @@ describe('PersonalHistoryService', () => {
       playerId: '7', puuid: 'target-puuid', displayName: '目标玩家', profileIconId: 29
     });
 
-    expect(sgp.getHistory).toHaveBeenCalledWith('target-puuid', 40);
+    expect(sgp.getHistory).toHaveBeenCalledWith('target-puuid', 20);
     expect(result.historyDataVersion).toBe(12);
     expect(cache.put).toHaveBeenCalled();
   });
@@ -384,7 +384,7 @@ describe('PersonalHistoryService', () => {
     await new PersonalHistoryService({ get } as LcuClient, cache).load();
 
     expect(get).toHaveBeenCalledWith(
-      '/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=40',
+      '/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=20',
       expect.anything()
     );
   });

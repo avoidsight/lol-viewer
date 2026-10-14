@@ -30,6 +30,7 @@ export type LiveMatchAction =
   | { type: 'roster-refreshed'; roster: LiveRoster }
   | { type: 'request-failed'; reason?: LiveMatchErrorReason; diagnostic?: Diagnostic }
   | { type: 'diagnostic-reported'; diagnostic: Diagnostic }
+  | { type: 'phase-check-failed'; reason: LiveMatchErrorReason; diagnostic?: Diagnostic }
   | { type: 'phase-observed'; phase: string; active: boolean; connected?: boolean }
   | { type: 'enrichment-paused'; phase: string }
   | { type: 'new-match-detected'; phase: string };
@@ -41,6 +42,7 @@ export const initialLiveMatchState: LiveMatchViewState = {
 };
 
 function mergeRoster(match: LiveMatch, roster: LiveRoster): LiveMatch {
+  if (match.gameId && roster.gameId && match.gameId !== roster.gameId) return match;
   const existingByTeam = new Map<number, PlayerSnapshot[]>();
   const used = new Set<PlayerSnapshot>();
   for (const player of match.players) {
@@ -49,8 +51,11 @@ function mergeRoster(match: LiveMatch, roster: LiveRoster): LiveMatch {
   const players = roster.players.map((player) => {
     const team = existingByTeam.get(player.teamId) ?? [];
     const existing = team.find((entry) => !used.has(entry) && entry.playerId === player.playerId)
-      ?? team.find((entry) => !used.has(entry));
-    if (!existing) return undefined;
+    if (!existing) return {
+      ...player, scope: 'all' as const, matches: [], sampleSize: 0, wins: 0, losses: 0, winRate: 0,
+      currentChampionGames: 0, currentChampionWins: 0, currentChampionWinRate: 0,
+      status: 'loading' as const, updatedAt: Date.now()
+    };
     used.add(existing);
     const championMatches = existing.matches.filter((entry) => entry.championId === player.championId);
     const currentChampionWins = championMatches.filter((entry) => entry.win).length;
@@ -61,7 +66,7 @@ function mergeRoster(match: LiveMatch, roster: LiveRoster): LiveMatch {
       currentChampionWins,
       currentChampionWinRate: championMatches.length ? currentChampionWins / championMatches.length : 0
     };
-  }).filter((player): player is PlayerSnapshot => player !== undefined);
+  });
   return players.length === roster.players.length
     ? { ...roster, players }
     : match;
@@ -112,6 +117,10 @@ export function liveMatchReducer(
         : { ...state, status: 'error', requesting: false, errorReason: action.reason ?? 'data-unavailable', diagnostic: action.diagnostic };
     case 'diagnostic-reported':
       return state.requesting && !state.match ? { ...state, diagnostic: action.diagnostic } : state;
+    case 'phase-check-failed':
+      if (state.match) return state;
+      return { ...state, ...(state.requesting ? {} : { status: 'error' }),
+        errorReason: action.reason, diagnostic: action.diagnostic ?? state.diagnostic };
     case 'phase-observed':
       if (!action.active && !state.match) return {
         status: action.connected === false ? 'disconnected' : 'waiting',

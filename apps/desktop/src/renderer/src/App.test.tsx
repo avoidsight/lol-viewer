@@ -38,6 +38,37 @@ function install(getLiveMatch: LolViewerApi['getLiveMatch'] = vi.fn().mockResolv
 afterEach(() => { delete window.lolViewer; });
 
 describe('App tab lifecycle', () => {
+  it('reloads histories when a champion-select roster reveals new player identities', async () => {
+    vi.useFakeTimers();
+    try {
+      const placeholder = { ...player, playerId: '-101', displayName: 'Hidden', status: 'unavailable' as const, errorCode: 'PRIVACY_RESTRICTED' as const };
+      const { api } = install(vi.fn().mockResolvedValueOnce({ ...match, players: [placeholder] }).mockResolvedValue(match));
+      vi.mocked(api.getGameflowSessionIdentity).mockResolvedValue({ phase: 'ChampSelect', gameId: 'game-1' });
+      render(<App initialTab="live" />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+      expect(api.getLiveMatch).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Player One')).toBeVisible();
+      await act(async () => { await vi.advanceTimersByTimeAsync(9000); });
+      expect(api.getLiveMatch).toHaveBeenCalledTimes(2);
+    } finally { vi.useRealTimers(); }
+  });
+  it('keeps pending player history through intermittent phase polling failures', async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = deferred<LiveMatch>();
+      const { api, emit } = install(vi.fn().mockReturnValue(pending.promise));
+      vi.mocked(api.getGameflowSessionIdentity).mockResolvedValueOnce({ phase: 'ChampSelect', gameId: 'game-1' })
+        .mockRejectedValueOnce(new Error('LCU request timed out')).mockResolvedValue({ phase: 'InProgress', gameId: 'game-1' });
+      render(<App initialTab="live" />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(6000); });
+      expect(api.cancelLiveMatch).not.toHaveBeenCalled();
+      expect(api.getLiveMatch).toHaveBeenCalledOnce();
+      await act(async () => { emit(player, 1); pending.resolve(match); });
+      expect(screen.getByText('Player One')).toBeVisible();
+      await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+      expect(api.getLiveMatch).toHaveBeenCalledOnce();
+    } finally { vi.useRealTimers(); }
+  });
   it('shows a safe reason and diagnostic ID on initial personal-history failure', async () => {
     const { api } = install();
     vi.mocked(api.getPersonalHistory).mockRejectedValue(new Error('Personal history is unavailable [HISTORY:SCHEMA] [DIAG:D-012345ABCDEF:SCHEMA]'));

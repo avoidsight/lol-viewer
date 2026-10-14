@@ -33,6 +33,34 @@ function requestDouble(
 }
 
 describe('createLcuClient', () => {
+  it.each(['aborted', 'close'])('settles an interrupted response on %s instead of hanging', async event => {
+    const req = new EventEmitter() as ClientRequest;
+    req.end = vi.fn(() => {
+      queueMicrotask(() => {
+        const response = new EventEmitter() as IncomingMessage;
+        response.statusCode = 200;
+        callback(response);
+        response.emit('data', Buffer.from('{'));
+        response.emit(event);
+      }); return req;
+    }) as ClientRequest['end'];
+    let callback!: (response: IncomingMessage) => void;
+    const request = ((_options, listener) => { callback = listener; return req; }) as HttpsRequest;
+    await expect(createLcuClient({ port: 12345, password: 'test', protocol: 'https' }, request).get('/endpoint', unknownSchema))
+      .rejects.toMatchObject({ code: 'LCU_UNAVAILABLE' });
+  });
+  it('bounds a request even if the transport never emits an idle timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      const req = new EventEmitter() as ClientRequest;
+      req.end = vi.fn() as ClientRequest['end']; req.destroy = vi.fn() as ClientRequest['destroy'];
+      const request = (() => req) as HttpsRequest;
+      const result = createLcuClient({ port: 12345, password: 'test', protocol: 'https' }, request).get('/endpoint', unknownSchema).catch(error => error);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await result).toMatchObject({ code: 'LCU_UNAVAILABLE', message: 'LCU request timed out' });
+      expect(req.destroy).toHaveBeenCalledOnce(); expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
   it('captures HTTP status, duration and schema failures without request identity or response values', async () => {
     const log = vi.spyOn(diagnostics, 'recordDiagnostic');
     try {

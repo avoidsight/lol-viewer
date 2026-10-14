@@ -14,6 +14,15 @@ const match = {
 } satisfies LiveMatch;
 
 describe('liveMatchReducer', () => {
+  it('does not assign an old identity history to newly revealed players', () => {
+    const previous = { ...match, gameId: 'same-game', players: [{ ...player, playerId: '-201', matches: [{ matchId: 'old', queueId: 420,
+      endedAt: 1, durationSeconds: 600, championId: 1, win: true, kills: 20, deaths: 1, assists: 10 }], wins: 1 }] };
+    const ready = liveMatchReducer(initialLiveMatchState, { type: 'request-succeeded', match: previous });
+    const roster = { ...previous, players: [{ playerId: 'new-player', displayName: 'New', teamId: 100, lane: 'TOP' as const, championId: 1 }] };
+    const updated = liveMatchReducer(ready, { type: 'roster-refreshed', roster });
+    expect(updated.match?.players[0]).toMatchObject({ playerId: 'new-player', matches: [], wins: 0, status: 'loading' });
+    expect(liveMatchReducer(ready, { type: 'roster-refreshed', roster: { ...roster, gameId: 'other-game' } }).match).toBe(previous);
+  });
   it('reports retry diagnostics without triggering duplicate loading and clears stale errors', () => {
     const diagnostic = { id: 'D-012345ABCDEF', reason: 'SCHEMA' } as const;
     const loading = liveMatchReducer(initialLiveMatchState, { type: 'request-started' });

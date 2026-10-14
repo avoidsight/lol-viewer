@@ -35,9 +35,9 @@ describe('readGameflowSessionIdentity', () => {
     await expect(readGameflowSessionIdentity(clientWith(get))).resolves.toEqual({ phase: 'InProgress' });
   });
 
-  it('returns an inactive state when the lightweight phase endpoint is unavailable', async () => {
+  it('does not report a false game end when the lightweight phase endpoint fails', async () => {
     const get = vi.fn().mockRejectedValue(new Error('client unavailable')) as LcuClient['get'];
 
-    await expect(readGameflowSessionIdentity(clientWith(get))).resolves.toEqual({ phase: 'None' });
+    await expect(readGameflowSessionIdentity(clientWith(get))).rejects.toThrow('client unavailable');
   });
 });

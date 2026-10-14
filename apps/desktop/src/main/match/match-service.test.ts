@@ -36,6 +36,33 @@ function deferred<T>() {
 }
 
 describe('MatchService', () => {
+  it('loads allies when champion select hides the enemy roster and never queries hidden identities', async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') return { phase: 'ChampSelect', gameData: { gameId: 123, teamOne: [], teamTwo: [], queueId: 440 } };
+      if (path === '/lol-champ-select/v1/session') return { localPlayerCellId: 0,
+        myTeam: participants.slice(0, 5).map((p, index) => ({ ...p, cellId: index, assignedPosition: null, playerAlias: null })), theirTeam: [] };
+      if (path === '/lol-summoner/v1/current-summoner') return { summonerId: '1', displayName: null, puuid: null };
+      if (path.includes('/matches?')) return history;
+      throw new Error('optional metadata offline');
+    });
+    const result = await new MatchService({ get } as LcuClient).loadLiveMatch('all', vi.fn());
+    expect(result.players).toHaveLength(10);
+    expect(result.players.slice(0, 5).every(p => p.status === 'ready')).toBe(true);
+    expect(result.players.slice(5).every(p => p.status === 'unavailable' && p.playerId.startsWith('-'))).toBe(true);
+    expect(new Set(result.players.map(p => p.playerId)).size).toBe(10);
+    expect(get.mock.calls.some(([path]) => /\/-\d+/.test(path))).toBe(false);
+  });
+  it('uses LCU histories for remote players when SGP fails without a privacy restriction', async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5).map(p => ({ ...p, puuid: `p-${p.summonerId}` })), teamTwo: participants.slice(5).map(p => ({ ...p, puuid: `p-${p.summonerId}` })), queueId: 420 } };
+      if (path === '/lol-summoner/v1/current-summoner') return { summonerId: '1' };
+      if (path.includes('/matches?')) return history;
+      throw new Error('optional metadata offline');
+    });
+    const sgp = { getHistory: vi.fn().mockRejectedValue(new Error('SGP request timed out')), getRankedStats: vi.fn().mockResolvedValue({ queues: [] }) };
+    const result = await new MatchService({ get } as LcuClient, { sgp }).loadLiveMatch('all', vi.fn());
+    expect(result.players.every(p => p.status === 'ready' && p.sampleSize === 1)).toBe(true);
+  });
   it('accepts the nested LCU history envelope at the HTTP schema boundary', async () => {
     const get = vi.fn(async (path: string, schema: import('zod').ZodTypeAny) => {
       let value: unknown;
@@ -448,7 +475,7 @@ describe('MatchService', () => {
     for (let id = 1; id <= 10; id += 1) {
       expect(get).toHaveBeenCalledWith(`/lol-ranked/v1/ranked-stats/puuid-${id}`, expect.anything());
       expect(get).toHaveBeenCalledWith(
-        `/lol-match-history/v1/products/lol/puuid-${id}/matches?begIndex=0&endIndex=20`,
+        `/lol-match-history/v1/products/lol/${id === 1 ? 'current-summoner' : `puuid-${id}`}/matches?begIndex=0&endIndex=20`,
         expect.anything()
       );
     }

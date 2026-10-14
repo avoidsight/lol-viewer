@@ -1,8 +1,32 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { LcuClient } from '../lcu/http-client';
-import { createSgpClient } from './sgp-client';
+import { createOptionalSgpClient, createSgpClient } from './sgp-client';
 
 describe('SgpClient', () => {
+  it('allows local queries when a regional SGP host is unsupported', () => {
+    const lcu = { get: vi.fn() } as unknown as LcuClient;
+    expect(createOptionalSgpClient(lcu, 'UNKNOWN-REGION')).toBeUndefined();
+    expect(createOptionalSgpClient(lcu, 'hn1')).toBeDefined();
+    expect(lcu.get).not.toHaveBeenCalled();
+  });
+  it('aborts a hung remote request within eight seconds and sanitizes the error', async () => {
+    vi.useFakeTimers();
+    try {
+      const lcu = { get: vi.fn().mockResolvedValue({ accessToken: 'test-token' }) } as unknown as LcuClient;
+      const request: typeof fetch = vi.fn((_url, init) => new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new Error('private-url-token')));
+      }));
+      const result = createSgpClient(lcu, 'HN1', request).getHistory('target', 20).catch(error => error);
+      await vi.advanceTimersByTimeAsync(8000);
+      expect(await result).toMatchObject({ message: 'SGP request timed out' });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+  it('bounds the response body, including bodies without a content-length', async () => {
+    const lcu = { get: vi.fn().mockResolvedValue({ accessToken: 'test-token' }) } as unknown as LcuClient;
+    const request = vi.fn(async () => new Response('x'.repeat(2 * 1024 * 1024 + 1)));
+    await expect(createSgpClient(lcu, 'HN1', request).getHistory('target', 20)).rejects.toMatchObject({ code: 'SGP_RESPONSE_TOO_LARGE' });
+  });
   it('isolates invalid games and accepts missing optional SGP statistics', async () => {
     const lcu = { get: vi.fn(async () => ({ accessToken: 'test-token' })) } as unknown as LcuClient;
     const request = vi.fn(async () => new Response(JSON.stringify({ games: [

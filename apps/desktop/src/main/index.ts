@@ -37,7 +37,7 @@ import { z } from 'zod';
 import { GameflowCoordinator } from './match/gameflow-coordinator';
 import { PersonalHistoryService } from './history/personal-history-service';
 import { ReadyCheckAutoAcceptor } from './match/ready-check-auto-acceptor';
-import { createSgpClient } from './sgp/sgp-client';
+import { createOptionalSgpClient } from './sgp/sgp-client';
 import { registerLcuAssetProtocol } from './lcu/asset-protocol';
 import { readGameflowSessionIdentity } from './lcu/gameflow-session';
 import type { LiveMatch, LiveRoster, GameflowSessionIdentity } from '../shared/ipc';
@@ -192,7 +192,7 @@ void app.whenReady().then(() => {
       if (!connection) throw new Error('League client is unavailable');
       const lcu = createLcuClient(connection);
       const sgp = connection.region?.toUpperCase() === 'TENCENT' && connection.rsoPlatformId
-        ? createSgpClient(lcu, connection.rsoPlatformId)
+        ? createOptionalSgpClient(lcu, connection.rsoPlatformId)
         : undefined;
       return new PersonalHistoryService(lcu, personalHistoryCache, sgp, staticData).load(target, forceRefresh);
     }
@@ -241,7 +241,7 @@ void app.whenReady().then(() => {
       if (!connection) throw new Error('League client is unavailable');
       const lcu = createLcuClient(connection);
       const sgp = connection.region?.toUpperCase() === 'TENCENT' && connection.rsoPlatformId
-        ? createSgpClient(lcu, connection.rsoPlatformId)
+        ? createOptionalSgpClient(lcu, connection.rsoPlatformId)
         : undefined;
       const match = await new MatchService(lcu, { cache, staticData, ...(sgp ? { sgp } : {}),
         onSnapshot: snapshot => { if (!signal.aborted) clipboardMatch = snapshot; }
