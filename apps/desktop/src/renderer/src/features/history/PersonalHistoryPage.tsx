@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { PersonalHistorySnapshot } from '../../../../shared/domain';
 import { diagnosticLabels, type Diagnostic } from '../../../../shared/diagnostics';
-import type { PersonalHistoryTarget } from '../../../../shared/ipc';
+import type { PersonalHistoryTarget, PersonalMatchDetail } from '../../../../shared/ipc';
 import { localizeRank } from '../../../../shared/rank';
 import { isRankedQueue } from '../../../../shared/queue';
 import './personal-history.css';
@@ -17,10 +17,12 @@ const championIconUrl = (_version: string | undefined, championId: number) =>
 const profileIconUrl = (_version: string | undefined, profileIconId: number) =>
   `lol-asset://profile-icons/${profileIconId}.jpg`;
 
-export default function PersonalHistoryPage({ snapshot, state, diagnostic, onRefresh, onPlayerSelect, onBack, refreshing = false, refreshError = '' }: {
+export default function PersonalHistoryPage({ snapshot, state, diagnostic, active = true, getMatchDetail, onRefresh, onPlayerSelect, onBack, refreshing = false, refreshError = '' }: {
   snapshot?: PersonalHistorySnapshot;
   state: HistoryState;
   diagnostic?: Diagnostic;
+  active?: boolean;
+  getMatchDetail?: (matchId: string, signal: AbortSignal) => Promise<PersonalMatchDetail | null>;
   onRefresh?: () => void;
   onPlayerSelect?: (target: PersonalHistoryTarget) => void;
   onBack?: () => void;
@@ -53,7 +55,7 @@ export default function PersonalHistoryPage({ snapshot, state, diagnostic, onRef
             <h1>{snapshot.displayName}</h1>
             {snapshot.cached && <strong className="personal-history__cached">缓存数据</strong>}
           </div>
-          <p>{localizeRank(snapshot.rank) ?? '未定级'} · 最近 {snapshot.sampleSize} 场</p>
+          <p>{localizeRank(snapshot.rank) ?? '段位未知'} · 最近 {snapshot.sampleSize} 场</p>
         </div>
         <div className="personal-history__summary">
           <div className="personal-history__win-rate"><strong>{(snapshot.winRate * 100).toFixed(1)}%</strong><span>胜率</span></div>
@@ -86,7 +88,7 @@ export default function PersonalHistoryPage({ snapshot, state, diagnostic, onRef
         </div>
       </section>
 
-      <HistoryWorkspace matches={filteredMatches} snapshot={snapshot} onPlayerSelect={onPlayerSelect} />
+      <HistoryWorkspace matches={filteredMatches} snapshot={snapshot} active={active} getMatchDetail={getMatchDetail} onPlayerSelect={onPlayerSelect} />
     </div>
   </main>;
 }

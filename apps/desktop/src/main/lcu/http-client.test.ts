@@ -33,6 +33,19 @@ function requestDouble(
 }
 
 describe('createLcuClient', () => {
+  it('aborts an obsolete detail request and clears its timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      const req = new EventEmitter() as ClientRequest;
+      req.end = vi.fn() as ClientRequest['end']; req.destroy = vi.fn() as ClientRequest['destroy'];
+      const request = (() => req) as HttpsRequest;
+      const controller = new AbortController();
+      const result = createLcuClient({ port: 12345, password: 'test', protocol: 'https' }, request).get('/endpoint', unknownSchema, controller.signal).catch(error => error);
+      controller.abort();
+      expect(await result).toMatchObject({ code: 'MATCH_CANCELLED' });
+      expect(req.destroy).toHaveBeenCalledOnce(); expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
   it.each(['aborted', 'close'])('settles an interrupted response on %s instead of hanging', async event => {
     const req = new EventEmitter() as ClientRequest;
     req.end = vi.fn(() => {

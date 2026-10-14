@@ -18,6 +18,10 @@ import {
   CHAMPION_CATALOG_GET_CHANNEL,
   CHAMPION_DETAILS_GET_CHANNEL,
   PERSONAL_HISTORY_GET_CHANNEL,
+  PERSONAL_MATCH_DETAIL_CHANNEL,
+  PERSONAL_MATCH_DETAIL_CANCEL_CHANNEL,
+  personalMatchDetailRequestSchema,
+  personalMatchDetailSchema,
   PLAYER_UPDATED_CHANNEL,
   SETTINGS_CLEAR_CACHE_CHANNEL,
   SETTINGS_GET_CHANNEL,
@@ -48,6 +52,12 @@ import {
 } from '../shared/ipc';
 
 const api: LolViewerApi = Object.freeze({
+  getPersonalMatchDetail: async (matchId: string, target: PersonalHistoryTarget, requestId: number) => personalMatchDetailSchema.nullable().parse(
+    await ipcRenderer.invoke(PERSONAL_MATCH_DETAIL_CHANNEL, personalMatchDetailRequestSchema.parse({ matchId, target, requestId }))
+  ),
+  cancelPersonalMatchDetail: async (requestId: number) => {
+    await ipcRenderer.invoke(PERSONAL_MATCH_DETAIL_CANCEL_CHANNEL, z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).parse(requestId));
+  },
   exportDiagnostics: async () => diagnosticExportSchema.parse(await ipcRenderer.invoke(DIAGNOSTICS_EXPORT)),
   onLiveDiagnostic: (callback: (diagnostic: Diagnostic, generation: number) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, input: unknown) => {

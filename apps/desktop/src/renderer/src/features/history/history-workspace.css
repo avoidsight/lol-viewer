@@ -52,3 +52,12 @@
 .history-workspace button:focus-visible { outline:2px solid #52bddc; outline-offset:-2px; }
 @media(max-width:1050px) { .history-workspace { grid-template-columns:250px minmax(0,1fr); gap:10px; } .history-team { margin:10px 10px 0; } .history-team table { min-width:550px; } }
 @media(max-width:720px) { .history-workspace { grid-template-columns:1fr; } }
+.history-detail__status { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; color: #9db6ca; font-size: 12px; border-bottom: 1px solid #273549; }
+.history-detail__status.is-error { color: #efabb5; }
+.history-detail__status button { flex-shrink: 0; padding: 5px 10px; color: #dce9f3; background: #172435; border: 1px solid #405169; border-radius: 6px; cursor: pointer; }
+.history-detail__skeleton { display: grid; gap: 8px; padding: 16px; }
+.history-detail__skeleton > div { display: grid; grid-template-columns: 34px 1.3fr 1fr 1fr; align-items: center; gap: 14px; height: 44px; }
+.history-detail__skeleton i, .history-detail__skeleton span { height: 14px; border-radius: 5px; background: #243447; animation: history-detail-pulse 1.3s ease-in-out infinite alternate; }
+.history-detail__skeleton i { height: 34px; }
+@keyframes history-detail-pulse { to { opacity: .4; } }
+@media (prefers-reduced-motion: reduce) { .history-detail__skeleton i, .history-detail__skeleton span { animation: none; } }

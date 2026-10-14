@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { PersonalHistorySnapshot } from '../../../../shared/domain';
 import PersonalHistoryPage from './PersonalHistoryPage';
@@ -81,6 +81,32 @@ const snapshot: PersonalHistorySnapshot = {
 };
 
 describe('PersonalHistoryPage', () => {
+  it('keeps the list usable during detail failures and retries only the selected game', async () => {
+    const getMatchDetail = vi.fn().mockRejectedValueOnce(new Error('Personal history is unavailable [HISTORY:TIMEOUT]'))
+      .mockResolvedValue({ match: snapshot.matches[0], itemIconPaths: {} });
+    render(<PersonalHistoryPage snapshot={snapshot} state="ready" getMatchDetail={getMatchDetail} />);
+    expect(screen.getAllByTestId('personal-match')).toHaveLength(10);
+    expect(await screen.findByRole('alert')).toHaveTextContent('请求超时');
+    expect(screen.getAllByTestId('personal-match')).toHaveLength(10);
+    fireEvent.click(screen.getByRole('button', { name: '重试详情' }));
+    await waitFor(() => expect(getMatchDetail).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    expect(getMatchDetail.mock.calls.every(([id]) => id === '0')).toBe(true);
+  });
+  it('aborts old selections and ignores their late responses without replacing the list', async () => {
+    const pending: Array<{ id: string; signal: AbortSignal; resolve: (value: any) => void }> = [];
+    const getMatchDetail = vi.fn((id: string, signal: AbortSignal) => new Promise<any>(resolve => { pending.push({ id, signal, resolve }); }));
+    const { rerender } = render(<PersonalHistoryPage snapshot={snapshot} state="ready" getMatchDetail={getMatchDetail} />);
+    await waitFor(() => expect(pending).toHaveLength(1));
+    fireEvent.click(screen.getAllByTestId('personal-match')[1]);
+    await waitFor(() => expect(pending).toHaveLength(2));
+    expect(pending[0].signal.aborted).toBe(true);
+    await act(async () => pending[0].resolve({ match: snapshot.matches[0], itemIconPaths: {} }));
+    expect(screen.getByText('对局 ID · 1')).toBeVisible();
+    expect(screen.getAllByTestId('personal-match')).toHaveLength(10);
+    rerender(<PersonalHistoryPage snapshot={snapshot} state="ready" active={false} getMatchDetail={getMatchDetail} />);
+    expect(pending[1].signal.aborted).toBe(true);
+  });
   it('sums complete team metrics, preserves zero and hides partial totals', () => {
     const players = snapshot.matches[0].allyPlayers!.map(p => ({ ...p, kills: 0, goldEarned: 10000, deaths: 1, assists: 2 }));
     const { rerender } = render(<PersonalHistoryPage snapshot={{ ...snapshot, matches: [{ ...snapshot.matches[0], allyPlayers: players }] }} state="ready" />);

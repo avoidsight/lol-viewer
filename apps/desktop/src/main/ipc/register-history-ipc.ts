@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { clipboard, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import type { PersonalHistorySnapshot } from '../../shared/domain';
-import { PERSONAL_HISTORY_GET_CHANNEL, personalHistorySchema, personalHistoryTargetSchema, type PersonalHistoryTarget } from '../../shared/ipc';
+import { PERSONAL_HISTORY_GET_CHANNEL, PERSONAL_MATCH_DETAIL_CHANNEL, PERSONAL_MATCH_DETAIL_CANCEL_CHANNEL, personalMatchDetailRequestSchema, personalMatchDetailSchema, personalHistorySchema, personalHistoryTargetSchema, type PersonalHistoryTarget, type PersonalMatchDetail } from '../../shared/ipc';
 import { historyErrorDiagnostic, safeHistoryError } from '../../shared/history-error';
 import { recordDiagnostic } from '../diagnostics/logger';
 import { assertAuthorizedRenderer } from './authorization';
@@ -10,9 +10,32 @@ import { PLAYER_SEARCH, PLAYER_SEARCH_CLIPBOARD, clipboardPlayerId, playerSearch
 export interface PersonalHistoryLoader {
   load(target?: PersonalHistoryTarget, forceRefresh?: boolean): Promise<PersonalHistorySnapshot>;
   search?(input: string): Promise<PlayerSearchResult>;
+  loadDetail?(matchId: string, target: PersonalHistoryTarget, signal: AbortSignal): Promise<PersonalMatchDetail>;
 }
 
 export function registerHistoryIpc(service: PersonalHistoryLoader): void {
+  const detailRequests = new Map<number, { requestId: number; controller: AbortController }>();
+  ipcMain.handle(PERSONAL_MATCH_DETAIL_CHANNEL, async (event: IpcMainInvokeEvent, input: unknown) => {
+    assertAuthorizedRenderer(event);
+    const request = personalMatchDetailRequestSchema.parse(input);
+    detailRequests.get(event.sender.id)?.controller.abort();
+    const job = { requestId: request.requestId, controller: new AbortController() };
+    detailRequests.set(event.sender.id, job);
+    try {
+      if (!service.loadDetail) throw new Error('Personal history is unavailable [HISTORY:NOT_READY]');
+      const result = await service.loadDetail(request.matchId, request.target, job.controller.signal);
+      return job.controller.signal.aborted ? null : personalMatchDetailSchema.parse(result);
+    } catch (error) {
+      if (job.controller.signal.aborted || (error as { code?: string } | null)?.code === 'MATCH_CANCELLED') return null;
+      recordDiagnostic('history.detail', error); throw safeHistoryError(error);
+    } finally { if (detailRequests.get(event.sender.id) === job) detailRequests.delete(event.sender.id); }
+  });
+  ipcMain.handle(PERSONAL_MATCH_DETAIL_CANCEL_CHANNEL, (event: IpcMainInvokeEvent, input: unknown) => {
+    assertAuthorizedRenderer(event);
+    const id = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).parse(input);
+    const job = detailRequests.get(event.sender.id);
+    if (job?.requestId === id) job.controller.abort();
+  });
   ipcMain.handle(PLAYER_SEARCH_CLIPBOARD, (event: IpcMainInvokeEvent) => {
     assertAuthorizedRenderer(event);
     try { return clipboardPlayerId(clipboard.readText()); } catch { return undefined; }

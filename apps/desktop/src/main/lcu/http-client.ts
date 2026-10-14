@@ -6,7 +6,7 @@ import { invalidateLcuConnection, type LcuConnection } from './discovery';
 import { lcuOperation, recordDiagnostic } from '../diagnostics/logger';
 
 export interface LcuError extends Error {
-  code: 'LCU_UNAVAILABLE' | 'LCU_AUTH' | 'LCU_INVALID_RESPONSE' | 'LCU_RESPONSE_TOO_LARGE';
+  code: 'LCU_UNAVAILABLE' | 'LCU_AUTH' | 'LCU_INVALID_RESPONSE' | 'LCU_RESPONSE_TOO_LARGE' | 'MATCH_CANCELLED';
 }
 
 export type HttpsRequest = (
@@ -15,7 +15,7 @@ export type HttpsRequest = (
 ) => ClientRequest;
 
 export interface LcuClient {
-  get<T>(path: string, schema: z.ZodType<T>): Promise<T>;
+  get<T>(path: string, schema: z.ZodType<T>, signal?: AbortSignal): Promise<T>;
   post?(path: string): Promise<void>;
   postJson?<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>;
 }
@@ -37,7 +37,8 @@ export function createLcuClient(
   request: HttpsRequest = httpsRequest,
   maxResponseBytes = 2 * 1024 * 1024
 ): LcuWritableClient {
-  function send<T>(method: 'GET' | 'POST', path: string, schema?: z.ZodType<T>, payload?: unknown): Promise<T | void> {
+  function send<T>(method: 'GET' | 'POST', path: string, schema?: z.ZodType<T>, payload?: unknown, signal?: AbortSignal): Promise<T | void> {
+    if (signal?.aborted) return Promise.reject(lcuError('MATCH_CANCELLED', 'History detail request cancelled'));
     const json = payload === undefined ? undefined : JSON.stringify(payload);
     if (!validPath(path)) {
       return Promise.reject(lcuError('LCU_INVALID_RESPONSE', 'LCU request path is invalid'));
@@ -52,10 +53,12 @@ export function createLcuClient(
         };
         let settled = false;
         let deadline: ReturnType<typeof setTimeout> | undefined;
+        let onAbort: (() => void) | undefined;
         const finish = (action: () => void): void => {
           if (settled) return;
           settled = true;
           clearTimeout(deadline);
+          if (onAbort) signal?.removeEventListener('abort', onAbort);
           action();
         };
         const authorization = Buffer.from(`riot:${connection.password}`).toString('base64');
@@ -142,6 +145,12 @@ export function createLcuClient(
           finish(() => fail(lcuError('LCU_UNAVAILABLE', 'LCU request timed out')));
           req.destroy();
         }, 10_000);
+        onAbort = () => {
+          finish(() => fail(lcuError('MATCH_CANCELLED', 'History detail request cancelled')));
+          req.destroy();
+        };
+        signal?.addEventListener('abort', onAbort, { once: true });
+        if (signal?.aborted) { onAbort(); return; }
         req.end(json);
       });
   }
@@ -150,8 +159,8 @@ export function createLcuClient(
     postJson<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
       return send('POST', path, schema, body) as Promise<T>;
     },
-    get<T>(path: string, schema: z.ZodType<T>): Promise<T> {
-      return send('GET', path, schema) as Promise<T>;
+    get<T>(path: string, schema: z.ZodType<T>, signal?: AbortSignal): Promise<T> {
+      return send('GET', path, schema, undefined, signal) as Promise<T>;
     },
     post(path: string): Promise<void> {
       return send('POST', path) as Promise<void>;

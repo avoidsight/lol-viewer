@@ -3,12 +3,35 @@ import { describe, expect, it, vi } from 'vitest';
 const { handle, getAllWindows, readText } = vi.hoisted(() => ({ handle: vi.fn(), getAllWindows: vi.fn(), readText: vi.fn() }));
 vi.mock('electron', () => ({ ipcMain: { handle }, BrowserWindow: { getAllWindows }, clipboard: { readText } }));
 
-import { PERSONAL_HISTORY_GET_CHANNEL } from '../../shared/ipc';
+import { PERSONAL_HISTORY_GET_CHANNEL, PERSONAL_MATCH_DETAIL_CHANNEL, PERSONAL_MATCH_DETAIL_CANCEL_CHANNEL } from '../../shared/ipc';
 import { createFixturePersonalHistory } from '../fixtures/live-match';
 import { registerHistoryIpc } from './register-history-ipc';
 import { PLAYER_SEARCH, PLAYER_SEARCH_CLIPBOARD } from '../../shared/player-search';
 
 describe('registerHistoryIpc', () => {
+  it('only allows the renderer, cancels replaced details and ignores stale cancellation IDs', async () => {
+    handle.mockClear();
+    const sender = { id: 1 };
+    getAllWindows.mockReturnValue([{ webContents: sender, isDestroyed: () => false }]);
+    const signals: AbortSignal[] = [];
+    const loadDetail = vi.fn((_id: string, _target: unknown, signal: AbortSignal) => {
+      signals.push(signal);
+      return new Promise<never>((_resolve, reject) => signal.addEventListener('abort', () => reject({ code: 'MATCH_CANCELLED' })));
+    });
+    registerHistoryIpc({ load: vi.fn(), loadDetail });
+    const load = handle.mock.calls.find(([channel]) => channel === PERSONAL_MATCH_DETAIL_CHANNEL)![1];
+    const cancel = handle.mock.calls.find(([channel]) => channel === PERSONAL_MATCH_DETAIL_CANCEL_CHANNEL)![1];
+    const request = { matchId: '1', target: { playerId: '7' }, requestId: 1 };
+    await expect(load({ sender: {} }, request)).rejects.toThrow('Unauthorized');
+    await expect(load({ sender }, { ...request, matchId: '../bad' })).rejects.toThrow();
+    const first = load({ sender }, request);
+    const second = load({ sender }, { ...request, requestId: 2 });
+    await expect(first).resolves.toBeNull();
+    expect(signals[0].aborted).toBe(true);
+    cancel({ sender }, 1); expect(signals[1].aborted).toBe(false);
+    cancel({ sender }, 2); await expect(second).resolves.toBeNull();
+    handle.mockClear();
+  });
   it('returns only recognizable player IDs and never reads for unauthorized senders', () => {
     handle.mockClear(); readText.mockClear();
     const sender = {};

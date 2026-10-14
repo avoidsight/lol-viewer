@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { MatchParticipantSummary, MatchSummary, PersonalHistorySnapshot } from '../../../../shared/domain';
-import type { PersonalHistoryTarget } from '../../../../shared/ipc';
+import type { PersonalHistoryTarget, PersonalMatchDetail } from '../../../../shared/ipc';
+import { hasCompleteMatchDetails } from '../../../../shared/history-detail';
+import { diagnosticFromError, diagnosticLabels } from '../../../../shared/diagnostics';
+import { historyErrorReason } from '../../../../shared/history-error';
 import { describeQueue } from '../../../../shared/queue';
 import './history-workspace.css';
 
@@ -39,8 +42,10 @@ function TeamDetails({ players, label, win, remake, snapshot, onPlayerSelect }: 
   </section>;
 }
 
-export default function HistoryWorkspace({ matches, snapshot, onPlayerSelect }: {
-  matches: MatchSummary[]; snapshot: PersonalHistorySnapshot; onPlayerSelect?: (target: PersonalHistoryTarget) => void;
+export default function HistoryWorkspace({ matches, snapshot, active = true, getMatchDetail, onPlayerSelect }: {
+  matches: MatchSummary[]; snapshot: PersonalHistorySnapshot; active?: boolean;
+  getMatchDetail?: (matchId: string, signal: AbortSignal) => Promise<PersonalMatchDetail | null>;
+  onPlayerSelect?: (target: PersonalHistoryTarget) => void;
 }) {
   const [page, setPage] = useState(0);
   const [selectedId, setSelectedId] = useState<string>();
@@ -48,8 +53,37 @@ export default function HistoryWorkspace({ matches, snapshot, onPlayerSelect }: 
   const pageCount = Math.max(1, Math.ceil(matches.length / 10));
   const visible = matches.slice(Math.min(page, pageCount - 1) * 10, (Math.min(page, pageCount - 1) + 1) * 10);
   const selected = visible.find(m => m.matchId === selectedId) ?? visible[0];
-  const allies = selected?.allyPlayers ?? selected?.allyChampionIds?.map(championId => ({ championId })) ?? [];
-  const enemies = selected?.enemyPlayers ?? selected?.enemyChampionIds?.map(championId => ({ championId })) ?? [];
+  const detailCache = useRef(new Map<string, PersonalMatchDetail>());
+  const [retry, setRetry] = useState(0);
+  const [detail, setDetail] = useState<{ key: string; loading?: boolean; data?: PersonalMatchDetail; error?: string }>();
+  const detailKey = `${snapshot.playerId}:${snapshot.updatedAt}:${selected?.matchId ?? ''}`;
+  useEffect(() => { detailCache.current.clear(); }, [snapshot.playerId, snapshot.updatedAt]);
+  useEffect(() => {
+    if (!active || !selected || !getMatchDetail || hasCompleteMatchDetails(selected)) return;
+    const cached = detailCache.current.get(detailKey);
+    if (cached) { setDetail({ key: detailKey, data: cached }); return; }
+    const controller = new AbortController();
+    setDetail({ key: detailKey, loading: true });
+    const timer = window.setTimeout(() => {
+      void getMatchDetail(selected.matchId, controller.signal).then(result => {
+        if (controller.signal.aborted) return;
+        if (!result || result.match.matchId !== selected.matchId) throw new Error('Personal history is unavailable [HISTORY:SCHEMA]');
+        if (detailCache.current.size >= 20) detailCache.current.delete(detailCache.current.keys().next().value!);
+        detailCache.current.set(detailKey, result);
+        setDetail({ key: detailKey, data: result });
+      }).catch(error => {
+        if (controller.signal.aborted) return;
+        const diagnostic = diagnosticFromError(error);
+        setDetail({ key: detailKey, error: `${diagnosticLabels[diagnostic?.reason ?? historyErrorReason(error)]}${diagnostic ? ` · ${diagnostic.id}` : ''}` });
+      });
+    }, 120);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [active, selected, getMatchDetail, detailKey, retry]);
+  const currentDetail = detail?.key === detailKey ? detail : undefined;
+  const viewedMatch = currentDetail?.data?.match ?? selected;
+  const viewedSnapshot = currentDetail?.data ? { ...snapshot, itemIconPaths: { ...snapshot.itemIconPaths, ...currentDetail.data.itemIconPaths } } : snapshot;
+  const allies = viewedMatch?.allyPlayers ?? viewedMatch?.allyChampionIds?.map(championId => ({ championId })) ?? [];
+  const enemies = viewedMatch?.enemyPlayers ?? viewedMatch?.enemyChampionIds?.map(championId => ({ championId })) ?? [];
   return <div className="history-workspace">
     <section className="history-browser" aria-label="战绩列表">
       <header><h2>最近战绩</h2><span>{matches.length} 场</span></header>
@@ -64,8 +98,14 @@ export default function HistoryWorkspace({ matches, snapshot, onPlayerSelect }: 
     </section>
     <section className="history-detail" aria-label="选中对局详情">
       {selected ? <>
-        <TeamDetails players={allies} label="己方" win={selected.win} remake={selected.remake} snapshot={snapshot} onPlayerSelect={onPlayerSelect} />
-        <TeamDetails players={enemies} label="敌方" win={!selected.win} remake={selected.remake} snapshot={snapshot} onPlayerSelect={onPlayerSelect} />
+        {currentDetail?.loading && <div className="history-detail__status" role="status">正在加载对局详情…</div>}
+        {currentDetail?.error && <div className="history-detail__status is-error" role="alert"><span>详情暂不可用：{currentDetail.error}</span><button onClick={() => { detailCache.current.delete(detailKey); setRetry(value => value + 1); }}>重试详情</button></div>}
+        {currentDetail?.loading && allies.length + enemies.length < 2
+          ? <div className="history-detail__skeleton" aria-hidden="true">{Array.from({ length: 10 }, (_, index) => <div key={index}><i /><span /><span /><span /></div>)}</div>
+          : <>
+            <TeamDetails players={allies} label="己方" win={viewedMatch!.win} remake={viewedMatch?.remake} snapshot={viewedSnapshot} onPlayerSelect={onPlayerSelect} />
+            <TeamDetails players={enemies} label="敌方" win={!viewedMatch!.win} remake={viewedMatch?.remake} snapshot={viewedSnapshot} onPlayerSelect={onPlayerSelect} />
+          </>}
         <footer>对局 ID · {selected.matchId}</footer>
       </> : <div className="history-detail__empty">暂无对局详情</div>}
     </section>

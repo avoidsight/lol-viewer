@@ -73,6 +73,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
   const historyRequest = useRef<Promise<PersonalHistorySnapshot> | undefined>(undefined);
   const ownHistoryRef = useRef<PersonalHistorySnapshot | undefined>(undefined);
   const historyNavigation = useRef(0);
+  const detailRequestId = useRef(0);
   const historyRefreshingRef = useRef(false);
   const liveViewRef = useRef(liveView);
   const settingsRef = useRef(settings);
@@ -368,6 +369,15 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
     setHistoryRefreshError('');
     setHistoryDiagnostic(undefined);
   };
+  const getMatchDetail = useCallback(async (matchId: string, signal: AbortSignal) => {
+    const api = window.lolViewer;
+    if (!api?.getPersonalMatchDetail || !history?.playerId || signal.aborted) return null;
+    const requestId = ++detailRequestId.current;
+    const cancel = () => { void api.cancelPersonalMatchDetail?.(requestId).catch(() => undefined); };
+    signal.addEventListener('abort', cancel, { once: true });
+    try { return await api.getPersonalMatchDetail(matchId, { playerId: history.playerId, puuid: history.puuid }, requestId); }
+    finally { signal.removeEventListener('abort', cancel); }
+  }, [history?.playerId, history?.puuid]);
   const clearCache = async () => { setMessage('正在清理缓存…'); try { await window.lolViewer?.clearCache(); setMessage('缓存已清理'); } catch { setMessage('清理失败，请重试'); } };
   const updateAutoAcceptSetting = async (autoAcceptReadyCheck: boolean) => {
     try { const next = await window.lolViewer?.updateSettings({ autoAcceptReadyCheck }); if (next) { settingsRef.current = next; setSettings(next); } } catch { setMessage('设置保存失败，请重试'); }
@@ -412,7 +422,7 @@ export default function App({ initialTab = 'history' }: { initialTab?: AppTab } 
         : null;
 
   const content = <>
-    <div hidden={page !== 'history'}><PersonalHistoryPage snapshot={history} state={historyState} diagnostic={historyDiagnostic} onRefresh={() => void refreshHistory()} onPlayerSelect={(target) => void viewPlayerHistory(target)} onBack={historyTarget ? returnToOwnHistory : undefined} refreshing={historyRefreshing} /></div>
+    <div hidden={page !== 'history'}><PersonalHistoryPage snapshot={history} state={historyState} active={page === 'history'} getMatchDetail={window.lolViewer?.getPersonalMatchDetail ? getMatchDetail : undefined} diagnostic={historyDiagnostic} onRefresh={() => void refreshHistory()} onPlayerSelect={(target) => void viewPlayerHistory(target)} onBack={historyTarget ? returnToOwnHistory : undefined} refreshing={historyRefreshing} /></div>
     <div hidden={page !== 'live'}><LiveMatchPage onPlayerSelect={target => void viewPlayerHistory(target)} match={liveView.match} players={liveView.match ? undefined : liveView.progress} loadingProgress={liveView.requesting && !liveView.match && (liveView.progress.length > 0 || (liveView.phase !== undefined && activePhases.has(liveView.phase))) ? liveView.progress.length : undefined} lifecycleStatus={liveView.status} gameflowPhase={liveView.phase} showLaneDifferences={settings.showLaneDifferences} notice={liveNotice} /></div>
     {page === 'champions' && <ChampionLibraryPage getCatalog={getChampionCatalog} getDetails={getChampionDetails} getGuide={getChampionGuide} />}
     {page === 'settings' && <SettingsPage onGameTextInputChange={(checked) => void updateGameTextInputSetting(checked)} settings={settings} message={message} onAutoCopyEnemyHistoryChange={(checked) => void updateAutoCopySetting(checked)} onAutoOpenChange={(checked) => void updateAutoOpenSetting(checked)} onAutoAcceptChange={(checked) => void updateAutoAcceptSetting(checked)} onClearCache={() => void clearCache()} />}

@@ -16,6 +16,8 @@ export const CHAMPION_GUIDE_GET_CHANNEL = 'champions:get-guide' as const;
 export const CHAMPION_CATALOG_GET_CHANNEL = 'champions:get-catalog' as const;
 export const CHAMPION_DETAILS_GET_CHANNEL = 'champions:get-details' as const;
 export const PERSONAL_HISTORY_GET_CHANNEL = 'history:get-personal' as const;
+export const PERSONAL_MATCH_DETAIL_CHANNEL = 'history:get-detail' as const;
+export const PERSONAL_MATCH_DETAIL_CANCEL_CHANNEL = 'history:cancel-detail' as const;
 export const APP_VERSION_CHANNEL = 'app:get-version' as const;
 
 const laneSchema = z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'UNKNOWN']);
@@ -97,6 +99,7 @@ const favoriteChampionSchema = z.object({
 
 export const personalHistorySchema: z.ZodType<PersonalHistorySnapshot> = z.object({
   playerId: z.string(),
+  puuid: z.string().min(1).optional(),
   displayName: z.string(),
   profileIconId: z.number().int().nonnegative(),
   rank: z.string().optional(),
@@ -121,6 +124,16 @@ export const personalHistoryTargetSchema = z.object({
   profileIconId: z.number().int().nonnegative().optional()
 }).strict();
 export type PersonalHistoryTarget = z.infer<typeof personalHistoryTargetSchema>;
+export const personalMatchDetailRequestSchema = z.object({
+  matchId: z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/),
+  target: personalHistoryTargetSchema,
+  requestId: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)
+}).strict();
+export const personalMatchDetailSchema = z.object({
+  match: matchSummarySchema,
+  itemIconPaths: z.record(z.string(), z.string().min(1))
+}).strict();
+export type PersonalMatchDetail = z.infer<typeof personalMatchDetailSchema>;
 
 export const playerSnapshotSchema: z.ZodType<PlayerSnapshot> = z.object({
   championName: z.string().min(1).max(100).optional(),
@@ -230,6 +243,8 @@ export type LiveRosterPlayer = z.infer<typeof liveRosterPlayerSchema>;
 export type LiveRoster = z.infer<typeof liveRosterSchema>;
 
 export interface LolViewerApi {
+  getPersonalMatchDetail?: (matchId: string, target: PersonalHistoryTarget, requestId: number) => Promise<PersonalMatchDetail | null>;
+  cancelPersonalMatchDetail?: (requestId: number) => Promise<void>;
   exportDiagnostics?: () => Promise<import('./diagnostics').DiagnosticExportResult>;
   onLiveDiagnostic?: (callback: (diagnostic: import('./diagnostics').Diagnostic, generation: number) => void) => () => void;
   checkUpdate?: () => Promise<import('./updates').AvailableUpdate | null>;

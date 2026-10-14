@@ -180,6 +180,17 @@ void app.whenReady().then(() => {
     readyCheckAutoAcceptor.start();
   }
   registerHistoryIpc({
+    loadDetail: async (matchId, target, signal) => {
+      if (fixtureMode) {
+        const snapshot = createFixturePersonalHistory(target);
+        const match = snapshot.matches.find(m => m.matchId === matchId);
+        if (!match) throw new Error('Personal history is unavailable [HISTORY:NOT_READY]');
+        return { match, itemIconPaths: snapshot.itemIconPaths ?? {} };
+      }
+      const connection = await discoverLcuConnection();
+      if (!connection) throw new Error('League client is unavailable');
+      return new PersonalHistoryService(createLcuClient(connection), personalHistoryCache, undefined, staticData).loadDetail(matchId, target, signal);
+    },
     search: async input => {
       if (fixtureMode) return { ok: true, target: { playerId: 'fixture-search', puuid: 'fixture-search', displayName: input, profileIconId: 29 } };
       const connection = await discoverLcuConnection();

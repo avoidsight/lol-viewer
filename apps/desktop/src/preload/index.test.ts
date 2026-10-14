@@ -32,6 +32,20 @@ async function loadApi(): Promise<LolViewerApi> {
 describe('preload match API validation', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('validates selected detail requests and scoped cancellation', async () => {
+    const api = await loadApi();
+    const snapshot = createFixturePersonalHistory();
+    const detail = { match: snapshot.matches[0], itemIconPaths: snapshot.itemIconPaths ?? {} };
+    electron.invoke.mockResolvedValue(detail);
+    await expect(api.getPersonalMatchDetail!(detail.match.matchId, { playerId: snapshot.playerId }, 1)).resolves.toEqual(detail);
+    expect(electron.invoke).toHaveBeenLastCalledWith('history:get-detail', { matchId: detail.match.matchId, target: { playerId: snapshot.playerId }, requestId: 1 });
+    await expect(api.getPersonalMatchDetail!('../bad', { playerId: snapshot.playerId }, 1)).rejects.toThrow();
+    await api.cancelPersonalMatchDetail!(1); expect(electron.invoke).toHaveBeenLastCalledWith('history:cancel-detail', 1);
+    await expect(api.cancelPersonalMatchDetail!(1.5)).rejects.toThrow();
+    electron.invoke.mockResolvedValue(null);
+    await expect(api.getPersonalMatchDetail!(detail.match.matchId, { playerId: snapshot.playerId }, 2)).resolves.toBeNull();
+  });
+
   it('exports diagnostics through a fixed channel and only forwards validated error IDs', async () => {
     const api = await loadApi();
     electron.invoke.mockResolvedValue({ status: 'saved' });

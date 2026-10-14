@@ -21,7 +21,7 @@ const cachedSnapshot: PersonalHistorySnapshot = {
   playerId: '7', displayName: 'Cached Player', profileIconId: 29, matches: [], sampleSize: 0,
   wins: 0, losses: 0, winRate: 0, averageKda: 0, favoriteChampions: [], cached: false,
   itemIconPaths: {},
-  historyDataVersion: 12,
+  historyDataVersion: 13,
   updatedAt: 1_000
 };
 
@@ -33,6 +33,39 @@ function createService(get: LcuClient['get']) {
 }
 
 describe('PersonalHistoryService', () => {
+  it('shows a healthy list even when optional metadata never settles', async () => {
+    vi.useFakeTimers();
+    try {
+      const get = vi.fn(async (path: string) => {
+        if (path === '/lol-summoner/v1/current-summoner') return { summonerId: '7', profileIconId: 1 };
+        if (path.includes('/matches?')) return { games: [game(0)] };
+        return new Promise(() => {});
+      }) as LcuClient['get'];
+      const { service } = createService(get);
+      const result = service.load();
+      await vi.advanceTimersByTimeAsync(1500);
+      expect((await result).matches).toHaveLength(1);
+      expect(vi.mocked(get).mock.calls.some(([path]) => path.includes('/v1/games/'))).toBe(false);
+    } finally { vi.useRealTimers(); }
+  });
+  it('rejects ambiguous detail identities rather than displaying the first participant', async () => {
+    const summary = game(0);
+    const match = { matchId: '1', queueId: 420, endedAt: 1, durationSeconds: 1800, championId: summary.participants[0].championId, ...summary.participants[0].stats };
+    const cache = { getFresh: vi.fn(), getLatest: vi.fn(() => ({ ...cachedSnapshot, matches: [match] })), put: vi.fn() };
+    const get = vi.fn(async () => ({ ...summary, participants: [summary.participants[0], summary.participants[0]] })) as LcuClient['get'];
+    const service = new PersonalHistoryService({ get }, cache);
+    await expect(service.loadDetail('1', { playerId: '7' })).rejects.toThrow('[HISTORY:NOT_READY]');
+    expect(cache.put).not.toHaveBeenCalled();
+  });
+  it('returns an identified detail without requiring a working cache', async () => {
+    const full = { ...game(0), participants: [{ ...game(0).participants[0], participantId: 1, teamId: 100 }],
+      participantIdentities: [{ participantId: 1, player: { puuid: 'real-player' } }] };
+    const get = vi.fn(async (path: string) => { if (path.includes('/games/')) return full; throw new Error('metadata offline'); }) as LcuClient['get'];
+    const cache = { getFresh: vi.fn(), getLatest: vi.fn(() => { throw new Error('cache unavailable'); }), put: vi.fn() };
+    const service = new PersonalHistoryService({ get }, cache);
+    const result = await service.loadDetail('1', { playerId: '7', puuid: 'real-player' });
+    expect(result.match).toMatchObject({ matchId: '1', championId: full.participants[0].championId });
+  });
   it('forced refresh bypasses fresh cache and does not hide failures behind old data', async () => {
     const get = vi.fn(async (path: string) => {
       if (path.includes('current-summoner') && !path.includes('/matches?')) return { summonerId: 7, profileIconId: 30 };
@@ -155,7 +188,7 @@ describe('PersonalHistoryService', () => {
       displayName: '目标玩家#CN1',
       profileIconId: 88,
       rank: '黄金 I 77 胜点',
-      historyDataVersion: 12
+      historyDataVersion: 13
     });
     expect(result.matches[0]).toMatchObject({
       championId: 99,
@@ -173,7 +206,7 @@ describe('PersonalHistoryService', () => {
     expect(get).not.toHaveBeenCalledWith('/lol-match-history/v1/games/1', expect.anything());
   });
 
-  it('loads each game detail when the Tencent history list only contains the local participant', async () => {
+  it('loads the selected detail separately when the list only contains the local participant', async () => {
     const listedGame = {
       ...game(0),
       participants: [{
@@ -213,15 +246,18 @@ describe('PersonalHistoryService', () => {
       throw new Error('optional endpoint offline');
     }) as LcuClient['get'];
 
-    const result = await createService(get).service.load();
-
-    expect(result.matches[0]).toMatchObject({
+    const { service } = createService(get);
+    const list = await service.load();
+    expect(vi.mocked(get).mock.calls.some(([path]) => path.includes('/v1/games/'))).toBe(false);
+    expect(list.matches).toHaveLength(1);
+    const result = await service.loadDetail('1', { playerId: '7' });
+    expect(result.match).toMatchObject({
       championId: listedGame.participants[0].championId,
       kills: listedGame.participants[0].stats.kills,
       allyChampionIds: [listedGame.participants[0].championId, 2, 3, 4, 5],
       enemyChampionIds: [6, 7, 8, 9, 10]
     });
-    expect(get).toHaveBeenCalledWith('/lol-match-history/v1/games/1', expect.anything());
+    expect(vi.mocked(get).mock.calls.map(call => call[0])).toContain('/lol-match-history/v1/games/1');
   });
 
   it('uses the target puuid when enriching a Tencent summary that has no performance metrics', async () => {
@@ -273,22 +309,25 @@ describe('PersonalHistoryService', () => {
     const database = new Database(':memory:');
     migrateDatabase(database);
 
-    const result = await new PersonalHistoryService(
+    const service = new PersonalHistoryService(
       { get } as LcuClient,
       new PersonalHistoryCache(database),
       sgp
-    ).load({ playerId: 'target', puuid: 'target-puuid', displayName: '目标玩家', profileIconId: 88 });
+    );
+    const target = { playerId: 'target', puuid: 'target-puuid', displayName: '目标玩家', profileIconId: 88 };
+    await service.load(target);
+    const result = await service.loadDetail('1', target);
 
-    expect(result.matches[0]).toMatchObject({
+    expect(result.match).toMatchObject({
       championId: 99,
       kills: 9,
       totalDamageDealtToChampions: 32_000,
       totalDamageTaken: 27_000
     });
-    expect(get).toHaveBeenCalledWith('/lol-match-history/v1/games/1', expect.anything());
+    expect(vi.mocked(get).mock.calls.map(call => call[0])).toContain('/lol-match-history/v1/games/1');
   });
 
-  it('limits game detail enrichment to four concurrent requests in newest-first order', async () => {
+  it('does not request unselected details while loading the list', async () => {
     const games = Array.from({ length: 12 }, (_, index) => game(index));
     let active = 0;
     let maximum = 0;
@@ -308,11 +347,13 @@ describe('PersonalHistoryService', () => {
       throw new Error('optional endpoint offline');
     }) as LcuClient['get'];
 
-    await createService(get).service.load();
-
-    expect(maximum).toBe(4);
-    expect(started.slice(0, 4)).toEqual([1, 2, 3, 4]);
-    expect(started).toHaveLength(12);
+    const { service } = createService(get);
+    const list = await service.load();
+    expect(list.matches).toHaveLength(12);
+    expect(started).toEqual([]);
+    await service.loadDetail('1', { playerId: '7' });
+    expect(maximum).toBe(1);
+    expect(started).toEqual([1]);
   });
 
   it('refreshes a legacy fresh cache that has no local item icon metadata', async () => {
@@ -352,7 +393,7 @@ describe('PersonalHistoryService', () => {
     });
 
     expect(sgp.getHistory).toHaveBeenCalledWith('target-puuid', 20);
-    expect(result.historyDataVersion).toBe(12);
+    expect(result.historyDataVersion).toBe(13);
     expect(cache.put).toHaveBeenCalled();
   });
 
@@ -445,10 +486,10 @@ describe('PersonalHistoryService', () => {
     await expect(service.load()).resolves.toEqual({ ...cachedSnapshot, cached: true });
   });
 
-  it('returns globally latest cache when LCU cannot identify the current summoner', async () => {
+  it('does not show another player as the current account when identity lookup fails', async () => {
     const { cache, service } = createService((async () => { throw new Error('offline'); }) as LcuClient['get']);
     cache.put(cachedSnapshot, 1_000);
-    await expect(service.load()).resolves.toEqual({ ...cachedSnapshot, cached: true });
+    await expect(service.load()).rejects.toThrow('Personal history is unavailable');
   });
 
   it('throws a sanitized unavailable error without cache', async () => {

@@ -87,6 +87,7 @@ export interface FavoriteChampion {
 
 export interface PersonalHistorySnapshot {
   playerId: string;
+  puuid?: string;
   displayName: string;
   profileIconId: number;
   rank?: string;
