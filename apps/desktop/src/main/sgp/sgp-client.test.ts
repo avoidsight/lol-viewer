@@ -24,8 +24,39 @@ describe('SgpClient', () => {
   });
   it('bounds the response body, including bodies without a content-length', async () => {
     const lcu = { get: vi.fn().mockResolvedValue({ accessToken: 'test-token' }) } as unknown as LcuClient;
-    const request = vi.fn(async () => new Response('x'.repeat(2 * 1024 * 1024 + 1)));
+    const request = vi.fn(async () => new Response('x'.repeat(16 * 1024 * 1024 + 1)));
     await expect(createSgpClient(lcu, 'HN1', request).getHistory('target', 20)).rejects.toMatchObject({ code: 'SGP_RESPONSE_TOO_LARGE' });
+  });
+  it.each([false, true])('accepts twenty summaries exceeding 2 MiB (content-length: %s)', async contentLength => {
+    const lcu = { get: vi.fn().mockResolvedValue({ accessToken: 'test-token' }) } as unknown as LcuClient;
+    // Synthetic forward-compatible extra statistics reproduce the size of full SGP games.
+    const body = JSON.stringify({ games: Array.from({ length: 20 }, (_, index) => ({ json: {
+      gameId: index + 1, queueId: 420, gameCreation: 1000, gameDuration: 1800,
+      participants: [{ puuid: 'target', championId: 1, kills: 8, deaths: 2, assists: 5, win: true,
+        extraStatistics: 'x'.repeat(125_000) }]
+    } })) });
+    expect(Buffer.byteLength(body)).toBeGreaterThan(2 * 1024 * 1024);
+    const request = vi.fn(async () => new Response(body, {
+      headers: contentLength ? { 'content-length': String(Buffer.byteLength(body)) } : {}
+    }));
+    const result = await createSgpClient(lcu, 'HN1', request).getHistory('target', 20) as { games: unknown[] };
+    expect(result.games).toHaveLength(20);
+    expect(request).toHaveBeenCalledOnce();
+  });
+  it('rejects an oversized declared history before reading the body', async () => {
+    const cancel = vi.fn();
+    const response = new Response('{}', { headers: { 'content-length': String(16 * 1024 * 1024 + 1) } });
+    vi.spyOn(response.body!, 'cancel').mockImplementation(cancel);
+    const lcu = { get: vi.fn().mockResolvedValue({ accessToken: 'test-token' }) } as unknown as LcuClient;
+    await expect(createSgpClient(lcu, 'HN1', vi.fn(async () => response)).getHistory('target', 20))
+      .rejects.toMatchObject({ code: 'SGP_RESPONSE_TOO_LARGE' });
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+  it('keeps the smaller bound for ranked responses', async () => {
+    const lcu = { get: vi.fn().mockResolvedValue('test-token') } as unknown as LcuClient;
+    const request = vi.fn(async () => new Response('x'.repeat(2 * 1024 * 1024 + 1)));
+    await expect(createSgpClient(lcu, 'HN1', request).getRankedStats('target'))
+      .rejects.toMatchObject({ code: 'SGP_RESPONSE_TOO_LARGE' });
   });
   it('isolates invalid games and accepts missing optional SGP statistics', async () => {
     const lcu = { get: vi.fn(async () => ({ accessToken: 'test-token' })) } as unknown as LcuClient;

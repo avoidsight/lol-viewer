@@ -18,7 +18,7 @@ export function diagnosticMarker(value?: Diagnostic): string {
   return value ? ` [DIAG:${value.id}:${value.reason}]` : '';
 }
 export const diagnosticLabels: Record<Diagnostic['reason'], string> = {
-  CONNECTION: '客户端连接中断', AUTH: '客户端授权失效', NOT_READY: '数据尚未就绪', TIMEOUT: '请求超时',
+  CONNECTION: '客户端连接中断', AUTH: '授权或查询权限异常', NOT_READY: '数据尚未就绪', TIMEOUT: '请求超时',
   RATE_LIMIT: '查询过于频繁', PRIVACY: '战绩受访问限制', SCHEMA: '数据格式不兼容',
   TOO_LARGE: '数据超过读取上限', REQUEST: '接口请求失败', UNKNOWN: '数据暂时无法读取'
 };

@@ -234,7 +234,7 @@ describe('MatchService', () => {
       if (path === '/lol-summoner/v1/current-summoner') return { summonerId: 'real-me', displayName: '我的账号' };
       if (path.includes('/ranked-stats/')) return { queues: [] };
       if (path === '/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=20') return history;
-      if (path.includes('/lol-match-history/')) throw new Error('privacy protected');
+      if (path.includes('/lol-match-history/')) throw new Error('[HISTORY:PRIVACY]');
       return '15.14.1';
     });
 
@@ -283,6 +283,26 @@ describe('MatchService', () => {
     const result = await new MatchService({ get } as LcuClient, { sgp }).loadLiveMatch('all', vi.fn());
 
     expect(result.players.every((entry) => entry.errorCode === 'DATA_SERVICE_UNAVAILABLE')).toBe(true);
+  });
+  it.each([401, 403, 404])('classifies SGP %s consistently with the history fallback policy', async status => {
+    const identified = participants.map(entry => ({ ...entry, puuid: `p-${entry.summonerId}` }));
+    const get = vi.fn(async (path: string) => {
+      if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: identified.slice(0, 5), teamTwo: identified.slice(5), queueId: 420 } };
+      if (path === '/lol-summoner/v1/current-summoner') return { summonerId: '1' };
+      if (path.includes('/matches?')) return history;
+      throw new Error('optional metadata offline');
+    });
+    const sgp = { getHistory: vi.fn().mockRejectedValue(new Error(`SGP request failed with status ${status}`)),
+      getRankedStats: vi.fn().mockResolvedValue({ queues: [] }) };
+    const result = await new MatchService({ get } as LcuClient, { sgp }).loadLiveMatch('all', vi.fn());
+    if (status === 404) {
+      expect(result.players.every(p => p.status === 'ready')).toBe(true);
+      expect(get.mock.calls.filter(([path]) => path.includes('/matches?'))).toHaveLength(10);
+    } else {
+      expect(result.players.every(p => p.errorCode === 'CLIENT_UNAVAILABLE')).toBe(true);
+      expect(get.mock.calls.some(([path]) => path.includes('/matches?'))).toBe(false);
+    }
+    expect(result.players.some(p => p.errorCode === 'PRIVACY_RESTRICTED')).toBe(false);
   });
   it('stops starting LCU requests, player events, and cache writes after cancellation', async () => {
     const controller = new AbortController();

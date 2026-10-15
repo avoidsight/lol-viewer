@@ -9,7 +9,7 @@ import { adaptMatchHistory, describeQueue, matchHistoryResponseSchema } from '..
 import type { SgpClient } from '../sgp/sgp-client';
 import { LcuStaticDataCache, type LcuStaticDataProvider } from '../lcu/static-data-cache';
 import { readHistorySource } from '../history/history-source';
-import { isTransientHistoryError } from '../../shared/history-error';
+import { historyErrorReason, isTransientHistoryError } from '../../shared/history-error';
 
 const participantSchema = z.object({
   summonerId: z.union([z.string(), z.number()]),
@@ -120,12 +120,10 @@ function isTransient(error: unknown): boolean {
 }
 
 function classifyHistoryError(error: unknown, source: 'lcu' | 'sgp'): PlayerDataErrorCode {
-  const code = (error as { code?: string })?.code;
-  const message = error instanceof Error ? error.message.toLowerCase() : '';
-  if (message.includes('privacy') || message.includes('forbidden') || /status (403|404)\b/.test(message)) return 'PRIVACY_RESTRICTED';
-  if (code === 'LCU_UNAVAILABLE' || code === 'LCU_AUTH') return 'CLIENT_UNAVAILABLE';
-  if (code === 'LCU_INVALID_RESPONSE' || code === 'LCU_RESPONSE_TOO_LARGE') return 'INVALID_RESPONSE';
-  if (error instanceof z.ZodError) return 'INVALID_RESPONSE';
+  const reason = historyErrorReason(error);
+  if (reason === 'PRIVACY') return 'PRIVACY_RESTRICTED';
+  if (reason === 'CONNECTION' || reason === 'AUTH') return 'CLIENT_UNAVAILABLE';
+  if (reason === 'SCHEMA' || reason === 'TOO_LARGE') return 'INVALID_RESPONSE';
   if (source === 'sgp') return 'DATA_SERVICE_UNAVAILABLE';
   return 'UNKNOWN';
 }

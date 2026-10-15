@@ -3,7 +3,7 @@ import { diagnosticFromError, diagnosticMarker } from './diagnostics';
 
 const reasons = {
   CONNECTION: '无法连接英雄联盟客户端，请确认已登录',
-  AUTH: '客户端授权已失效，请重新连接',
+  AUTH: '客户端授权或查询权限异常，请重新登录后重试',
   NOT_READY: '客户端战绩数据尚未就绪，请稍后重试',
   TIMEOUT: '战绩请求超时，请稍后重试',
   RATE_LIMIT: '查询过于频繁，请稍后重试',
@@ -46,12 +46,16 @@ export function historyErrorReason(error: unknown): Reason {
   const code = (error as { code?: string } | null)?.code;
   const status = historyErrorStatus(error);
   const source = historyErrorSource(error);
-  if (code === 'LCU_AUTH') return 'AUTH';
+  if (code === 'LCU_AUTH' || code === 'SGP_AUTH') return 'AUTH';
+  if (code === 'SGP_PRIVACY') return 'PRIVACY';
   if (code === 'LCU_RESPONSE_TOO_LARGE' || code === 'SGP_RESPONSE_TOO_LARGE') return 'TOO_LARGE';
   if (/timed out|timeout/i.test(message)) return 'TIMEOUT';
   if (/schema|invalid JSON/i.test(message)) return 'SCHEMA';
   if (status === 429) return 'RATE_LIMIT';
-  if (source === 'sgp' && (status === 403 || status === 404)) return 'PRIVACY';
+  // A status alone is not evidence of a player's privacy setting. Never retry
+  // authorization failures via another source, but allow unavailable data to fall back.
+  if (source === 'sgp' && (status === 401 || status === 403)) return 'AUTH';
+  if (source === 'sgp' && status === 404) return 'NOT_READY';
   if (code === 'LCU_UNAVAILABLE' || /League client is unavailable/i.test(message)) return 'CONNECTION';
   if (source === 'lcu' && status === 404) return 'NOT_READY';
   if (code === 'LCU_INVALID_RESPONSE' || /SGP request failed with status/i.test(message)) return 'REQUEST';

@@ -55,13 +55,16 @@ export interface SgpClient {
   getRankedStats(puuid: string): Promise<{ queues: Array<{ queueType: string; tier: string; division: string; leaguePoints: number }> }>;
 }
 
-async function readJson(request: typeof fetch, url: string, token: string): Promise<unknown> {
+// Twenty full summaries include all participants and can legitimately exceed 2 MiB.
+// Keep the larger allowance specific to history, not every remote endpoint.
+const historyMaxBytes = 16 * 1024 * 1024;
+
+async function readJson(request: typeof fetch, url: string, token: string, maxBytes = 2 * 1024 * 1024): Promise<unknown> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8_000);
   try {
     const response = await request(url, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal, redirect: 'error' });
     if (!response.ok) { await response.body?.cancel(); throw new Error(`SGP request failed with status ${response.status}`); }
-    const maxBytes = 2 * 1024 * 1024;
     if (Number(response.headers.get('content-length')) > maxBytes) {
       await response.body?.cancel(); throw Object.assign(new Error('SGP response exceeded the size limit'), { code: 'SGP_RESPONSE_TOO_LARGE' });
     }
@@ -101,7 +104,7 @@ export function createSgpClient(lcu: LcuClient, rsoPlatformId: string, request: 
         await lcu.get('/entitlements/v1/token', entitlementsSchema)
       );
       const url = `${baseUrl}/match-history-query/v1/products/lol/player/${encodeURIComponent(puuid)}/SUMMARY?startIndex=0&count=${count}`;
-      const source = sgpHistorySchema.parse(await readJson(request, url, accessToken));
+      const source = sgpHistorySchema.parse(await readJson(request, url, accessToken, historyMaxBytes));
       return { games: source.games.flatMap(({ json: game }) => {
         const target = game.participants.find((participant) => participant.puuid === puuid);
         if (!target) return [];

@@ -16,7 +16,9 @@ describe('history refresh errors', () => {
     ['LCU returned an unexpected status (500)', '接口请求失败'],
     ['SGP request failed with status 503', '接口请求失败'],
     ['SGP request failed with status 429', '频繁'],
-    ['SGP request failed with status 403', '未公开'],
+    ['SGP request failed with status 401', '授权或查询权限'],
+    ['SGP request failed with status 403', '授权或查询权限'],
+    ['SGP request failed with status 404', '尚未就绪'],
     ['secret-token-player-data', '暂时无法读取']
   ])('preserves safe reason across Electron wrapping: %s', (message, expected) => {
     const safe = safeHistoryError(new Error(message));
