@@ -10,6 +10,7 @@ import type { PersonalHistoryCache } from '../cache/database';
 import type { LcuClient } from '../lcu/http-client';
 import type { SgpClient } from '../sgp/sgp-client';
 import { LcuStaticDataCache, type LcuStaticDataProvider } from '../lcu/static-data-cache';
+import { optionalWithin } from '../lcu/optional-data';
 import {
   adaptMatchHistory,
   matchHistoryGameSchema,
@@ -74,12 +75,6 @@ function favoriteChampions(matches: PersonalHistorySnapshot['matches']): Favorit
     .sort((left, right) => right.games - left.games || left.championId - right.championId);
 }
 
-function optionalWithin<T>(request: Promise<T>): Promise<T | undefined> {
-  return new Promise(resolve => {
-    const timer = setTimeout(() => resolve(undefined), 1500);
-    request.then(value => { clearTimeout(timer); resolve(value); }, () => { clearTimeout(timer); resolve(undefined); });
-  });
-}
 function checkCancelled(signal?: AbortSignal) {
   if (signal?.aborted) throw Object.assign(new Error('History detail request cancelled'), { code: 'MATCH_CANCELLED' });
 }

@@ -8,6 +8,7 @@ import type { LcuClient } from '../lcu/http-client';
 import { adaptMatchHistory, describeQueue, matchHistoryResponseSchema } from '../lcu/match-adapter';
 import type { SgpClient } from '../sgp/sgp-client';
 import { LcuStaticDataCache, type LcuStaticDataProvider } from '../lcu/static-data-cache';
+import { optionalWithin } from '../lcu/optional-data';
 import { readHistorySource } from '../history/history-source';
 import { historyErrorReason, isTransientHistoryError } from '../../shared/history-error';
 
@@ -208,19 +209,11 @@ export class MatchService {
       champSelectFallback
     } = roster;
     checkCancelled(signal);
-    let assetVersion: string | undefined;
-    try {
-      assetVersion = await this.staticData.getAssetVersion(this.client);
-    } catch {
-      checkCancelled(signal);
-      assetVersion = undefined;
-    }
-    checkCancelled(signal);
-    const [itemIconPaths, champions] = await Promise.all([
-      this.staticData.getItemIconPaths(this.client).catch(() => ({} as Record<string, string>)),
-      this.staticData.getChampionMetadata?.(this.client).catch(() => ({} as Record<number, { name: string }>)) ?? ({} as Record<number, { name: string }>)
+    const metadata = Promise.all([
+      optionalWithin(Promise.resolve().then(() => { checkCancelled(signal); return this.staticData.getAssetVersion(this.client); }), signal),
+      optionalWithin(Promise.resolve().then(() => { checkCancelled(signal); return this.staticData.getItemIconPaths(this.client); }), signal),
+      optionalWithin(Promise.resolve().then(() => { checkCancelled(signal); return this.staticData.getChampionMetadata?.(this.client); }), signal)
     ]);
-    checkCancelled(signal);
     const players = await mapLimit(participants, 4, async (participant) => {
       checkCancelled(signal);
       const isLocalPlayer = participant === local;
@@ -251,7 +244,6 @@ export class MatchService {
         ...(localTeamId === null ? {} : { isLocalTeam: participant.teamId === localTeamId }),
         lane: laneOf(participant.selectedPosition),
         championId: participant.championId,
-        ...(assetVersion === undefined ? {} : { assetVersion }),
         scope: 'all' as const,
         updatedAt: Date.now()
       };
@@ -266,21 +258,15 @@ export class MatchService {
       let historyErrorCode: PlayerDataErrorCode | undefined;
       let diagnostic: Diagnostic | undefined;
       let rank = cached?.rank;
-      if (!cached && !hiddenIdentity) {
-        try {
-          const ranked = rankedStatsSchema.parse(playerPuuid && this.sgp
+      // Start optional rank lookup alongside, not ahead of, required history.
+      const rankRequest = !cached && !hiddenIdentity ? optionalWithin(Promise.resolve().then(async () => {
+          checkCancelled(signal);
+          return rankedStatsSchema.parse(playerPuuid && this.sgp
             ? await this.sgp.getRankedStats(playerPuuid)
             : await this.client.get(
               `/lol-ranked/v1/ranked-stats/${encodeURIComponent(lookupId)}`, rankedStatsSchema
             ));
-          const rankQueueType = queueId === 440 ? 'RANKED_FLEX_SR' : 'RANKED_SOLO_5x5';
-          const selectedRank = ranked.queues.find((queue) => queue.queueType === rankQueueType);
-          if (selectedRank) rank = formatRank(selectedRank.tier, selectedRank.division, selectedRank.leaguePoints);
-        } catch {
-          checkCancelled(signal);
-          rank = undefined;
-        }
-      }
+        }), signal) : Promise.resolve(undefined);
       checkCancelled(signal);
       if (!cached && !hiddenIdentity) {
         let historySource: 'lcu' | 'sgp' = playerPuuid && this.sgp ? 'sgp' : 'lcu';
@@ -301,6 +287,14 @@ export class MatchService {
         }
       }
       if (hiddenIdentity) { matches = null; historyErrorCode = 'PRIVACY_RESTRICTED'; }
+      const [[assetVersion, itemIcons, championMetadata], ranked] = await Promise.all([metadata, rankRequest]);
+      if (ranked) {
+        const rankQueueType = queueId === 440 ? 'RANKED_FLEX_SR' : 'RANKED_SOLO_5x5';
+        const selectedRank = ranked.queues.find(queue => queue.queueType === rankQueueType);
+        if (selectedRank) rank = formatRank(selectedRank.tier, selectedRank.division, selectedRank.leaguePoints);
+      }
+      const itemIconPaths = itemIcons ?? {};
+      const champions = championMetadata ?? {};
       checkCancelled(signal);
       const recentMatches = matches ?? [];
       const wins = recentMatches.filter((match) => match.win).length;
@@ -308,6 +302,7 @@ export class MatchService {
       const currentChampionWins = championMatches.filter((match) => match.win).length;
       const player: PlayerSnapshot = {
         ...base,
+        ...(assetVersion === undefined ? {} : { assetVersion }),
         ...(champions[base.championId] ? { championName: champions[base.championId].name } : {}),
         itemIconPaths: Object.fromEntries(recentMatches.flatMap((match) => (match.itemIds ?? [])
           .filter((id) => itemIconPaths[String(id)])

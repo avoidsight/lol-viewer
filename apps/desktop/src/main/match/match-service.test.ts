@@ -36,6 +36,68 @@ function deferred<T>() {
 }
 
 describe('MatchService', () => {
+  it('starts history before optional assets/ranks settle and bounds the optional wait', async () => {
+    vi.useFakeTimers();
+    try {
+      const lateRank = deferred<{ queues: Array<{ queueType: string; tier: string; division: string; leaguePoints: number }> }>();
+      const get = vi.fn(async (path: string) => {
+        if (path === '/lol-gameflow/v1/session') return { gameData: {
+          teamOne: participants.slice(0, 5).map(p => ({ ...p, puuid: `p-${p.summonerId}` })),
+          teamTwo: participants.slice(5).map(p => ({ ...p, puuid: `p-${p.summonerId}` })), queueId: 420 } };
+        if (path === '/lol-summoner/v1/current-summoner') return { summonerId: '1' };
+        if (path.includes('/matches?')) return history;
+        if (path.includes('/ranked-stats/')) return lateRank.promise;
+        throw new Error('unexpected request');
+      });
+      const progress = vi.fn();
+      const cache = { get: vi.fn(() => null), put: vi.fn() };
+      const result = new MatchService({ get } as LcuClient, { cache, staticData: {
+        getAssetVersion: () => new Promise(() => {}), getItemIconPaths: () => new Promise(() => {}),
+        getChampionMetadata: () => new Promise(() => {})
+      } }).loadLiveMatch('all', progress);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(get.mock.calls.filter(([p]) => p.includes('/matches?'))).toHaveLength(4);
+      expect(progress).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(progress).toHaveBeenCalledTimes(4);
+      await vi.advanceTimersByTimeAsync(3000);
+      const match = await result;
+      expect(match.players.every(p => p.status === 'ready' && p.sampleSize === 1 && p.rank === undefined)).toBe(true);
+      expect(progress).toHaveBeenCalledTimes(10);
+      expect(cache.put).toHaveBeenCalledTimes(10);
+      lateRank.resolve({ queues: [{ queueType: 'RANKED_SOLO_5x5', tier: 'GOLD', division: 'II', leaguePoints: 10 }] });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(match.players.every(p => p.rank === undefined)).toBe(true);
+      expect(progress).toHaveBeenCalledTimes(10);
+      expect(cache.put).toHaveBeenCalledTimes(10);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+  it('cancels optional waits promptly without emitting players or starting another batch', async () => {
+    vi.useFakeTimers();
+    try {
+      const controller = new AbortController();
+      const get = vi.fn(async (path: string) => {
+        if (path === '/lol-gameflow/v1/session') return { gameData: {
+          teamOne: participants.slice(0, 5).map(p => ({ ...p, puuid: `p-${p.summonerId}` })),
+          teamTwo: participants.slice(5).map(p => ({ ...p, puuid: `p-${p.summonerId}` })), queueId: 420 } };
+        if (path === '/lol-summoner/v1/current-summoner') return { summonerId: '1' };
+        if (path.includes('/matches?')) return history;
+        return new Promise(() => {});
+      });
+      const progress = vi.fn();
+      const cache = { get: vi.fn(() => null), put: vi.fn() };
+      const result = new MatchService({ get } as LcuClient, { cache }).loadLiveMatch('all', progress, controller.signal).catch(e => e);
+      await vi.advanceTimersByTimeAsync(0);
+      const started = get.mock.calls.length;
+      controller.abort();
+      expect(await result).toMatchObject({ code: 'MATCH_CANCELLED' });
+      expect(get.mock.calls).toHaveLength(started);
+      expect(progress).not.toHaveBeenCalled();
+      expect(cache.put).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
   it('loads allies when champion select hides the enemy roster and never queries hidden identities', async () => {
     const get = vi.fn(async (path: string) => {
       if (path === '/lol-gameflow/v1/session') return { phase: 'ChampSelect', gameData: { gameId: 123, teamOne: [], teamTwo: [], queueId: 440 } };
@@ -321,13 +383,14 @@ describe('MatchService', () => {
     const onPlayer = vi.fn();
     const pending = new MatchService({ get } as LcuClient, { cache }).loadLiveMatch('all', onPlayer, controller.signal);
     await rankStarted.promise;
+    const historyRequestsBeforeCancel = get.mock.calls.filter(([path]) => String(path).includes('/matches?')).length;
     controller.abort();
     releaseRank.resolve();
 
     await expect(pending).rejects.toMatchObject({ code: 'MATCH_CANCELLED', message: 'Live match request cancelled' });
     expect(onPlayer).not.toHaveBeenCalled();
     expect(cache.put).not.toHaveBeenCalled();
-    expect(get.mock.calls.filter(([path]) => String(path).includes('/matches?'))).toHaveLength(0);
+    expect(get.mock.calls.filter(([path]) => String(path).includes('/matches?'))).toHaveLength(historyRequestsBeforeCancel);
   });
   it('returns ARAM metadata, preserves roster order, and keeps all-mode histories', async () => {
     const aramParticipants = participants.map(({ selectedPosition: _selectedPosition, ...participant }) => participant);
@@ -625,6 +688,8 @@ describe('MatchService', () => {
     let maximum = 0;
     const get = vi.fn(async (path: string) => {
       if (path === '/lol-gameflow/v1/session') return { gameData: { teamOne: participants.slice(0, 5), teamTwo: participants.slice(5), queueId: 420 } };
+      // Count the expensive history calls, not optional metadata now running alongside them.
+      if (!path.includes('/matches?')) return history;
       active += 1;
       maximum = Math.max(maximum, active);
       await new Promise<void>((resolve) => setTimeout(resolve, 5));
